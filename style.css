@@ -1,0 +1,253 @@
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Cinzel', 'Trajan Pro', 'Times New Roman', serif;
+    background-color: #d4cfc4;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" /></filter><rect width="400" height="400" filter="url(%23noise)" opacity="0.05"/></svg>');
+    background-size: 100px 100px, 100px 100px, 400px 400px;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2a2520;
+    position: relative;
+}
+
+/* Marble texture overlay */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background:
+        radial-gradient(ellipse at 20% 30%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(200, 190, 180, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(220, 210, 200, 0.1) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.container {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 60px 40px;
+    max-width: 600px;
+    width: 100%;
+}
+
+/* Header Styles */
+.main-header {
+    margin-bottom: 60px;
+}
+
+.title {
+    font-size: 3.5rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: #1a1612;
+    text-shadow:
+        2px 2px 0px rgba(255, 255, 255, 0.3),
+        -1px -1px 0px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    font-family: 'Cinzel', serif;
+}
+
+/* Game Menu Styles */
+.game-menu {
+    background: linear-gradient(135deg,
+            rgba(255, 255, 255, 0.2) 0%,
+            rgba(240, 235, 225, 0.15) 100%);
+    border: 2px solid rgba(100, 90, 80, 0.2);
+    border-radius: 2px;
+    padding: 40px 60px;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+}
+
+.game-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.game-list li {
+    position: relative;
+}
+
+.game-link {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: #2a2520;
+    text-decoration: none;
+    padding: 14px 24px;
+    border-bottom: 1px solid rgba(100, 90, 80, 0.25);
+    transition: all 0.3s ease;
+    position: relative;
+    background: transparent;
+}
+
+.game-link::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 1px;
+    background: linear-gradient(90deg, #8b7355 0%, transparent 100%);
+    transition: width 0.3s ease;
+}
+
+.game-link:hover {
+    color: #1a1612;
+    background: rgba(139, 115, 85, 0.08);
+    border-bottom-color: rgba(100, 90, 80, 0.4);
+    padding-left: 36px;
+}
+
+.game-link:hover::before {
+    width: 20px;
+}
+
+.game-link:active {
+    transform: translateY(1px);
+}
+
+/* Coming Soon Games */
+.game-link.coming-soon {
+    color: rgba(42, 37, 32, 0.35);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.game-link.coming-soon:hover {
+    background: transparent;
+    border-bottom-color: rgba(100, 90, 80, 0.25);
+    padding-left: 24px;
+}
+
+.game-link.coming-soon:hover::before {
+    width: 0;
+}
+
+.game-link.coming-soon:active {
+    transform: none;
+}
+
+/* Copyright Footer */
+.copyright {
+    margin-top: 40px;
+    text-align: center;
+    padding: 20px 0;
+    border-top: 1px solid rgba(100, 90, 80, 0.2);
+}
+
+.copyright p {
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    color: rgba(42, 37, 32, 0.6);
+    font-weight: 400;
+}
+
+/* Extra Buttons Styles */
+.extra-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 30px;
+    align-items: center;
+}
+
+.action-btn {
+    display: inline-block;
+    padding: 12px 30px;
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #2a2520;
+    background: transparent;
+    border: 2px solid rgba(100, 90, 80, 0.4);
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    min-width: 200px;
+    text-align: center;
+    letter-spacing: 0.1em;
+}
+
+.action-btn:hover {
+    background: rgba(139, 115, 85, 0.1);
+    border-color: #8b7355;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:active {
+    transform: translateY(0);
+}
+
+.back-btn {
+    font-size: 0.9rem;
+    padding: 10px 25px;
+    opacity: 0.8;
+}
+
+.back-btn:hover {
+    opacity: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .title {
+        font-size: 2.5rem;
+        letter-spacing: 0.12em;
+    }
+
+    .container {
+        padding: 40px 20px;
+    }
+
+    .game-menu {
+        padding: 30px 30px;
+    }
+
+    .game-link {
+        font-size: 1.1rem;
+        padding: 12px 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .title {
+        font-size: 2rem;
+        letter-spacing: 0.1em;
+    }
+
+    .game-menu {
+        padding: 25px 20px;
+    }
+
+    .game-link {
+        font-size: 1rem;
+        padding: 10px 16px;
+    }
+}
+
+/* Google Fonts Import */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;700&display=swap');

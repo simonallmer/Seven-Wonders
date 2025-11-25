@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gardens - Seven Wonders</title>
+    <meta name="description" content="Play Gardens, an ancient strategy game from the Seven Wonders series">
+    <link rel="stylesheet" href="gardens-style.css">
+</head>
+
+<body>
+    <a href="index.html" class="back-link">← Back to Seven Wonders</a>
+
+    <header class="game-header">
+        <h1 class="game-title">GARDENS</h1>
+        <p class="game-subtitle">The Hanging Gardens of Babylon</p>
+    </header>
+
+    <div class="status-panel">
+        <div class="turn-display">
+            <div class="current-player-indicator" id="current-player-color"></div>
+            <span id="game-status">White to move. Select a stone to move.</span>
+        </div>
+        <div id="hand-display" class="hand-display hidden">
+            <span>In Hand: </span>
+            <div class="hand-stones" id="hand-stones"></div>
+        </div>
+        <div class="stone-counts">
+            <span>White: <span id="white-count">0</span></span>
+            <span>Black: <span id="black-count">0</span></span>
+        </div>
+    </div>
+
+    <div class="board-container">
+        <div class="gardens-board">
+            <!-- Left garden fields -->
+            <div class="garden-column left-gardens">
+                <div class="garden-field" data-garden="0"></div>
+                <div class="stairs"></div>
+                <div class="garden-field" data-garden="1"></div>
+            </div>
+
+            <!-- Main playing areas -->
+            <div class="playing-areas">
+                <!-- Top playing field (5x3) -->
+                <div class="playing-field top-field" id="top-field"></div>
+
+                <!-- Wall separator -->
+                <div class="wall-separator"></div>
+
+                <!-- Bottom playing field (5x3) -->
+                <div class="playing-field bottom-field" id="bottom-field"></div>
+            </div>
+
+            <!-- Right garden fields -->
+            <div class="garden-column right-gardens">
+                <div class="garden-field" data-garden="3"></div>
+                <div class="stairs"></div>
+                <div class="garden-field" data-garden="2"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-buttons">
+        <button id="cancel-button" class="action-btn cancel-btn hidden">Cancel Move</button>
+        <button id="reset-button" class="action-btn reset-btn">New Game</button>
+    </div>
+
+    <div id="message-box" class="message-box hidden"></div>
+
+    <footer class="game-footer">
+        <p>Game Design: Simon Allmer</p>
+    </footer>
+
+    <script src="gardens-game.js"></script>
+</body>
+
+</html>

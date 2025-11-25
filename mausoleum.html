@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mausoleum - Seven Wonders</title>
+    <meta name="description" content="Play Mausoleum, an ancient strategy game from the Seven Wonders series">
+    <link rel="stylesheet" href="mausoleum-style.css">
+</head>
+
+<body>
+    <!-- Back to Menu -->
+    <a href="index.html" class="back-link">← Back to Seven Wonders</a>
+
+    <!-- Header -->
+    <header class="game-header">
+        <h1 class="game-title">MAUSOLEUM</h1>
+        <p class="game-subtitle">The Mausoleum at Halicarnassus</p>
+    </header>
+
+    <!-- Game Status -->
+    <div class="status-panel">
+        <div class="turn-display">
+            <span>Current Turn: </span>
+            <span id="current-player" class="player-name">White</span>
+        </div>
+        <div class="stone-counts">
+            <span>White Stones: <strong id="player1-count">9</strong></span>
+            <span class="separator">•</span>
+            <span>Black Stones: <strong id="player2-count">9</strong></span>
+        </div>
+    </div>
+
+    <!-- Game Board -->
+    <div class="board-wrapper">
+        <svg id="game-board" viewBox="0 0 100 100"></svg>
+    </div>
+
+    <!-- Reset Button -->
+    <button id="reset-button" class="action-btn">New Game</button>
+
+    <!-- Message Box (Game Over) -->
+    <div id="message-box" class="message-overlay">
+        <div class="message-content">
+            <h2 id="message-title" class="message-title"></h2>
+            <p id="message-text" class="message-text"></p>
+            <button id="message-ok-button" class="action-btn">Play Again</button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="game-footer">
+        <p>Game Design: Simon Allmer</p>
+    </footer>
+
+    <script src="mausoleum-game.js"></script>
+</body>
+
+</html>

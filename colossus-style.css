@@ -1,0 +1,317 @@
+/* Import Cinzel font */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;700&display=swap');
+
+:root {
+    --marble-bg: #d4cfc4;
+    --dark-stone: #2a2520;
+    --player1-color: #ffffff;
+    --player2-color: #1a1a1a;
+    --selection-glow: #f59e0b;
+    --valid-move: #10b981;
+    --direction-field: #ef4444;
+    --border-color: rgba(100, 90, 80, 0.3);
+    --cell-size: min(8vmin, 50px);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Cinzel', serif;
+    background-color: var(--marble-bg);
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" /></filter><rect width="400" height="400" filter="url(%23noise)" opacity="0.05"/></svg>');
+    background-size: 100px 100px, 100px 100px, 400px 400px;
+    min-height: 100vh;
+    color: var(--dark-stone);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background:
+        radial-gradient(ellipse at 20% 30%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(200, 190, 180, 0.15) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.back-link {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: var(--dark-stone);
+    text-decoration: none;
+    font-size: 0.95rem;
+    letter-spacing: 0.05em;
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+    z-index: 10;
+}
+
+.back-link:hover {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.game-header {
+    text-align: center;
+    margin: 40px 0 20px;
+    z-index: 1;
+}
+
+.game-title {
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--dark-stone);
+    text-shadow:
+        2px 2px 0px rgba(255, 255, 255, 0.3),
+        -1px -1px 0px rgba(0, 0, 0, 0.1);
+    margin-bottom: 8px;
+}
+
+.game-subtitle {
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    color: rgba(42, 37, 32, 0.7);
+}
+
+.status-panel {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(240, 235, 225, 0.2) 100%);
+    border: 1px solid var(--border-color);
+    padding: 16px 24px;
+    margin: 20px 0;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    max-width: 600px;
+    width: 100%;
+    z-index: 1;
+}
+
+.turn-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.current-player-indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin-right: 12px;
+    border: 2px solid var(--dark-stone);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.stone-counts {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    font-size: 0.9rem;
+}
+
+.board-wrapper {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0;
+    z-index: 1;
+}
+
+.board-container {
+    display: grid;
+    grid-template-columns: repeat(11, var(--cell-size));
+    grid-template-rows: repeat(11, var(--cell-size));
+    gap: 1px;
+    background: var(--border-color);
+    border: 2px solid var(--border-color);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.cell {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(240, 235, 225, 0.1) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.2s;
+}
+
+.cell.inactive {
+    background: transparent;
+    cursor: default;
+    pointer-events: none;
+}
+
+.cell.direction-field {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(220, 38, 38, 0.2) 100%);
+}
+
+.cell.direction-field::after {
+    content: '▼';
+    font-size: 1.2rem;
+    color: var(--direction-field);
+    position: absolute;
+}
+
+.cell.direction-up::after {
+    content: '▲';
+}
+
+.cell.direction-down::after {
+    content: '▼';
+}
+
+.cell.direction-left::after {
+    content: '◀';
+}
+
+.cell.direction-right::after {
+    content: '▶';
+}
+
+.cell.valid-move {
+    background: rgba(16, 185, 129, 0.4);
+    box-shadow: inset 0 0 10px rgba(16, 185, 129, 0.6);
+}
+
+.stone {
+    width: 70%;
+    height: 70%;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+
+.stone.white {
+    background: var(--player1-color);
+    border: 2px solid rgba(107, 114, 128, 0.5);
+}
+
+.stone.black {
+    background: var(--player2-color);
+    border: 2px solid rgba(75, 85, 99, 0.5);
+}
+
+.stone.selected {
+    transform: scale(1.15);
+    box-shadow: 0 0 15px 5px var(--selection-glow);
+    z-index: 10;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 16px;
+    margin: 20px 0;
+    z-index: 1;
+}
+
+.action-btn {
+    font-family: 'Cinzel', serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    padding: 12px 24px;
+    border: 2px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.cancel-btn {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.9) 0%, rgba(245, 158, 11, 0.85) 100%);
+    color: var(--dark-stone);
+}
+
+.cancel-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.9) 100%);
+    transform: translateY(-2px);
+}
+
+.reset-btn {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.9) 0%, rgba(220, 38, 38, 0.85) 100%);
+    color: white;
+}
+
+.reset-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.95) 0%, rgba(185, 28, 28, 0.9) 100%);
+    transform: translateY(-2px);
+}
+
+.action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.message-box {
+    background: linear-gradient(135deg, rgba(55, 65, 81, 0.95) 0%, rgba(31, 41, 55, 0.9) 100%);
+    border: 1px solid rgba(156, 163, 175, 0.3);
+    color: #f3f4f6;
+    padding: 16px 24px;
+    margin: 16px 0;
+    max-width: 600px;
+    width: 100%;
+    text-align: center;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+}
+
+.game-footer {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: rgba(42, 37, 32, 0.6);
+    z-index: 1;
+}
+
+@media (max-width: 768px) {
+    .game-title {
+        font-size: 2.5rem;
+    }
+
+    :root {
+        --cell-size: min(7vmin, 40px);
+    }
+}
+
+@media (max-width: 480px) {
+    .game-title {
+        font-size: 2rem;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+        width: 100%;
+        max-width: 300px;
+    }
+
+    .action-btn {
+        width: 100%;
+    }
+}
