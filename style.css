@@ -168,10 +168,9 @@ body::before {
 /* Extra Buttons Styles */
 .extra-buttons {
     display: flex;
-    flex-direction: column;
-    gap: 15px;
+    gap: 16px;
+    justify-content: center;
     margin-top: 30px;
-    align-items: center;
 }
 
 .action-btn {

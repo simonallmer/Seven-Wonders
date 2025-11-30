@@ -170,6 +170,18 @@ function drawBoard() {
             } else {
                 if (cellData.directionField) {
                     cell.classList.add('direction-field', `direction-${cellData.directionField}`);
+
+                    // Add clickable arrow if in gravity selection mode
+                    if (gameState === 'SELECT_GRAVITY_ORDER' &&
+                        pendingGravityDirections.includes(cellData.directionField)) {
+                        const arrow = document.createElement('div');
+                        arrow.classList.add('gravity-arrow-overlay', `arrow-${cellData.directionField}`);
+                        arrow.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            handleGravityChoice(cellData.directionField);
+                        });
+                        cell.appendChild(arrow);
+                    }
                 }
 
                 if (validMoves.some(m => m.row === r && m.col === c)) {
@@ -386,15 +398,17 @@ function handleCellClick(row, col) {
 }
 
 function executeMove(move) {
+    let newlyActivatedDir = null;
+
     if (move.type === 'run') {
         // Simple run movement
         board[move.row][move.col].piece = board[selectedStone.row][selectedStone.col].piece;
         board[selectedStone.row][selectedStone.col].piece = null;
         lastPushedStone = null;
 
-        // Check for direction field activation
+        // Check if landed on direction field
         if (board[move.row][move.col].directionField) {
-            handleTilt(board[move.row][move.col].directionField);
+            newlyActivatedDir = board[move.row][move.col].directionField;
         }
     } else if (move.type === 'push') {
         // Push movement
@@ -410,68 +424,127 @@ function executeMove(move) {
         // Record pushed stone to prevent immediate push-back
         lastPushedStone = { row: move.pushTo.row, col: move.pushTo.col };
 
-        // Check for direction field activation on pushed stone
+        // Check if pushed stone landed on direction field
         if (board[move.pushTo.row][move.pushTo.col].directionField) {
-            handleTilt(board[move.pushTo.row][move.pushTo.col].directionField);
+            newlyActivatedDir = board[move.pushTo.row][move.pushTo.col].directionField;
         }
     }
 
-    // Check for Hades after movement
-    checkAndRemoveHades();
-
-    // End turn
-    endTurn();
+    // Resolve Gravity after movement
+    resolveGravity(newlyActivatedDir);
 }
 
-function handleTilt(direction) {
-    const activatedFields = [direction];
-    processTilts(activatedFields);
-}
+function resolveGravity(prioritizedDir = null) {
+    // 1. Identify active directions
+    const activeDirections = [];
+    DIRECTION_FIELDS.forEach(({ row, col, dir }) => {
+        if (board[row][col].piece) {
+            activeDirections.push(dir);
+        }
+    });
 
-function processTilts(activatedDirections) {
-    // Check for opposite directions (they cancel out)
-    const hasUp = activatedDirections.includes('up');
-    const hasDown = activatedDirections.includes('down');
-    const hasLeft = activatedDirections.includes('left');
-    const hasRight = activatedDirections.includes('right');
-
-    if ((hasUp && hasDown) || (hasLeft && hasRight)) {
-        showMessage("Opposite direction fields activated - no tilt occurs!");
+    if (activeDirections.length === 0) {
+        checkAndRemoveHades();
+        endTurn();
         return;
     }
 
-    // Process each unique direction
-    const uniqueDirections = [...new Set(activatedDirections)];
+    // 2. Handle Opposing Directions (Cancellation)
+    const hasUp = activeDirections.includes('up');
+    const hasDown = activeDirections.includes('down');
+    const hasLeft = activeDirections.includes('left');
+    const hasRight = activeDirections.includes('right');
 
-    uniqueDirections.forEach(dir => {
-        tiltBoard(dir);
+    let effectiveDirections = [...new Set(activeDirections)];
+
+    if (hasUp && hasDown) {
+        effectiveDirections = effectiveDirections.filter(d => d !== 'up' && d !== 'down');
+        showMessage("Opposing gravity (Up/Down) neutralizes!");
+    }
+    if (hasLeft && hasRight) {
+        effectiveDirections = effectiveDirections.filter(d => d !== 'left' && d !== 'right');
+        showMessage("Opposing gravity (Left/Right) neutralizes!");
+    }
+
+    if (effectiveDirections.length === 0) {
         checkAndRemoveHades();
+        endTurn();
+        return;
+    }
+
+    // 3. Apply prioritized direction first if it exists
+    if (prioritizedDir && effectiveDirections.includes(prioritizedDir)) {
+        tiltBoard(prioritizedDir);
+        effectiveDirections = effectiveDirections.filter(d => d !== prioritizedDir);
+
+        if (effectiveDirections.length === 0) {
+            checkAndRemoveHades();
+            endTurn();
+            return;
+        }
+    }
+
+    // 4. Handle remaining directions
+    if (effectiveDirections.length === 1) {
+        tiltBoard(effectiveDirections[0]);
+        checkAndRemoveHades();
+        endTurn();
+    } else if (effectiveDirections.length > 1) {
+        // Multiple non-opposing directions (e.g., Up + Left)
+        // Player must choose order
+        gameState = 'SELECT_GRAVITY_ORDER';
+        pendingGravityDirections = effectiveDirections;
+        updateStatus(`Gravity Conflict! Click a directional field to choose which direction applies first.`);
+        drawBoard(); // Redraw to show arrows
+    }
+}
+
+let pendingGravityDirections = [];
+
+// Removed - arrows now shown on board via drawBoard
+
+function handleGravityChoice(firstDirection) {
+    if (gameState !== 'SELECT_GRAVITY_ORDER') return;
+
+    hideMessage(); // Hide any previous messages
+
+    // Apply first direction
+    tiltBoard(firstDirection);
+
+    // Apply remaining directions
+    const remainingDirections = pendingGravityDirections.filter(d => d !== firstDirection);
+    remainingDirections.forEach(dir => {
+        tiltBoard(dir);
     });
+
+    checkAndRemoveHades();
+    endTurn();
 }
 
 function tiltBoard(direction) {
-    const newActivations = [];
-
-    // Determine slide direction - stones slide in the direction the arrow points
+    // Determine slide direction
     let dr = 0, dc = 0;
-    if (direction === 'up') dr = -1;      // Arrow points up - slide upward
-    if (direction === 'down') dr = 1;     // Arrow points down - slide downward
-    if (direction === 'left') dc = -1;    // Arrow points left - slide left
-    if (direction === 'right') dc = 1;    // Arrow points right - slide right
+    if (direction === 'up') dr = -1;
+    if (direction === 'down') dr = 1;
+    if (direction === 'left') dc = -1;
+    if (direction === 'right') dc = 1;
 
-    // Slide all stones in the direction
     let moved = true;
-    while (moved) {
+    // Limit iterations to prevent infinite loops in weird edge cases
+    let iterations = 0;
+
+    while (moved && iterations < BOARD_SIZE * 2) {
         moved = false;
+        iterations++;
 
         // Iterate in the direction of gravity
-        const startR = dr < 0 ? 0 : (dr > 0 ? BOARD_SIZE - 1 : 0);
-        const endR = dr < 0 ? BOARD_SIZE : (dr > 0 ? -1 : BOARD_SIZE);
-        const stepR = dr < 0 ? 1 : (dr > 0 ? -1 : 1);
+        const startR = dr > 0 ? BOARD_SIZE - 1 : 0;
+        const endR = dr > 0 ? -1 : BOARD_SIZE;
+        const stepR = dr > 0 ? -1 : 1;
 
-        const startC = dc < 0 ? 0 : (dc > 0 ? BOARD_SIZE - 1 : 0);
-        const endC = dc < 0 ? BOARD_SIZE : (dc > 0 ? -1 : BOARD_SIZE);
-        const stepC = dc < 0 ? 1 : (dc > 0 ? -1 : 1);
+        const startC = dc > 0 ? BOARD_SIZE - 1 : 0;
+        const endC = dc > 0 ? -1 : BOARD_SIZE;
+        const stepC = dc > 0 ? -1 : 1;
 
         for (let r = startR; r !== endR; r += stepR) {
             for (let c = startC; c !== endC; c += stepC) {
@@ -483,30 +556,30 @@ function tiltBoard(direction) {
                         board[newR][newC].piece = board[r][c].piece;
                         board[r][c].piece = null;
                         moved = true;
-
-                        // Check if landed on direction field
-                        if (board[newR][newC].directionField) {
-                            newActivations.push(board[newR][newC].directionField);
-                        }
                     }
                 }
             }
         }
     }
-
-    // Process cascading tilts
-    if (newActivations.length > 0) {
-        processTilts(newActivations);
-    }
 }
 
 function checkAndRemoveHades() {
+    const visited = new Set();
     const toRemove = [];
 
     for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
-            if (board[r][c].piece && isEncircled(r, c)) {
-                toRemove.push({ row: r, col: c });
+            const key = `${r},${c}`;
+            if (board[r][c].piece && !visited.has(key)) {
+                const { group, liberties } = getGroupAndLiberties(r, c, board[r][c].piece);
+
+                // Mark group as visited
+                group.forEach(stone => visited.add(`${stone.row},${stone.col}`));
+
+                // If no liberties, the entire group is captured
+                if (liberties === 0) {
+                    toRemove.push(...group);
+                }
             }
         }
     }
@@ -520,25 +593,46 @@ function checkAndRemoveHades() {
     }
 }
 
-function isEncircled(row, col) {
-    const directions = [{ dr: -1, dc: 0 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: 0, dc: 1 }];
+function getGroupAndLiberties(startR, startC, color) {
+    const group = [];
+    let liberties = 0;
+    const queue = [{ row: startR, col: startC }];
+    const visited = new Set();
+    const visitedLiberties = new Set(); // To avoid counting the same liberty multiple times
 
-    for (const { dr, dc } of directions) {
-        const adjR = row + dr;
-        const adjC = col + dc;
+    visited.add(`${startR},${startC}`);
 
-        // If adjacent cell is out of bounds or inactive, not encircled
-        if (!isInBounds(adjR, adjC)) {
-            return false;
-        }
+    while (queue.length > 0) {
+        const { row, col } = queue.shift();
+        group.push({ row, col });
 
-        // If adjacent cell is empty, not encircled
-        if (!board[adjR][adjC].piece) {
-            return false;
+        const directions = [{ dr: -1, dc: 0 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: 0, dc: 1 }];
+
+        for (const { dr, dc } of directions) {
+            const adjR = row + dr;
+            const adjC = col + dc;
+            const adjKey = `${adjR},${adjC}`;
+
+            if (isInBounds(adjR, adjC)) {
+                const neighborPiece = board[adjR][adjC].piece;
+
+                if (!neighborPiece) {
+                    // Empty spot = Liberty
+                    if (!visitedLiberties.has(adjKey)) {
+                        liberties++;
+                        visitedLiberties.add(adjKey);
+                    }
+                } else if (neighborPiece === color && !visited.has(adjKey)) {
+                    // Friendly stone = Part of group
+                    visited.add(adjKey);
+                    queue.push({ row: adjR, col: adjC });
+                }
+            }
+            // Out of bounds / Inactive = Wall (No liberty)
         }
     }
 
-    return true;
+    return { group, liberties };
 }
 
 function cancelMove() {

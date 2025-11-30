@@ -47,13 +47,15 @@
     </div>
 
     <!-- Game Over Modal -->
-    <div id="game-over-modal" class="hidden">
-        <div class="message-overlay"></div>
+    <div id="game-over-modal" class="message-overlay hidden">
         <div class="message-content">
-            <h2 id="modal-title">Game Over</h2>
-            <p id="modal-text"></p>
+            <p id="modal-text" class="message-text"></p>
+            <button id="new-game-btn" class="action-btn reset-btn">NEW GAME</button>
         </div>
     </div>
+
+    <!-- Reset Button -->
+    <button id="reset-button-main" class="action-btn reset-btn" style="margin-top: 20px;">New Game</button>
 
     <!-- Footer -->
     <footer class="game-footer">

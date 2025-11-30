@@ -846,4 +846,4 @@ cancelButton.addEventListener('click', cancelMove);
 // ============================================
 
 document.addEventListener('DOMContentLoaded', initializeBoard);
-```
+

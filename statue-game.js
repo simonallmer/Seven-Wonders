@@ -47,9 +47,10 @@ const p2BoardCountDisplay = document.getElementById('p2-board-count');
 const btnPlace = document.getElementById('action-place');
 const btnDiminish = document.getElementById('action-diminish');
 const btnCancel = document.getElementById('action-cancel');
+const resetBtnMain = document.getElementById('reset-button-main');
 const gameOverModal = document.getElementById('game-over-modal');
-const modalTitle = document.getElementById('modal-title');
 const modalText = document.getElementById('modal-text');
+const newGameBtn = document.getElementById('new-game-btn');
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -137,7 +138,7 @@ function updateStatusDisplay() {
 }
 
 function showGameOverModal(title, text) {
-    modalTitle.textContent = title;
+    // Title is removed from modal, only text is shown
     modalText.textContent = text;
     gameOverModal.classList.remove('hidden');
     // Trigger reflow to enable transition
@@ -521,8 +522,23 @@ btnCancel.addEventListener('click', handleCancel);
 // ============================================
 // INITIALIZATION
 // ============================================
-window.addEventListener('load', () => {
+
+function startNewGame() {
+    currentDieId = 0;
+    onBoardDice = [];
+    reserveDice = { 1: 8, 2: 8 };
+    currentPlayer = 1;
+    gamePhase = 'ACTION_SELECT';
+    forcedTurnActive = false;
+    selectedDie = null;
+
     toggleActionButtons(true, false);
     renderBoard();
     hideGameOverModal();
-});
+    messageBox.textContent = "Player 1's turn. Click a die to move, or choose an action.";
+}
+
+newGameBtn.addEventListener('click', startNewGame);
+resetBtnMain.addEventListener('click', startNewGame);
+
+window.addEventListener('load', startNewGame);
