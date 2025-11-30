@@ -1,0 +1,281 @@
+/* Base Styles */
+:root {
+    --bg-color: #d4cfc4;
+    --dark-stone: #2a2520;
+    --border-color: rgba(100, 90, 80, 0.3);
+    --octagon-fill: #e8e3d8;
+    --octagon-stroke: #2a2520;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Cinzel', 'Trajan Pro', 'Times New Roman', serif;
+    background-color: var(--bg-color);
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 100px 100px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: var(--dark-stone);
+    padding: 20px;
+}
+
+/* Back Link */
+.back-link {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: var(--dark-stone);
+    text-decoration: none;
+    font-size: 0.95rem;
+    letter-spacing: 0.05em;
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+    z-index: 10;
+}
+
+.back-link:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(100, 90, 80, 0.5);
+}
+
+/* Header */
+.game-header {
+    text-align: center;
+    margin: 60px 0 30px 0;
+}
+
+.game-title {
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--dark-stone);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 8px;
+}
+
+.game-subtitle {
+    font-size: 1rem;
+    letter-spacing: 0.2em;
+    color: rgba(42, 37, 32, 0.7);
+    font-weight: 300;
+}
+
+/* Stone Boxes */
+.stone-boxes {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+.stone-box {
+    width: 120px;
+    border: 2px solid var(--octagon-stroke);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.box-label {
+    padding: 8px;
+    text-align: center;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    background: rgba(255, 255, 255, 0.3);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.box-content {
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.white-box .box-content {
+    background: #f5f5f5;
+}
+
+.white-box .box-content:hover {
+    background: #e8e8e8;
+}
+
+.black-box .box-content {
+    background: #2a2520;
+}
+
+.black-box .box-content:hover {
+    background: #1a1510;
+}
+
+.stone-count {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.white-box .stone-count {
+    color: #666;
+}
+
+.black-box .stone-count {
+    color: #ccc;
+}
+
+.box-content.selected {
+    box-shadow: inset 0 0 0 3px #d4a574;
+}
+
+/* Rotation Controls */
+.rotation-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+.rotate-btn {
+    width: 50px;
+    height: 50px;
+    border: 2px solid var(--octagon-stroke);
+    background: rgba(255, 255, 255, 0.3);
+    color: var(--dark-stone);
+    font-size: 1.5rem;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rotate-btn:hover {
+    background: rgba(255, 255, 255, 0.5);
+    transform: scale(1.1);
+}
+
+.rotate-btn:active {
+    transform: scale(0.95);
+}
+
+.rotation-label {
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    color: rgba(42, 37, 32, 0.7);
+}
+
+/* Board */
+.board-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 20px 0;
+}
+
+#game-board {
+    width: 100%;
+    max-width: 600px;
+    height: auto;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+/* Octagon Levels */
+.octagon-level {
+    fill: var(--octagon-fill);
+    stroke: var(--octagon-stroke);
+    stroke-width: 2;
+    transition: fill 0.2s ease;
+}
+
+/* Edge Positions */
+.edge-position {
+    fill: rgba(212, 165, 116, 0.3);
+    stroke: var(--octagon-stroke);
+    stroke-width: 1.5;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.edge-position:hover {
+    fill: rgba(212, 165, 116, 0.6);
+    stroke-width: 2;
+}
+
+.edge-position.valid-move {
+    fill: rgba(100, 200, 100, 0.4);
+    stroke: #2d5016;
+    stroke-width: 2;
+}
+
+.edge-position.selected {
+    fill: rgba(212, 165, 116, 0.8);
+    stroke-width: 2.5;
+}
+
+/* Stones */
+.stone {
+    pointer-events: none;
+}
+
+.stone-white {
+    fill: #f5f5f5;
+    stroke: #2a2520;
+    stroke-width: 2;
+}
+
+.stone-black {
+    fill: #1a1a1a;
+    stroke: #2a2520;
+    stroke-width: 2;
+}
+
+/* Status Panel */
+.status-panel {
+    text-align: center;
+    margin: 20px 0;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    max-width: 600px;
+}
+
+.turn-display {
+    font-size: 1.1rem;
+    letter-spacing: 0.05em;
+    color: var(--dark-stone);
+}
+
+/* Footer */
+.game-footer {
+    margin-top: auto;
+    padding: 20px;
+    text-align: center;
+    color: rgba(42, 37, 32, 0.6);
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .game-title {
+        font-size: 2.5rem;
+    }
+
+    #game-board {
+        max-width: 90vw;
+    }
+}
