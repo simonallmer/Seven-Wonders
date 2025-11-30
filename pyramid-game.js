@@ -20,7 +20,7 @@ let currentPlayer = 'white';
 let selectedStone = null;
 let validMoves = [];
 let gameState = 'SELECT_STONE';
-let lastPushedStone = null;
+let lastPush = null;
 
 // ============================================
 // DOM ELEMENTS
@@ -33,6 +33,9 @@ const topCountElement = document.getElementById('top-count');
 const messageBox = document.getElementById('message-box');
 const resetButton = document.getElementById('reset-button');
 const cancelButton = document.getElementById('cancel-button');
+const gameOverModal = document.getElementById('game-over-modal');
+const modalTitle = document.getElementById('modal-title');
+const modalText = document.getElementById('modal-text');
 
 // ============================================
 // INITIALIZATION
@@ -81,12 +84,30 @@ function initializePyramid() {
     selectedStone = null;
     validMoves = [];
     gameState = 'SELECT_STONE';
-    lastPushedStone = null;
+    lastPush = null;
 
     drawPyramid();
     updateStatus();
     updateCounts();
+    updateCounts();
     hideMessage();
+    hideGameOverModal();
+}
+
+function showGameOverModal(title, text) {
+    modalTitle.textContent = title;
+    modalText.textContent = text;
+    gameOverModal.classList.remove('hidden');
+    // Trigger reflow to enable transition
+    void gameOverModal.offsetWidth;
+    gameOverModal.classList.add('visible');
+}
+
+function hideGameOverModal() {
+    gameOverModal.classList.remove('visible');
+    setTimeout(() => {
+        gameOverModal.classList.add('hidden');
+    }, 300);
 }
 
 function placeStartingStones() {
@@ -202,31 +223,37 @@ function updateCounts() {
     topCountElement.textContent = `${victoryStones}/4`;
 
     // Check win/draw conditions
-    if (victoryStones >= 4) {
-        // Find which player has stones on victory fields
-        let whiteVictory = 0, blackVictory = 0;
-        pyramid[2].forEach(row => {
-            row.forEach(cell => {
-                if (cell.victory && cell.piece === 'white') whiteVictory++;
-                if (cell.victory && cell.piece === 'black') blackVictory++;
-            });
+    // Check win/draw conditions
+
+    // Find which player has stones on victory fields
+    let whiteVictory = 0, blackVictory = 0;
+    pyramid[2].forEach(row => {
+        row.forEach(cell => {
+            if (cell.victory && cell.piece === 'white') whiteVictory++;
+            if (cell.victory && cell.piece === 'black') blackVictory++;
         });
-        const winner = whiteVictory >= 4 ? 'White' : 'Black';
+    });
+
+    if (whiteVictory >= 4) {
         gameState = 'GAME_OVER';
-        showMessage(`${winner} wins by reaching 4 stones on the victory fields!`);
-        updateStatus(`Game Over! ${winner} wins!`);
+        updateStatus(`Game Over! White wins!`);
+        showGameOverModal('White Wins!', 'White wins by occupying all 4 victory fields!');
+    } else if (blackVictory >= 4) {
+        gameState = 'GAME_OVER';
+        updateStatus(`Game Over! Black wins!`);
+        showGameOverModal('Black Wins!', 'Black wins by occupying all 4 victory fields!');
     } else if (whiteCount < 4 && blackCount < 4) {
         gameState = 'GAME_OVER';
-        showMessage('Draw! Both players have fewer than 4 stones.');
         updateStatus('Game Over! Draw!');
+        showGameOverModal('Draw!', 'Both players have fewer than 4 stones.');
     } else if (whiteCount < 4) {
         gameState = 'GAME_OVER';
-        showMessage('Black wins! White has fewer than 4 stones.');
         updateStatus('Game Over! Black wins!');
+        showGameOverModal('Black Wins!', 'Black wins! White has fewer than 4 stones.');
     } else if (blackCount < 4) {
         gameState = 'GAME_OVER';
-        showMessage('White wins! Black has fewer than 4 stones.');
         updateStatus('Game Over! White wins!');
+        showGameOverModal('White Wins!', 'White wins! Black has fewer than 4 stones.');
     }
 }
 
@@ -261,34 +288,61 @@ function calculateRunMoves(level, row, col) {
     const directions = [{ dr: -1, dc: 0 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: 0, dc: 1 }];
 
     directions.forEach(({ dr, dc }) => {
-        let r = row + dr;
-        let c = col + dc;
+        let currentLevel = level;
+        let r = row;
+        let c = col;
 
-        // Run on same level only (cannot run to higher levels)
-        while (isPlayable(level, r, c) && !pyramid[level][r][c].piece) {
-            moves.push({ level, row: r, col: c, type: 'run' });
-            r += dr;
-            c += dc;
-        }
-    });
+        while (true) {
+            // Calculate next position in current direction
+            let nextR = r + dr;
+            let nextC = c + dc;
+            let nextLevel = currentLevel;
 
-    // Run down to ALL lower levels (can run down through the entire pyramid)
-    for (let lowerLevel = level - 1; lowerLevel >= 0; lowerLevel--) {
-        // Calculate the offset between current level and lower level
-        const offset = (LEVELS[lowerLevel].size - LEVELS[level].size) / 2;
-        const targetR = row + offset;
-        const targetC = col + offset;
+            // Check if next position is off the current level
+            if (!isPlayable(currentLevel, nextR, nextC)) {
+                // Try to step down
+                if (currentLevel > 0) {
+                    nextLevel = currentLevel - 1;
+                    // Let's use this robust mapping.
+                    const currentOffset = (7 - LEVELS[currentLevel].size) / 2;
+                    const nextOffset = (7 - LEVELS[nextLevel].size) / 2;
 
-        if (isPlayable(lowerLevel, targetR, targetC)) {
-            if (pyramid[lowerLevel][targetR][targetC].piece) {
-                // Can smash any stone on any lower level
-                moves.push({ level: lowerLevel, row: targetR, col: targetC, type: 'smash' });
+                    const globalR = r + currentOffset;
+                    const globalC = c + currentOffset;
+                    const targetGlobalR = globalR + dr;
+                    const targetGlobalC = globalC + dc;
+
+                    nextR = targetGlobalR - nextOffset;
+                    nextC = targetGlobalC - nextOffset;
+                } else {
+                    // Cannot go lower than level 0
+                    break;
+                }
+            }
+
+            // Check if the new position is valid and playable
+            if (isPlayable(nextLevel, nextR, nextC)) {
+                if (pyramid[nextLevel][nextR][nextC].piece) {
+                    // Smash!
+                    // Only allow smash if we dropped a level. If same level, it's a blocker.
+                    if (nextLevel < currentLevel) {
+                        moves.push({ level: nextLevel, row: nextR, col: nextC, type: 'smash' });
+                    }
+                    break; // Stop after smash or block
+                } else {
+                    // Empty space, continue run
+                    moves.push({ level: nextLevel, row: nextR, col: nextC, type: 'run' });
+                    // Update current position for next iteration
+                    currentLevel = nextLevel;
+                    r = nextR;
+                    c = nextC;
+                }
             } else {
-                // Can also land on empty fields on lower levels
-                moves.push({ level: lowerLevel, row: targetR, col: targetC, type: 'run' });
+                // Not playable (e.g. corner of level 2 which is not playable, or off board of level 0)
+                break;
             }
         }
-    }
+    });
 
     return moves;
 }
@@ -331,27 +385,58 @@ function calculatePushMoves(level, row, col) {
         const adjR = row + dr;
         const adjC = col + dc;
 
+        // Check if there is a stone to push at (adjR, adjC)
         if (isPlayable(level, adjR, adjC) && pyramid[level][adjR][adjC].piece) {
             const pushR = adjR + dr;
             const pushC = adjC + dc;
 
-            // Check if can push on same level
-            if (isPlayable(level, pushR, pushC) && !pyramid[level][pushR][pushC].piece) {
-                if (!lastPushedStone || lastPushedStone.level !== adjR ||
-                    lastPushedStone.row !== adjR || lastPushedStone.col !== adjC) {
-                    moves.push({
-                        level, row: adjR, col: adjC, type: 'push',
-                        pushTo: { level, row: pushR, col: pushC }
-                    });
+            // 1. Try to push on the SAME level
+            if (isPlayable(level, pushR, pushC)) {
+                if (!pyramid[level][pushR][pushC].piece) {
+                    // Prevent pushing back:
+                    // If I am the stone that was just pushed (lastPush.pushed)
+                    // AND I am trying to push the stone that pushed me (lastPush.pusher)
+                    // THEN forbid.
+                    let isPushBack = false;
+                    if (lastPush) {
+                        const amIThePushedOne = (level === lastPush.pushed.level && row === lastPush.pushed.row && col === lastPush.pushed.col);
+                        const isTargetThePusher = (level === lastPush.pusher.level && adjR === lastPush.pusher.row && adjC === lastPush.pusher.col);
+                        if (amIThePushedOne && isTargetThePusher) {
+                            isPushBack = true;
+                        }
+                    }
+
+                    if (!isPushBack) {
+                        moves.push({
+                            level, row: adjR, col: adjC, type: 'push',
+                            pushTo: { level, row: pushR, col: pushC }
+                        });
+                    }
                 }
             }
+            // 2. If not playable on same level, check if it's a push to a LOWER level (or fall off Level 0)
+            else {
+                if (level > 0) {
+                    // Push down to lower level
+                    const lowerLevel = level - 1;
+                    const offset = (LEVELS[lowerLevel].size - LEVELS[level].size) / 2;
+                    const lowerPushR = pushR + offset;
+                    const lowerPushC = pushC + offset;
 
-            // Check if pushed stone falls off corner (level 0 only)
-            if (level === 0 && !isPlayable(level, pushR, pushC)) {
-                moves.push({
-                    level, row: adjR, col: adjC, type: 'push-fall',
-                    pushTo: null
-                });
+                    // Only allow push if the target on lower level is playable
+                    if (isPlayable(lowerLevel, lowerPushR, lowerPushC)) {
+                        moves.push({
+                            level, row: adjR, col: adjC, type: 'push',
+                            pushTo: { level: lowerLevel, row: lowerPushR, col: lowerPushC }
+                        });
+                    }
+                } else {
+                    // Level 0: Push off the board (FALL)
+                    moves.push({
+                        level, row: adjR, col: adjC, type: 'push-fall',
+                        pushTo: null
+                    });
+                }
             }
         }
     });
@@ -417,24 +502,41 @@ function executeMove(move) {
     if (move.type === 'run' || move.type === 'jump') {
         pyramid[move.level][move.row][move.col].piece = fromPiece;
         pyramid[selectedStone.level][selectedStone.row][selectedStone.col].piece = null;
-        lastPushedStone = null;
+        lastPush = null;
     } else if (move.type === 'smash') {
         const smashedPiece = pyramid[move.level][move.row][move.col].piece;
         pyramid[move.level][move.row][move.col].piece = fromPiece;
         pyramid[selectedStone.level][selectedStone.row][selectedStone.col].piece = null;
         showMessage(`${fromPiece} smashed ${smashedPiece}!`);
-        lastPushedStone = null;
+        lastPush = null;
     } else if (move.type === 'push') {
         const pushedPiece = pyramid[move.level][move.row][move.col].piece;
+
+        // Check if destination has a piece (Smash)
+        const targetPiece = pyramid[move.pushTo.level][move.pushTo.row][move.pushTo.col].piece;
+
         pyramid[move.pushTo.level][move.pushTo.row][move.pushTo.col].piece = pushedPiece;
         pyramid[move.level][move.row][move.col].piece = fromPiece;
         pyramid[selectedStone.level][selectedStone.row][selectedStone.col].piece = null;
-        lastPushedStone = { level: move.pushTo.level, row: move.pushTo.row, col: move.pushTo.col };
+
+        // Track the push event
+        lastPush = {
+            pusher: { level: move.level, row: move.row, col: move.col }, // Where the pusher ended up
+            pushed: { level: move.pushTo.level, row: move.pushTo.row, col: move.pushTo.col } // Where the pushed stone ended up
+        };
+
+        if (move.pushTo.level < move.level) {
+            if (targetPiece) {
+                showMessage(`DROP and SMASH! Stone dropped to level ${move.pushTo.level} and smashed ${targetPiece}!`);
+            } else {
+                showMessage(`DROP! Stone dropped to level ${move.pushTo.level}.`);
+            }
+        }
     } else if (move.type === 'push-fall') {
         pyramid[move.level][move.row][move.col].piece = fromPiece;
         pyramid[selectedStone.level][selectedStone.row][selectedStone.col].piece = null;
-        showMessage(`Stone pushed off the pyramid!`);
-        lastPushedStone = null;
+        showMessage(`FALL! Stone pushed off the pyramid!`);
+        lastPush = null;
     }
 
     // Check for Osiris
@@ -444,11 +546,104 @@ function executeMove(move) {
 }
 
 function checkAndRemoveOsiris() {
-    // Check each level for Osiris (surrounded stones in a line)
-    pyramid.forEach((grid, level) => {
-        // Check horizontal and vertical lines
-        // This is simplified - full implementation would check all line patterns
+    const opponent = currentPlayer === 'white' ? 'black' : 'white';
+    let stonesToRemove = [];
+
+    // Iterate through each level independently
+    LEVELS.forEach(({ level, size }) => {
+        const grid = pyramid[level];
+        const gridMap = [];
+
+        // Create a map for the current level
+        for (let r = 0; r < size; r++) {
+            const rowMap = [];
+            for (let c = 0; c < size; c++) {
+                if (grid[r][c].piece) {
+                    rowMap.push({ level, row: r, col: c });
+                } else {
+                    rowMap.push(null);
+                }
+            }
+            gridMap.push(rowMap);
+        }
+
+        // Check Rows
+        for (let r = 0; r < size; r++) {
+            const rowPieces = grid[r].map(cell => cell.piece);
+            // Active Capture
+            stonesToRemove.push(...checkLine(rowPieces, gridMap[r], currentPlayer, opponent));
+            // Passive Capture
+            stonesToRemove.push(...checkLine(rowPieces, gridMap[r], opponent, currentPlayer));
+        }
+
+        // Check Cols
+        for (let c = 0; c < size; c++) {
+            const colPieces = [];
+            const colMap = [];
+            for (let r = 0; r < size; r++) {
+                colPieces.push(grid[r][c].piece);
+                colMap.push(gridMap[r][c]);
+            }
+            // Active Capture
+            stonesToRemove.push(...checkLine(colPieces, colMap, currentPlayer, opponent));
+            // Passive Capture
+            stonesToRemove.push(...checkLine(colPieces, colMap, opponent, currentPlayer));
+        }
     });
+
+    if (stonesToRemove.length > 0) {
+        // Remove duplicates (in case a stone is captured both horizontally and vertically)
+        const uniqueStones = [];
+        const seen = new Set();
+        stonesToRemove.forEach(s => {
+            const key = `${s.level},${s.row},${s.col}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                uniqueStones.push(s);
+            }
+        });
+
+        uniqueStones.forEach(({ level, row, col }) => {
+            const piece = pyramid[level][row][col].piece;
+            pyramid[level][row][col].piece = null;
+            // Optional: Visual effect or message
+        });
+
+        showMessage(`Osiris! ${uniqueStones.length} stones captured!`);
+    }
+}
+
+function checkLine(line, map, player, opponent) {
+    const captured = [];
+    // Pattern: Player - Opponent(s) - Player
+    // Find all indices of Player
+    const playerIndices = [];
+    line.forEach((p, i) => {
+        if (p === player) playerIndices.push(i);
+    });
+
+    for (let i = 0; i < playerIndices.length - 1; i++) {
+        const start = playerIndices[i];
+        const end = playerIndices[i + 1];
+
+        // Check if everything between start and end is Opponent
+        if (end > start + 1) { // Must have at least one stone in between
+            let allOpponent = true;
+            for (let k = start + 1; k < end; k++) {
+                if (line[k] !== opponent) {
+                    allOpponent = false;
+                    break;
+                }
+            }
+
+            if (allOpponent) {
+                for (let k = start + 1; k < end; k++) {
+                    captured.push(map[k]);
+                }
+            }
+        }
+    }
+    return captured;
 }
 
 function cancelMove() {

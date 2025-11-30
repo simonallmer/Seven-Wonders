@@ -38,6 +38,9 @@ const blackCountElement = document.getElementById('black-count');
 const messageBox = document.getElementById('message-box');
 const resetButton = document.getElementById('reset-button');
 const cancelButton = document.getElementById('cancel-button');
+const gameOverModal = document.getElementById('game-over-modal');
+const modalTitle = document.getElementById('modal-title');
+const modalText = document.getElementById('modal-text');
 
 // ============================================
 // BOARD INITIALIZATION
@@ -91,7 +94,25 @@ function initializeBoard() {
     drawBoard();
     updateStatus();
     updateStoneCounts();
+    updateStoneCounts();
     hideMessage();
+    hideGameOverModal();
+}
+
+function showGameOverModal(title, text) {
+    modalTitle.textContent = title;
+    modalText.textContent = text;
+    gameOverModal.classList.remove('hidden');
+    // Trigger reflow to enable transition
+    void gameOverModal.offsetWidth;
+    gameOverModal.classList.add('visible');
+}
+
+function hideGameOverModal() {
+    gameOverModal.classList.remove('visible');
+    setTimeout(() => {
+        gameOverModal.classList.add('hidden');
+    }, 300);
 }
 
 function placeStartingStones() {
@@ -207,14 +228,15 @@ function updateStoneCounts() {
     blackCountElement.textContent = blackCount;
 
     // Check win condition
+    // Check win condition
     if (whiteCount < 4) {
         gameState = 'GAME_OVER';
-        showMessage('Black wins! White has fewer than 4 stones.');
         updateStatus('Game Over! Black wins!');
+        showGameOverModal('Black Wins!', 'Black wins! White has fewer than 4 stones.');
     } else if (blackCount < 4) {
         gameState = 'GAME_OVER';
-        showMessage('White wins! Black has fewer than 4 stones.');
         updateStatus('Game Over! White wins!');
+        showGameOverModal('White Wins!', 'White wins! Black has fewer than 4 stones.');
     }
 }
 

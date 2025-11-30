@@ -131,13 +131,14 @@ body::before {
 }
 
 /* Action Panel */
-.action-panel {
+.action-buttons {
     display: flex;
-    gap: 12px;
+    gap: 16px;
     margin: 20px 0;
+    position: relative;
+    z-index: 1001;
     flex-wrap: wrap;
     justify-content: center;
-    z-index: 1;
 }
 
 .action-btn {

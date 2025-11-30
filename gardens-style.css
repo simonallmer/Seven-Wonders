@@ -114,12 +114,22 @@ body {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    margin: 8px 0;
-    padding: 6px 12px;
-    background: rgba(255, 255, 255, 0.3);
+    margin: 10px 0;
+    padding: 6px 24px;
+    background: rgba(255, 255, 255, 0.4);
     border-radius: 20px;
     font-weight: bold;
     color: var(--dark-stone);
+    min-height: 40px;
+    /* Reserve space to prevent jumping */
+    min-width: 200px;
+    visibility: hidden;
+    /* Hidden by default, toggled to visible */
+    border: 1px solid rgba(100, 90, 80, 0.2);
+}
+
+.hand-display.visible {
+    visibility: visible;
 }
 
 .hand-stones {
@@ -154,7 +164,8 @@ body {
     display: flex;
     gap: 12px;
     align-items: stretch;
-    background: linear-gradient(135deg, rgba(122, 156, 111, 0.15), rgba(90, 124, 79, 0.1));
+    /* Sandstone background */
+    background: linear-gradient(135deg, #d2b48c, #c2a47c);
     padding: 20px;
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
@@ -168,29 +179,79 @@ body {
 }
 
 .garden-field {
-    width: calc(var(--cell-size) * 1.2);
-    height: calc(var(--cell-size) * 3 + 8px);
+    width: calc(var(--cell-size) * 1.4);
+    /* Compact width for 2 small columns */
+    height: calc(var(--cell-size) * 2.8);
+    /* Fit within the 2-row height (plus margins) */
     background: linear-gradient(135deg, var(--garden-green), var(--garden-light));
     border: 3px solid var(--garden-dark);
-    border-radius: 20px;
+    border-radius: 16px;
     box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.15);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-evenly;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(5, 1fr);
+    gap: 2px;
+    padding: 6px;
     align-items: center;
-    padding: 8px;
+    justify-items: center;
+}
+
+/* Garden Stone (Flat View) */
+.garden-stone {
+    width: 80%;
+    height: 80%;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.garden-stone.white {
+    background: radial-gradient(circle at 30% 30%, #ffffff, #e0e0e0);
+}
+
+.garden-stone.black {
+    background: radial-gradient(circle at 30% 30%, #4a4a4a, #2a2a2a);
+}
+
+.garden-stone.selected-ghost {
+    opacity: 0.2;
+    transform: scale(0.9);
 }
 
 .stairs {
-    height: 30px;
-    background: repeating-linear-gradient(90deg,
+    height: 40px;
+    width: 100%;
+    /* Match garden field width */
+    align-self: center;
+    /* Default color, overridden below */
+    background: repeating-linear-gradient(to bottom,
             var(--stairs-color),
-            var(--stairs-color) 8px,
-            transparent 8px,
-            transparent 16px);
-    border-left: 3px solid var(--stairs-color);
-    border-right: 3px solid var(--stairs-color);
-    opacity: 0.7;
+            var(--stairs-color) 4px,
+            transparent 4px,
+            transparent 8px);
+    border-left: 4px solid var(--stairs-color);
+    border-right: 4px solid var(--stairs-color);
+    opacity: 0.8;
+    margin: 0;
+    /* Connect visually */
+}
+
+.left-gardens .stairs {
+    --stairs-color: #2a2520;
+    /* Black/Dark */
+}
+
+.right-gardens .stairs {
+    --stairs-color: #e8e8e8;
+    /* White/Light */
+    border-color: #ccc;
+    /* Slightly darker border for visibility on light bg */
+}
+
+/* Ensure relative positioning for pseudo-element placement */
+.garden-field {
+    position: relative;
 }
 
 .playing-areas {
@@ -354,6 +415,8 @@ body {
     display: flex;
     gap: 16px;
     margin: 20px 0;
+    position: relative;
+    z-index: 1001;
 }
 
 .action-btn {

@@ -43,6 +43,7 @@ let selectedSource = null; // { area, row, col }
 let hand = []; // Stones currently being moved
 let moveHistory = []; // Track path to prevent backward movement in same turn
 let messageTimeout = null;
+let handFullWarningShown = false; // Track if "Hand Full" warning has been shown
 
 // ============================================
 // DOM ELEMENTS
@@ -55,6 +56,9 @@ const blackCountElement = document.getElementById('black-count');
 const messageBox = document.getElementById('message-box');
 const resetButton = document.getElementById('reset-button');
 const cancelButton = document.getElementById('cancel-button');
+const gameOverModal = document.getElementById('game-over-modal');
+const modalTitle = document.getElementById('modal-title');
+const modalText = document.getElementById('modal-text');
 
 // ============================================
 // INITIALIZATION
@@ -79,7 +83,25 @@ function initializeGame() {
     drawBoard();
     updateStatus();
     updateCounts();
+    updateCounts();
     hideMessage();
+    hideGameOverModal();
+}
+
+function showGameOverModal(title, text) {
+    modalTitle.textContent = title;
+    modalText.textContent = text;
+    gameOverModal.classList.remove('hidden');
+    // Trigger reflow to enable transition
+    void gameOverModal.offsetWidth;
+    gameOverModal.classList.add('visible');
+}
+
+function hideGameOverModal() {
+    gameOverModal.classList.remove('visible');
+    setTimeout(() => {
+        gameOverModal.classList.add('hidden');
+    }, 300);
 }
 
 function createGrid(rows, cols) {
@@ -93,6 +115,7 @@ function resetTurnState() {
     selectedSource = null;
     hand = [];
     moveHistory = [];
+    handFullWarningShown = false;
     cancelButton.classList.add('hidden');
 }
 
@@ -132,10 +155,15 @@ function handleCellClick(area, row, col) {
 function handleSelectPhase(area, row, col) {
     const stack = getStack(area, row, col);
 
-    // Validation: Must be own stack
-    if (!stack || stack.length === 0 || !isOwner(stack, currentPlayer)) {
-        // If clicking empty or opponent stack, ignore
-        return;
+    // Validation: Must be own stack (for playing fields) OR contain own stones (for gardens)
+    if (area === 'garden') {
+        const myStones = stack.filter(s => s === currentPlayer);
+        if (myStones.length === 0) return; // No stones of own color
+    } else {
+        // Playing fields: Must own the top of the stack
+        if (!stack || stack.length === 0 || !isOwner(stack, currentPlayer)) {
+            return;
+        }
     }
 
     // Logic for Playing Fields: ALWAYS pick up the entire stack
@@ -153,16 +181,32 @@ function handleSelectPhase(area, row, col) {
         return;
     }
 
-    // Logic for Gardens: Cycle 1-5 stones
+    // Logic for Gardens: Cycle 1-5 stones (Separated by Color)
+    // In Gardens, you can only select YOUR OWN stones, even if mixed.
+    const myStones = stack.filter(s => s === currentPlayer);
+
+    if (myStones.length === 0) return; // No stones of own color
+
     // If clicking the same stack again, cycle count
     if (selectedSource && selectedSource.area === area && selectedSource.row === row && selectedSource.col === col) {
-        // Cycle 1-5, but max is stack size
-        const maxSelect = Math.min(stack.length, 5);
+        // Cycle 1-5, but max is available stones of own color
+        const maxSelect = Math.min(myStones.length, 5);
         let currentCount = hand.length;
+
+        // Check for "Hand Full" warning condition
+        if (currentCount === 5 && !handFullWarningShown) {
+            handFullWarningShown = true;
+            updateStatus(`Hand Full! Click again to reset to 1.`);
+            return;
+        }
+
+        // Reset warning flag if we are moving past it (or if we weren't at 5)
+        handFullWarningShown = false;
+
         let newCount = (currentCount % maxSelect) + 1;
 
-        // Update hand with top N stones from stack
-        hand = stack.slice(-newCount);
+        // Update hand with N stones of own color
+        hand = Array(newCount).fill(currentPlayer);
 
         updateStatus(`Selected ${newCount} stones. Click again to change count, or click a neighbor to move.`);
         drawBoard();
@@ -170,10 +214,11 @@ function handleSelectPhase(area, row, col) {
     }
 
     // New selection in Garden
-    const maxSelect = Math.min(stack.length, 5);
+    const maxSelect = Math.min(myStones.length, 5);
     selectedSource = { area, row, col };
-    // Start with 1 stone (the top one)
-    hand = stack.slice(-1);
+    // Start with 1 stone
+    hand = [currentPlayer];
+    handFullWarningShown = false;
 
     turnPhase = 'SELECT'; // Still selecting count
     cancelButton.classList.remove('hidden');
@@ -234,7 +279,8 @@ function isValidMove(targetArea, targetRow, targetCol) {
 
     // 3. Tower Capacity Check
     const targetStack = getStack(targetArea, targetRow, targetCol);
-    if (targetStack.length >= BOARD_CONFIG.maxStackHeight) {
+    // Gardens are exempt from max height check
+    if (targetArea !== 'garden' && targetStack.length >= BOARD_CONFIG.maxStackHeight) {
         return false; // Full tower
     }
 
@@ -248,14 +294,35 @@ function isValidMove(targetArea, targetRow, targetCol) {
     const isPlayingField = targetArea === 'top' || targetArea === 'bottom';
 
     if (isPlayingField && targetStack.length > 0 && isOwner(targetStack, currentPlayer)) {
-        return false; // Cannot stack on own color in playing field
+        // return false; // REMOVED: Allow stacking on own color in playing field
     }
 
     // 5. Safe Zone Check (Capturing restrictions)
     // "In all Home Gardens and High Gardens, stones are safe from being captured by the opponent."
-    // So if target is a Garden, and it's controlled by opponent, we cannot enter/capture.
-    if (targetArea === 'garden' && targetStack.length > 0 && !isOwner(targetStack, currentPlayer)) {
-        return false;
+    // EXCEPTION: You CAN enter the OPPOSITE Home Garden (to dump stones).
+    // White can enter Black Home (G_BOT_RIGHT). Black can enter White Home (G_BOT_LEFT).
+
+    const isOppositeHome = (currentPlayer === 'white' && targetArea === 'garden' && targetRow === G_BOT_RIGHT) ||
+        (currentPlayer === 'black' && targetArea === 'garden' && targetRow === G_BOT_LEFT);
+
+    // Allow entering if:
+    // 1. It's empty
+    // 2. We own the top stone
+    // 3. It's our Home Garden (we can always stack there)
+    // 4. It's our High Garden (we can always stack there)
+    // 5. It's the Opposite Home Garden (dumping rule)
+
+    if (targetArea === 'garden') {
+        if (targetStack.length > 0 &&
+            !isOwner(targetStack, currentPlayer) &&
+            !isHome &&
+            !isTargetHigh &&
+            !isOppositeHome) {
+            return false;
+        }
+    } else {
+        // Playing fields
+        // Allow stacking on anyone's tower as long as height < 5 (checked earlier)
     }
 
     return true;
@@ -326,11 +393,8 @@ function isAdjacent(pos1, pos2) {
     // Let's assume YES, they are vertically adjacent, wall is just a zone marker.
 
     if ((pos1.area === 'top' && pos2.area === 'bottom') || (pos1.area === 'bottom' && pos2.area === 'top')) {
-        // Top [2][c] <-> Bottom [0][c]
-        const topRow = 2;
-        const botRow = 0;
-        if (pos1.area === 'top') return pos1.row === topRow && pos2.row === botRow && pos1.col === pos2.col;
-        if (pos1.area === 'bottom') return pos1.row === botRow && pos2.row === topRow && pos1.col === pos2.col;
+        // Wall separates them. No direct crossing.
+        return false;
     }
 
     // Garden <-> Field Connections
@@ -365,18 +429,58 @@ function isAdjacent(pos1, pos2) {
 function executeMoveStep(area, row, col) {
     // 1. Remove stone from source (if first step)
     if (moveHistory.length === 0) {
-        // Remove 'hand.length' stones from source stack
         const sourceStack = getStack(selectedSource.area, selectedSource.row, selectedSource.col);
-        // We already have 'hand' populated. Just remove them from board.
-        for (let i = 0; i < hand.length; i++) sourceStack.pop();
+
+        if (selectedSource.area === 'garden') {
+            // Remove specific colored stones (Separated by Color logic)
+            // We need to remove hand.length stones of currentPlayer color
+            // We remove the top-most instances of that color to minimize visual disruption
+
+            const toRemove = hand.length;
+            const colorToRemove = currentPlayer;
+
+            const newStack = [];
+            let found = 0;
+            // Iterate backwards to find top-most
+            for (let i = sourceStack.length - 1; i >= 0; i--) {
+                if (sourceStack[i] === colorToRemove && found < toRemove) {
+                    found++;
+                    // Remove this stone
+                } else {
+                    newStack.unshift(sourceStack[i]);
+                }
+            }
+
+            // Update stack content in place
+            sourceStack.length = 0;
+            sourceStack.push(...newStack);
+
+        } else {
+            // Normal pop for playing fields (Top of stack)
+            // Remove 'hand.length' stones from source stack
+            for (let i = 0; i < hand.length; i++) sourceStack.pop();
+        }
 
         turnPhase = 'MOVING';
     }
 
-    // 2. Drop 1 stone from hand to target
-    const stone = hand.pop();
+    // 2. Drop stone(s) from hand to target
     const targetStack = getStack(area, row, col);
-    targetStack.push(stone);
+
+    // Special Rule: If entering a Garden (specifically opposite home?), drop ALL stones.
+    // User said: "when stones enter the Garden... all remaining stones are dropped there"
+    // Let's apply this to ANY Garden entry for now, as it seems to be the "dumping" mechanic.
+    if (area === 'garden') {
+        // Drop ALL stones
+        while (hand.length > 0) {
+            targetStack.push(hand.shift());
+        }
+    } else {
+        // Normal drop (1 stone)
+        // Use shift() to take from the BOTTOM of the hand (FIFO)
+        const stone = hand.shift();
+        targetStack.push(stone);
+    }
 
     // 3. Record history
     moveHistory.push({ area, row, col });
@@ -434,7 +538,7 @@ function updateStatus(msg) {
     const handStones = document.getElementById('hand-stones');
 
     if (hand.length > 0) {
-        handDisplay.classList.remove('hidden');
+        handDisplay.classList.add('visible');
         handStones.innerHTML = '';
         hand.forEach(color => {
             const s = document.createElement('div');
@@ -442,7 +546,7 @@ function updateStatus(msg) {
             handStones.appendChild(s);
         });
     } else {
-        handDisplay.classList.add('hidden');
+        handDisplay.classList.remove('visible');
     }
 }
 
@@ -454,14 +558,37 @@ function processStaircases() {
         const blackCount = wHome.filter(s => s === 'black').length;
 
         // Left Stairs are BLACK. Only Black stones use them if majority.
+        // Rule: "only if the stones of the color that can wander up... is higher than the stones of the other color"
+        // Move ONLY the difference (Majority - Minority)
         if (blackCount > whiteCount) {
-            // Move ALL black stones
-            const moving = wHome.filter(s => s === 'black');
-            const staying = wHome.filter(s => s === 'white');
+            const diff = blackCount - whiteCount;
 
-            board.gardens[G_BOT_LEFT] = staying;
+            // Move 'diff' black stones
+            // We need to remove 'diff' black stones from wHome and add to G_TOP_LEFT
+            let movedCount = 0;
+            // Filter out the stones to move (take from top or bottom? usually top is easier to pop)
+            // But we need to keep the stack structure for the rest?
+            // Actually, gardens are just piles in this logic?
+            // "The turn ends and... stones 'wander' up automatically"
+            // Let's remove the first 'diff' black stones we find? Or last?
+            // Let's assume we take them out.
+
+            const newStack = [];
+            const moving = [];
+
+            // Iterate and extract
+            for (const stone of wHome) {
+                if (stone === 'black' && movedCount < diff) {
+                    moving.push(stone);
+                    movedCount++;
+                } else {
+                    newStack.push(stone);
+                }
+            }
+
+            board.gardens[G_BOT_LEFT] = newStack;
             board.gardens[G_TOP_LEFT].push(...moving); // Move to Top Left
-            showMessage("Black stones moved up the Left Staircase!");
+            showMessage(`${diff} Black stones moved up the Left Staircase!`);
         }
     }
 
@@ -473,13 +600,24 @@ function processStaircases() {
 
         // Right Stairs are WHITE. Only White stones use them if majority.
         if (whiteCount > blackCount) {
-            // Move ALL white stones
-            const moving = bHome.filter(s => s === 'white');
-            const staying = bHome.filter(s => s === 'black');
+            const diff = whiteCount - blackCount;
 
-            board.gardens[G_BOT_RIGHT] = staying;
+            let movedCount = 0;
+            const newStack = [];
+            const moving = [];
+
+            for (const stone of bHome) {
+                if (stone === 'white' && movedCount < diff) {
+                    moving.push(stone);
+                    movedCount++;
+                } else {
+                    newStack.push(stone);
+                }
+            }
+
+            board.gardens[G_BOT_RIGHT] = newStack;
             board.gardens[G_TOP_RIGHT].push(...moving); // Move to Top Right
-            showMessage("White stones moved up the Right Staircase!");
+            showMessage(`${diff} White stones moved up the Right Staircase!`);
         }
     }
 }
@@ -496,14 +634,14 @@ function checkWin() {
     const blackScore = blackHigh.filter(s => s === 'black').length;
 
     if (whiteScore >= BOARD_CONFIG.winCount) {
-        showMessage("WHITE WINS!");
         turnPhase = 'GAME_OVER';
+        showGameOverModal('White Wins!', 'White wins by gathering 7 stones in the High Garden!');
         return true;
     }
 
     if (blackScore >= BOARD_CONFIG.winCount) {
-        showMessage("BLACK WINS!");
         turnPhase = 'GAME_OVER';
+        showGameOverModal('Black Wins!', 'Black wins by gathering 7 stones in the High Garden!');
         return true;
     }
 
@@ -559,25 +697,55 @@ function drawGardens() {
         const element = document.querySelector(`.garden-field[data-garden="${i}"]`);
         element.innerHTML = '';
 
-        // Gardens are single stacks in this logic, but rendered as a container
-        // We render the stack inside
+        // Gardens are now rendered as a grid of stones
         const stack = board.gardens[i];
-        if (stack.length > 0) {
-            const stackEl = createStackElement(stack);
 
-            // Highlight if selected source
-            if (selectedSource && selectedSource.area === 'garden' && selectedSource.row === i) {
-                stackEl.classList.add('selected');
-                // Show selection count
-                if (turnPhase === 'SELECT') {
-                    const indicator = document.createElement('div');
-                    indicator.className = 'selection-indicator';
-                    indicator.textContent = `${hand.length} selected`;
-                    stackEl.appendChild(indicator);
+        // Determine how many stones of current player are "selected" (in hand)
+        // and should be visually hidden/ghosted in the garden
+        let selectedCount = 0;
+        if (selectedSource && selectedSource.area === 'garden' && selectedSource.row === i) {
+            selectedCount = hand.length;
+        }
+
+        // Render stones
+        // We need to render ALL stones in the stack.
+        // But we need to identify which ones are "selected".
+        // The logic removes from the "top" (end of array) of that color.
+        // So we count backwards for that color.
+
+        // Helper to track how many of current player's color we've seen from the end
+        let seenPlayerColor = 0;
+
+        // Render in reverse order? Or just map?
+        // Grid fills top-left to bottom-right usually.
+        // Let's render them in order.
+
+        stack.forEach((color, index) => {
+            const stone = document.createElement('div');
+            stone.className = `garden-stone ${color}`;
+
+            // Check if this stone is one of the selected ones
+            // We need to know if this is one of the LAST 'selectedCount' stones of that color
+            // This is tricky in a forEach loop.
+            // Let's pre-calculate indices to ghost.
+
+            element.appendChild(stone);
+        });
+
+        // Post-process to ghost the correct stones
+        if (selectedCount > 0) {
+            const stones = Array.from(element.children);
+            let ghosted = 0;
+            // Iterate backwards
+            for (let j = stones.length - 1; j >= 0; j--) {
+                const stoneEl = stones[j];
+                if (stoneEl.classList.contains(currentPlayer)) {
+                    if (ghosted < selectedCount) {
+                        stoneEl.classList.add('selected-ghost');
+                        ghosted++;
+                    }
                 }
             }
-
-            element.appendChild(stackEl);
         }
 
         // Click handler on the garden container
@@ -696,11 +864,6 @@ function hideMessage() {
 
 resetButton.addEventListener('click', initializeGame);
 cancelButton.addEventListener('click', () => {
-    // Reset turn
-    // We need to restore the board state if we were moving
-    // For simplicity, just re-init turn state if in SELECT
-    // If in MOVING, it's harder to undo without a backup.
-    // Let's just allow cancel in SELECT phase.
     if (turnPhase === 'SELECT') {
         resetTurnState();
         drawBoard();

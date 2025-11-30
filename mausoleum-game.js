@@ -47,7 +47,6 @@ const resetButton = document.getElementById('reset-button');
 const messageBox = document.getElementById('message-box');
 const messageTitle = document.getElementById('message-title');
 const messageText = document.getElementById('message-text');
-const messageOkButton = document.getElementById('message-ok-button');
 
 // ============================================
 // BOARD INITIALIZATION
@@ -515,10 +514,6 @@ function initGame() {
 // EVENT LISTENERS
 // ============================================
 resetButton.addEventListener('click', initGame);
-messageOkButton.addEventListener('click', () => {
-    hideEndGameMessage();
-    initGame();
-});
 
 // ============================================
 // INITIALIZATION

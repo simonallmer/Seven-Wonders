@@ -223,7 +223,8 @@ body::before {
     display: flex;
     gap: 16px;
     margin: 20px 0;
-    z-index: 1;
+    position: relative;
+    z-index: 1001;
 }
 
 .action-btn {

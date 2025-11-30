@@ -40,6 +40,9 @@ const playerColorElement = document.getElementById('current-player-color');
 const messageBox = document.getElementById('message-box');
 const resetButton = document.getElementById('reset-button');
 const endTurnButton = document.getElementById('end-turn-button');
+const gameOverModal = document.getElementById('game-over-modal');
+const modalTitle = document.getElementById('modal-title');
+const modalText = document.getElementById('modal-text');
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -133,7 +136,25 @@ function initializeBoard() {
 
     drawBoard();
     updateUI();
+    updateUI();
     hideMessage();
+    hideGameOverModal();
+}
+
+function showGameOverModal(title, text) {
+    modalTitle.textContent = title;
+    modalText.textContent = text;
+    gameOverModal.classList.remove('hidden');
+    // Trigger reflow to enable transition
+    void gameOverModal.offsetWidth;
+    gameOverModal.classList.add('visible');
+}
+
+function hideGameOverModal() {
+    gameOverModal.classList.remove('visible');
+    setTimeout(() => {
+        gameOverModal.classList.add('hidden');
+    }, 300);
 }
 
 /**
@@ -584,8 +605,11 @@ function endTurn() {
 
     if (!canMove(losingPlayer)) {
         updateStatus(`Game Over! ${winningPlayer.charAt(0).toUpperCase() + winningPlayer.slice(1)} wins!`);
-        showMessage(`Game Over! ${winningPlayer.charAt(0).toUpperCase() + winningPlayer.slice(1)} wins, as ${losingPlayer} has no legal moves to start their turn.`, true);
         gameState = 'GAME_OVER';
+        showGameOverModal(
+            `${winningPlayer.charAt(0).toUpperCase() + winningPlayer.slice(1)} Wins!`,
+            `${winningPlayer.charAt(0).toUpperCase() + winningPlayer.slice(1)} wins because ${losingPlayer} has no legal moves!`
+        );
         drawBoard();
         return;
     }

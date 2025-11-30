@@ -47,6 +47,9 @@ const p2BoardCountDisplay = document.getElementById('p2-board-count');
 const btnPlace = document.getElementById('action-place');
 const btnDiminish = document.getElementById('action-diminish');
 const btnCancel = document.getElementById('action-cancel');
+const gameOverModal = document.getElementById('game-over-modal');
+const modalTitle = document.getElementById('modal-title');
+const modalText = document.getElementById('modal-text');
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -126,7 +129,27 @@ function updateStatusDisplay() {
 
         messageBox.textContent = `GAME OVER! Player ${winner} wins! Player ${loser} has fewer than three dice left (Total: ${losingDiceCount}).`;
         toggleActionButtons(false, false);
+        showGameOverModal(
+            `Player ${winner} Wins!`,
+            `Player ${winner} wins! Player ${loser} has fewer than three dice left (Total: ${losingDiceCount}).`
+        );
     }
+}
+
+function showGameOverModal(title, text) {
+    modalTitle.textContent = title;
+    modalText.textContent = text;
+    gameOverModal.classList.remove('hidden');
+    // Trigger reflow to enable transition
+    void gameOverModal.offsetWidth;
+    gameOverModal.classList.add('visible');
+}
+
+function hideGameOverModal() {
+    gameOverModal.classList.remove('visible');
+    setTimeout(() => {
+        gameOverModal.classList.add('hidden');
+    }, 300);
 }
 
 /**
@@ -501,4 +524,5 @@ btnCancel.addEventListener('click', handleCancel);
 window.addEventListener('load', () => {
     toggleActionButtons(true, false);
     renderBoard();
+    hideGameOverModal();
 });
