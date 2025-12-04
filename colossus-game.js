@@ -170,18 +170,6 @@ function drawBoard() {
             } else {
                 if (cellData.directionField) {
                     cell.classList.add('direction-field', `direction-${cellData.directionField}`);
-
-                    // Add clickable arrow if in gravity selection mode
-                    if (gameState === 'SELECT_GRAVITY_ORDER' &&
-                        pendingGravityDirections.includes(cellData.directionField)) {
-                        const arrow = document.createElement('div');
-                        arrow.classList.add('gravity-arrow-overlay', `arrow-${cellData.directionField}`);
-                        arrow.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            handleGravityChoice(cellData.directionField);
-                        });
-                        cell.appendChild(arrow);
-                    }
                 }
 
                 if (validMoves.some(m => m.row === r && m.col === c)) {
@@ -197,6 +185,22 @@ function drawBoard() {
                     }
 
                     cell.appendChild(stone);
+                }
+
+                // Add clickable arrow if in gravity selection mode
+                // Appended AFTER stone to ensure it's on top in DOM order
+                if (gameState === 'SELECT_GRAVITY_ORDER' &&
+                    cellData.directionField &&
+                    pendingGravityDirections.includes(cellData.directionField)) {
+                    console.log('Creating overlay for:', cellData.directionField); // Debug log
+                    const arrow = document.createElement('div');
+                    arrow.classList.add('gravity-arrow-overlay', `arrow-${cellData.directionField}`);
+                    arrow.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        console.log('Arrow clicked:', cellData.directionField); // Debug log
+                        handleGravityChoice(cellData.directionField);
+                    });
+                    cell.appendChild(arrow);
                 }
 
                 cell.addEventListener('click', () => handleCellClick(r, c));
@@ -347,13 +351,23 @@ function calculatePushMoves(row, col) {
     return moves;
 }
 
-function handleCellClick(row, col) {
+async function handleCellClick(row, col) {
     if (gameState === 'GAME_OVER') {
         showMessage("Game Over! Click New Game to play again.");
         return;
     }
 
+    if (gameState === 'ANIMATING') return;
+
     const cellData = board[row][col];
+
+    // Handle Gravity Selection (Fallback if overlay click is missed)
+    if (gameState === 'SELECT_GRAVITY_ORDER') {
+        if (cellData.directionField && pendingGravityDirections.includes(cellData.directionField)) {
+            await handleGravityChoice(cellData.directionField);
+        }
+        return;
+    }
 
     if (gameState === 'SELECT_STONE') {
         if (cellData.piece === currentPlayer) {
@@ -377,7 +391,7 @@ function handleCellClick(row, col) {
         const move = validMoves.find(m => m.row === row && m.col === col);
 
         if (move) {
-            executeMove(move);
+            await executeMove(move);
         } else if (cellData.piece === currentPlayer) {
             // Reselect different stone
             selectedStone = { row, col };
@@ -397,29 +411,55 @@ function handleCellClick(row, col) {
     }
 }
 
-function executeMove(move) {
+async function executeMove(move) {
+    gameState = 'ANIMATING';
     let newlyActivatedDir = null;
 
     if (move.type === 'run') {
-        // Simple run movement
+        // Animate the run movement
+        const runAnimation = [{
+            from: { row: selectedStone.row, col: selectedStone.col },
+            to: { row: move.row, col: move.col }
+        }];
+
+        await animateMoves(runAnimation);
+
+        // Apply run movement to board
         board[move.row][move.col].piece = board[selectedStone.row][selectedStone.col].piece;
         board[selectedStone.row][selectedStone.col].piece = null;
         lastPushedStone = null;
+
+        // Redraw to snap stone to grid
+        drawBoard();
 
         // Check if landed on direction field
         if (board[move.row][move.col].directionField) {
             newlyActivatedDir = board[move.row][move.col].directionField;
         }
     } else if (move.type === 'push') {
-        // Push movement
+        // Animate both the pushed stone and the pushing stone
         const pushedPiece = board[move.row][move.col].piece;
 
-        // Move pushed stone
-        board[move.pushTo.row][move.pushTo.col].piece = pushedPiece;
+        const pushAnimations = [
+            {
+                from: { row: move.row, col: move.col },
+                to: { row: move.pushTo.row, col: move.pushTo.col }
+            },
+            {
+                from: { row: selectedStone.row, col: selectedStone.col },
+                to: { row: move.row, col: move.col }
+            }
+        ];
 
-        // Move pushing stone
+        await animateMoves(pushAnimations);
+
+        // Apply push movement to board
+        board[move.pushTo.row][move.pushTo.col].piece = pushedPiece;
         board[move.row][move.col].piece = board[selectedStone.row][selectedStone.col].piece;
         board[selectedStone.row][selectedStone.col].piece = null;
+
+        // Redraw to snap stones to grid
+        drawBoard();
 
         // Record pushed stone to prevent immediate push-back
         lastPushedStone = { row: move.pushTo.row, col: move.pushTo.col };
@@ -431,10 +471,10 @@ function executeMove(move) {
     }
 
     // Resolve Gravity after movement
-    resolveGravity(newlyActivatedDir);
+    await resolveGravity(newlyActivatedDir);
 }
 
-function resolveGravity(prioritizedDir = null) {
+async function resolveGravity(prioritizedDir = null) {
     // 1. Identify active directions
     const activeDirections = [];
     DIRECTION_FIELDS.forEach(({ row, col, dir }) => {
@@ -474,7 +514,7 @@ function resolveGravity(prioritizedDir = null) {
 
     // 3. Apply prioritized direction first if it exists
     if (prioritizedDir && effectiveDirections.includes(prioritizedDir)) {
-        tiltBoard(prioritizedDir);
+        await tiltBoard(prioritizedDir);
         effectiveDirections = effectiveDirections.filter(d => d !== prioritizedDir);
 
         if (effectiveDirections.length === 0) {
@@ -486,7 +526,7 @@ function resolveGravity(prioritizedDir = null) {
 
     // 4. Handle remaining directions
     if (effectiveDirections.length === 1) {
-        tiltBoard(effectiveDirections[0]);
+        await tiltBoard(effectiveDirections[0]);
         checkAndRemoveHades();
         endTurn();
     } else if (effectiveDirections.length > 1) {
@@ -503,26 +543,87 @@ let pendingGravityDirections = [];
 
 // Removed - arrows now shown on board via drawBoard
 
-function handleGravityChoice(firstDirection) {
+async function handleGravityChoice(firstDirection) {
     if (gameState !== 'SELECT_GRAVITY_ORDER') return;
 
     hideMessage(); // Hide any previous messages
 
     // Apply first direction
-    tiltBoard(firstDirection);
+    await tiltBoard(firstDirection);
 
     // Apply remaining directions
     const remainingDirections = pendingGravityDirections.filter(d => d !== firstDirection);
-    remainingDirections.forEach(dir => {
-        tiltBoard(dir);
-    });
+    for (const dir of remainingDirections) {
+        await tiltBoard(dir);
+    }
 
     checkAndRemoveHades();
     endTurn();
 }
 
-function tiltBoard(direction) {
-    // Determine slide direction
+async function tiltBoard(direction) {
+    const previousState = gameState;
+    gameState = 'ANIMATING';
+
+    // 1. Calculate moves without modifying board
+    const moves = simulateTilt(direction);
+
+    // 2. Animate moves
+    if (moves.length > 0) {
+        await animateMoves(moves);
+
+        // 3. Apply moves to logical board
+        // Capture moving pieces first to avoid overwriting issues
+        const updates = moves.map(move => ({
+            to: move.to,
+            piece: board[move.from.row][move.from.col].piece
+        }));
+
+        // Clear source positions
+        moves.forEach(move => {
+            board[move.from.row][move.from.col].piece = null;
+        });
+
+        // Set destination positions
+        updates.forEach(update => {
+            board[update.to.row][update.to.col].piece = update.piece;
+        });
+    }
+
+    // 4. Redraw to snap everything to grid and remove transforms
+    drawBoard();
+
+    // Restore state if we are not ending turn immediately (though resolveGravity usually ends turn)
+    // But resolveGravity might call tiltBoard multiple times.
+    // We should leave it as ANIMATING if we are in a sequence?
+    // Actually, resolveGravity controls the flow. 
+    // If we return here, we are still in resolveGravity.
+    // We can set it back to previousState, but resolveGravity might change it again.
+    // Let's just set it back to previousState if it wasn't ANIMATING?
+    // Actually, it's safer to let the caller handle state, but here we set ANIMATING.
+    // Let's just leave it as ANIMATING and let endTurn() reset it to SELECT_STONE.
+    // But if we are in SELECT_GRAVITY_ORDER, we might need to stay there?
+    // No, handleGravityChoice calls tiltBoard then endTurn.
+    // The only case is multiple tilts in resolveGravity.
+    // So leaving it as ANIMATING is fine, as long as endTurn resets it.
+}
+
+function simulateTilt(direction) {
+    // Create a simulation board with IDs to track pieces
+    const simBoard = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(null));
+    const pieces = [];
+    let nextId = 1;
+
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            if (board[r][c].piece) {
+                const id = nextId++;
+                simBoard[r][c] = { id, piece: board[r][c].piece };
+                pieces.push({ id, startR: r, startC: c, currentR: r, currentC: c });
+            }
+        }
+    }
+
     let dr = 0, dc = 0;
     if (direction === 'up') dr = -1;
     if (direction === 'down') dr = 1;
@@ -530,14 +631,12 @@ function tiltBoard(direction) {
     if (direction === 'right') dc = 1;
 
     let moved = true;
-    // Limit iterations to prevent infinite loops in weird edge cases
     let iterations = 0;
 
     while (moved && iterations < BOARD_SIZE * 2) {
         moved = false;
         iterations++;
 
-        // Iterate in the direction of gravity
         const startR = dr > 0 ? BOARD_SIZE - 1 : 0;
         const endR = dr > 0 ? -1 : BOARD_SIZE;
         const stepR = dr > 0 ? -1 : 1;
@@ -548,19 +647,64 @@ function tiltBoard(direction) {
 
         for (let r = startR; r !== endR; r += stepR) {
             for (let c = startC; c !== endC; c += stepC) {
-                if (board[r][c].piece) {
+                if (simBoard[r][c]) {
                     const newR = r + dr;
                     const newC = c + dc;
 
-                    if (isInBounds(newR, newC) && !board[newR][newC].piece) {
-                        board[newR][newC].piece = board[r][c].piece;
-                        board[r][c].piece = null;
+                    if (isInBounds(newR, newC) && !simBoard[newR][newC]) {
+                        simBoard[newR][newC] = simBoard[r][c];
+                        simBoard[r][c] = null;
+
+                        const p = pieces.find(p => p.id === simBoard[newR][newC].id);
+                        p.currentR = newR;
+                        p.currentC = newC;
+
                         moved = true;
                     }
                 }
             }
         }
     }
+
+    return pieces.filter(p => p.startR !== p.currentR || p.startC !== p.currentC)
+        .map(p => ({
+            from: { row: p.startR, col: p.startC },
+            to: { row: p.currentR, col: p.currentC }
+        }));
+}
+
+function animateMoves(moves) {
+    if (moves.length === 0) return Promise.resolve();
+
+    const animations = moves.map(move => {
+        const cell = document.querySelector(`.cell[data-row="${move.from.row}"][data-col="${move.from.col}"]`);
+        if (!cell) return null;
+        const stone = cell.querySelector('.stone');
+        if (!stone) return null;
+
+        const destCell = document.querySelector(`.cell[data-row="${move.to.row}"][data-col="${move.to.col}"]`);
+        if (!destCell) return null;
+
+        const startRect = cell.getBoundingClientRect();
+        const endRect = destCell.getBoundingClientRect();
+
+        const deltaX = endRect.left - startRect.left;
+        const deltaY = endRect.top - startRect.top;
+
+        stone.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+
+        return new Promise(resolve => {
+            const handler = () => {
+                stone.removeEventListener('transitionend', handler);
+                resolve();
+            };
+            stone.addEventListener('transitionend', handler);
+            // Fallback
+            setTimeout(handler, 350);
+        });
+    });
+
+    return Promise.all(animations);
 }
 
 function checkAndRemoveHades() {

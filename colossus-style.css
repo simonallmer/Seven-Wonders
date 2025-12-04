@@ -171,6 +171,7 @@ body::before {
     font-size: 1.2rem;
     color: var(--direction-field);
     position: absolute;
+    pointer-events: none;
 }
 
 .cell.direction-up::after {
@@ -199,8 +200,10 @@ body::before {
     height: 70%;
     border-radius: 50%;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transition: transform 0.3s ease-in-out, box-shadow 0.2s;
     cursor: pointer;
+    z-index: 5;
 }
 
 .stone.white {
@@ -329,8 +332,9 @@ body::before {
     align-items: center;
     background-color: rgba(255, 255, 255, 0.3);
     cursor: pointer;
-    z-index: 10;
+    z-index: 1000;
     animation: pulse-arrow 1.5s infinite;
+    pointer-events: auto;
 }
 
 .gravity-arrow-overlay::after {
