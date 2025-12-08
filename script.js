@@ -43,6 +43,48 @@ const games = {
         description: 'The Lighthouse of Alexandria',
         status: 'available',
         url: 'pharos.html'
+    },
+    colosseum: {
+        name: 'Colosseum',
+        description: 'The Flavian Amphitheatre',
+        status: 'playtest',
+        url: 'colosseum.html'
+    },
+    great_wall: {
+        name: 'Great Wall',
+        description: 'The Great Wall of China',
+        status: 'playtest',
+        url: 'great_wall.html'
+    },
+    tower: {
+        name: 'Tower',
+        description: 'The Tower of Babel',
+        status: 'playtest',
+        url: 'tower.html'
+    },
+    citadell: {
+        name: 'Citadell',
+        description: 'Machu Picchu',
+        status: 'playtest',
+        url: 'citadell.html'
+    },
+    church: {
+        name: 'Church',
+        description: 'St. Peter\'s Basilica',
+        status: 'playtest',
+        url: 'church.html'
+    },
+    island: {
+        name: 'Island',
+        description: 'Easter Island',
+        status: 'playtest',
+        url: 'island.html'
+    },
+    skyscraper: {
+        name: 'Skyscraper',
+        description: 'Empire State Building',
+        status: 'playtest',
+        url: 'skyscraper.html'
     }
 };
 
@@ -51,17 +93,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameLinks = document.querySelectorAll('.game-link');
 
     gameLinks.forEach(link => {
-        const gameId = link.getAttribute('href').substring(1);
+        // Use data-id if available, otherwise fallback (for safety)
+        const gameId = link.dataset.id || link.getAttribute('href').substring(1);
         const game = games[gameId];
 
-        // Add coming-soon class to unavailable games
-        if (game && game.status === 'coming-soon') {
-            link.classList.add('coming-soon');
-        }
-
         link.addEventListener('click', (e) => {
-            e.preventDefault();
-            handleGameSelection(gameId);
+            // Prevent default for all links handled by JS to check status
+            if (game) {
+                e.preventDefault();
+                handleGameSelection(gameId);
+            }
         });
     });
 });
@@ -75,6 +116,14 @@ function handleGameSelection(gameId) {
         if (game.status === 'available' && game.url) {
             // Navigate to the game page
             window.location.href = game.url;
+        } else if (game.status === 'playtest' && game.url) {
+            // Check password for playtest games
+            const password = prompt(`${game.name} is currently only open to playtesters.\n\nPlease enter the access password:`);
+            if (password === '2020') {
+                window.location.href = game.url;
+            } else if (password !== null) { // If user cancelled, do nothing. If wrong password, alert.
+                alert('Incorrect password.');
+            }
         } else {
             // Show coming soon message
             alert(`${game.name}\n\n${game.description}\n\nComing Soon...`);
@@ -93,4 +142,29 @@ window.addEventListener('load', () => {
         container.style.opacity = '1';
         container.style.transform = 'translateY(0)';
     }, 100);
+});
+
+// Menu Flip Functionality
+document.addEventListener('DOMContentLoaded', () => {
+    const flipper = document.querySelector('.menu-flipper');
+    const showNewBtn = document.getElementById('show-new-wonders');
+    const showOldBtn = document.getElementById('show-old-wonders');
+
+    if (flipper && showNewBtn && showOldBtn) {
+        showNewBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            flipper.classList.add('flipped');
+        });
+
+        showOldBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            flipper.classList.remove('flipped');
+        });
+
+        // Check for URL parameter to auto-flip
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('menu') === 'new') {
+            flipper.classList.add('flipped');
+        }
+    }
 });

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skyscraper - Seven Wonders</title>
+    <meta name="description" content="Play Skyscraper, an ancient strategy game from the Seven Wonders series">
+    <link rel="stylesheet" href="skyscraper-style.css">
+</head>
+
+<body>
+    <!-- Back to Menu -->
+    <a href="index.html?menu=new" class="back-link">← Back to Seven Wonders</a>
+
+    <!-- Header -->
+    <header class="game-header">
+        <h1 class="game-title">SKYSCRAPER</h1>
+        <p class="game-subtitle">Empire State Building</p>
+    </header>
+
+    <!-- Stone Boxes -->
+    <div class="stone-boxes">
+        <div class="stone-box white-box" id="white-box">
+            <div class="box-label">White Stones</div>
+            <div class="box-content" data-color="white">
+                <div class="stone-count">∞</div>
+            </div>
+        </div>
+        <div class="stone-box black-box" id="black-box">
+            <div class="box-label">Black Stones</div>
+            <div class="box-content" data-color="black">
+                <div class="stone-count">∞</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Status -->
+    <div class="status-panel">
+        <div class="turn-display">
+            <div class="current-player-indicator" id="current-player-color"></div>
+            <span id="game-status">Select a stone from a bag to place it.</span>
+        </div>
+    </div>
+
+    <!-- Game Board -->
+    <div class="board-wrapper">
+        <div id="game-board" class="board-container">
+            <!-- Board cells will be generated here by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+        <button id="cancel-button" class="action-btn cancel-btn hidden">
+            Cancel Move
+        </button>
+        <button id="reset-button" class="action-btn reset-btn">
+            New Game
+        </button>
+    </div>
+
+    <!-- Message Box -->
+    <div id="message-box" class="message-box hidden">
+        <!-- Game messages -->
+    </div>
+
+    <!-- Footer -->
+    <footer class="game-footer">
+        <p>Game Design: Simon Allmer</p>
+    </footer>
+
+    <script src="skyscraper-game.js"></script>
+</body>
+
+</html>

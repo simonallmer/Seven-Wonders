@@ -135,6 +135,30 @@ body {
     color: #ccc;
 }
 
+.manual-controls {
+    display: flex;
+    justify-content: space-around;
+    padding: 5px;
+    background: rgba(255, 255, 255, 0.2);
+    border-top: 1px solid var(--border-color);
+}
+
+.control-btn {
+    width: 25px;
+    height: 25px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.control-btn:hover {
+    background: rgba(255, 255, 255, 0.8);
+}
+
 .box-content.selected {
     box-shadow: inset 0 0 0 3px #d4a574;
 }
@@ -190,9 +214,15 @@ body {
 
 /* Center Circle */
 .center-circle {
-    fill: #1a1a1a;
+    fill: var(--field-fill);
     stroke: var(--field-stroke);
     stroke-width: 2;
+    cursor: pointer;
+    transition: fill 0.2s ease;
+}
+
+.center-circle:hover {
+    fill: var(--field-hover);
 }
 
 /* Status Panel */

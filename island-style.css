@@ -1,0 +1,371 @@
+/* Import Cinzel font */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;700&display=swap');
+
+:root {
+    --marble-bg: #d4cfc4;
+    --dark-stone: #2a2520;
+    --player1-color: #f0f0f0;
+    --player2-color: #1a1a1a;
+    --selection-glow: #f59e0b;
+    --valid-move: #10b981;
+    --border-color: rgba(100, 90, 80, 0.3);
+    --cell-size: min(8vmin, 65px);
+    /* Significantly larger cells */
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Cinzel', serif;
+    background-color: var(--marble-bg);
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 100px 100px;
+    min-height: 100vh;
+    color: var(--dark-stone);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.back-link {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: #1a1a1a;
+    text-decoration: none;
+    font-size: 0.95rem;
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.2);
+    transition: all 0.3s;
+    z-index: 10;
+}
+
+.back-link:hover {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.game-header {
+    text-align: center;
+    margin: 40px 0 20px;
+}
+
+.game-title {
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: #1a1a1a;
+    text-shadow: 2px 2px 0px rgba(255, 255, 255, 0.1);
+}
+
+.game-subtitle {
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    color: rgba(26, 26, 26, 0.7);
+}
+
+/* Inventory Display */
+.stone-boxes {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.stone-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-width: 120px;
+}
+
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    text-align: center;
+    font-size: 0.8rem;
+}
+
+.inv-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.inv-label {
+    font-weight: bold;
+    font-size: 0.7rem;
+}
+
+.inv-count {
+    font-size: 0.9rem;
+}
+
+/* Crafting Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.crafting-modal {
+    background: #e6e2d8;
+    padding: 20px;
+    border-radius: 8px;
+    border: 2px solid var(--dark-stone);
+    width: 300px;
+    text-align: center;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.crafting-section {
+    margin-bottom: 15px;
+}
+
+.crafting-options {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.craft-btn {
+    width: 40px;
+    height: 40px;
+    border: 2px solid #555;
+    background: #fff;
+    cursor: pointer;
+    font-weight: bold;
+    font-family: 'Cinzel', serif;
+}
+
+.craft-btn.selected {
+    background: var(--selection-glow);
+    border-color: #000;
+    color: #fff;
+}
+
+.craft-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.box-label {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.box-content {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 3px solid var(--border-color);
+    box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.2), 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+    position: relative;
+}
+
+.box-content:hover {
+    transform: translateY(-2px);
+    border-color: var(--selection-glow);
+}
+
+.box-content.selected {
+    border-color: var(--selection-glow);
+    box-shadow: 0 0 15px var(--selection-glow);
+    transform: scale(1.05);
+}
+
+.white-box .box-content {
+    background: radial-gradient(circle at 30% 30%, #f7f7f7, #d1d1d1);
+}
+
+.black-box .box-content {
+    background: radial-gradient(circle at 30% 30%, #4a4a4a, #1a1a1a);
+}
+
+.stone-count {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.black-box .stone-count {
+    color: #f0f0f0;
+}
+
+.status-panel {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(240, 235, 225, 0.2));
+    border: 1px solid var(--border-color);
+    padding: 12px 24px;
+    margin: 10px 0 20px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+.turn-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+}
+
+.current-player-indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin-right: 12px;
+    border: 2px solid var(--dark-stone);
+    background-color: var(--player1-color);
+}
+
+/* Island Board */
+.board-wrapper {
+    margin: 20px 0;
+    padding: 30px;
+    background: rgba(30, 60, 30, 0.1);
+    /* Grassy hint */
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+}
+
+.island-board {
+    display: grid;
+    /* 9x9 Grid */
+    grid-template-columns: repeat(9, var(--cell-size));
+    grid-template-rows: repeat(9, var(--cell-size));
+    gap: 2px;
+    /* Slight gap for separation */
+    background: var(--border-color);
+    border: 4px solid var(--border-color);
+}
+
+.cell {
+    background: rgba(220, 210, 190, 0.9);
+    display: flex;
+    flex-wrap: wrap;
+    /* Allow multiple units */
+    align-content: center;
+    justify-content: center;
+    gap: 2px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.figure {
+    width: 45%;
+    height: 45%;
+    border-radius: 15%;
+    border: 2px solid rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: #fff;
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.figure.white {
+    background: var(--player1-color);
+    color: #000;
+}
+
+.figure.black {
+    background: var(--player2-color);
+    color: #fff;
+}
+
+.figure-stats {
+    font-size: 0.7rem;
+    line-height: 1.1;
+    text-align: center;
+}
+
+.stone {
+    width: 70%;
+    height: 70%;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+}
+
+.stone.white {
+    background: var(--player1-color);
+    border: 2px solid #ccc;
+}
+
+.stone.black {
+    background: var(--player2-color);
+    border: 2px solid #000;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 16px;
+    margin: 20px 0;
+}
+
+.action-btn {
+    font-family: 'Cinzel', serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    padding: 10px 20px;
+    border: 2px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.3s;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.action-btn:hover {
+    background: rgba(255, 255, 255, 0.8);
+    transform: translateY(-2px);
+}
+
+.hidden {
+    display: none !important;
+}
+
+.message-box {
+    background: #333;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.game-footer {
+    margin-top: 40px;
+    font-size: 0.8rem;
+    opacity: 0.7;
+}

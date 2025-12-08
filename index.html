@@ -16,17 +16,44 @@
             <h1 class="title">SEVEN WONDERS</h1>
         </header>
 
-        <nav class="game-menu">
-            <ul class="game-list">
-                <li><a href="#pyramid" class="game-link">Pyramid</a></li>
-                <li><a href="#gardens" class="game-link">Gardens</a></li>
-                <li><a href="#temple" class="game-link">Temple</a></li>
-                <li><a href="#statue" class="game-link">Statue</a></li>
-                <li><a href="#mausoleum" class="game-link">Mausoleum</a></li>
-                <li><a href="#colossus" class="game-link">Colossus</a></li>
-                <li><a href="#pharos" class="game-link">Pharos</a></li>
-            </ul>
-        </nav>
+        <div class="menu-container-3d">
+            <div class="menu-flipper">
+                <div class="menu-face menu-front">
+                    <nav class="game-menu">
+                        <ul class="game-list">
+                            <li><a href="#pyramid" class="game-link" data-id="pyramid">Pyramid</a></li>
+                            <li><a href="#gardens" class="game-link" data-id="gardens">Gardens</a></li>
+                            <li><a href="#temple" class="game-link" data-id="temple">Temple</a></li>
+                            <li><a href="#statue" class="game-link" data-id="statue">Statue</a></li>
+                            <li><a href="#mausoleum" class="game-link" data-id="mausoleum">Mausoleum</a></li>
+                            <li><a href="#colossus" class="game-link" data-id="colossus">Colossus</a></li>
+                            <li><a href="pharos.html" class="game-link" data-id="pharos">Pharos</a></li>
+                        </ul>
+                        <div class="menu-toggle-wrapper">
+                            <button id="show-new-wonders" class="action-btn menu-toggle-btn">New Seven Wonders</button>
+                        </div>
+                    </nav>
+                </div>
+                <div class="menu-face menu-back">
+                    <nav class="game-menu">
+                        <ul class="game-list">
+                            <li><a href="colosseum.html" class="game-link coming-soon" data-id="colosseum">Colosseum</a>
+                            </li>
+                            <li><a href="#" class="game-link coming-soon" data-id="great_wall">Great Wall</a></li>
+                            <li><a href="tower.html" class="game-link coming-soon" data-id="tower">Tower</a></li>
+                            <li><a href="island.html" class="game-link coming-soon" data-id="island">Island</a></li>
+                            <li><a href="#" class="game-link coming-soon" data-id="citadell">Citadell</a></li>
+                            <li><a href="#" class="game-link coming-soon" data-id="church">Church</a></li>
+                            <li><a href="skyscraper.html" class="game-link coming-soon"
+                                    data-id="skyscraper">Skyscraper</a></li>
+                        </ul>
+                        <div class="menu-toggle-wrapper">
+                            <button id="show-old-wonders" class="action-btn menu-toggle-btn">Old Seven Wonders</button>
+                        </div>
+                    </nav>
+                </div>
+            </div>
+        </div>
 
         <div class="extra-buttons">
             <a href="events.html" class="action-btn back-btn">Events</a>

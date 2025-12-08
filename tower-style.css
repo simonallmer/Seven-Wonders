@@ -225,6 +225,18 @@ body {
     stroke-width: 2.5;
 }
 
+.tip-field {
+    stroke: #8b7355;
+    fill: rgba(212, 165, 116, 0.4);
+}
+
+.center-field {
+    stroke: #8b7355;
+    fill: rgba(255, 255, 255, 0.2);
+    /* Make it visually distinct, perhaps slightly smaller to look "inside" */
+    r: 10px;
+}
+
 /* Stones */
 .stone {
     pointer-events: none;

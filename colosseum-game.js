@@ -23,8 +23,22 @@ let gameState = {
     fields: [],
     selectedField: null,
     selectedStoneColor: null, // 'white', 'black', or null
-    stones: {} // Maps field key (ring-index) to stone color
+    stones: {}, // Maps field key (ring-index) to stone color
+    scores: { white: 0, black: 0 }
 };
+
+// ... (skipping unchanged code)
+
+// Make function available globally for HTML buttons
+window.adjustCount = function (color, amount) {
+    gameState.scores[color] += amount;
+    updateScoreDisplay();
+};
+
+function updateScoreDisplay() {
+    document.getElementById('white-count').textContent = gameState.scores.white;
+    document.getElementById('black-count').textContent = gameState.scores.black;
+}
 
 // ============================================
 // DOM ELEMENTS
@@ -58,7 +72,18 @@ function initializeBoard() {
     centerCircle.setAttribute('cy', BOARD_CONFIG.centerY);
     centerCircle.setAttribute('r', BOARD_CONFIG.centerRadius);
     centerCircle.setAttribute('class', 'center-circle');
+    centerCircle.setAttribute('data-ring', -1);
+    centerCircle.setAttribute('data-index', 0);
+
+    centerCircle.addEventListener('click', () => handleFieldClick(-1, 0));
+
     boardSVG.appendChild(centerCircle);
+
+    gameState.fields.push({
+        ring: -1,
+        index: 0,
+        element: centerCircle
+    });
 
     updateStatus('Board initialized - Click a field to select');
 }
@@ -186,13 +211,22 @@ function placeStone(ring, index, color) {
     gameState.stones[fieldKey] = color;
 
     // Calculate stone position (center of field)
-    const ringConfig = BOARD_CONFIG.rings[ring];
-    const angleStep = 360 / ringConfig.count;
-    const angle = (index * angleStep - 90 + angleStep / 2) * Math.PI / 180;
-    const radius = (ringConfig.innerRadius + ringConfig.outerRadius) / 2;
+    let x, y;
 
-    const x = BOARD_CONFIG.centerX + radius * Math.cos(angle);
-    const y = BOARD_CONFIG.centerY + radius * Math.sin(angle);
+    if (ring === -1) {
+        // Center field
+        x = BOARD_CONFIG.centerX;
+        y = BOARD_CONFIG.centerY;
+    } else {
+        // Ring fields
+        const ringConfig = BOARD_CONFIG.rings[ring];
+        const angleStep = 360 / ringConfig.count;
+        const angle = (index * angleStep - 90 + angleStep / 2) * Math.PI / 180;
+        const radius = (ringConfig.innerRadius + ringConfig.outerRadius) / 2;
+
+        x = BOARD_CONFIG.centerX + radius * Math.cos(angle);
+        y = BOARD_CONFIG.centerY + radius * Math.sin(angle);
+    }
 
     // Create stone circle
     const stone = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -253,5 +287,6 @@ blackBox.addEventListener('click', () => handleBoxClick('black'));
 
 document.addEventListener('DOMContentLoaded', () => {
     initializeBoard();
+    updateScoreDisplay();
     updateStatus('Click a stone box to select a stone, then click a field to place it.');
 });

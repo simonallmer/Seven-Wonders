@@ -1,0 +1,278 @@
+/* Import Cinzel font */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;700&display=swap');
+
+:root {
+    --marble-bg: #d4cfc4;
+    --dark-stone: #2a2520;
+    --player1-color: #f0f0f0;
+    --player2-color: #1a1a1a;
+    --selection-glow: #f59e0b;
+    --valid-move: #10b981;
+    --border-color: rgba(100, 90, 80, 0.3);
+    --cell-size: min(4.5vmin, 40px);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Cinzel', serif;
+    background-color: var(--marble-bg);
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 100px 100px;
+    min-height: 100vh;
+    color: var(--dark-stone);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.back-link {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: var(--dark-stone);
+    text-decoration: none;
+    font-size: 0.95rem;
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.2);
+    transition: all 0.3s;
+    z-index: 10;
+}
+
+.back-link:hover {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.game-header {
+    text-align: center;
+    margin: 40px 0 20px;
+}
+
+.game-title {
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--dark-stone);
+    text-shadow: 2px 2px 0px rgba(255, 255, 255, 0.3);
+}
+
+.game-subtitle {
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    color: rgba(42, 37, 32, 0.7);
+}
+
+/* Stone Boxes (Bags) */
+.stone-boxes {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 20px;
+}
+
+.stone-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.box-label {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--dark-stone);
+}
+
+.box-content {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 3px solid var(--border-color);
+    box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.2), 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+    position: relative;
+}
+
+.box-content:hover {
+    transform: translateY(-2px);
+    border-color: var(--selection-glow);
+}
+
+.box-content.selected {
+    border-color: var(--selection-glow);
+    box-shadow: 0 0 15px var(--selection-glow);
+    transform: scale(1.05);
+}
+
+.white-box .box-content {
+    background: radial-gradient(circle at 30% 30%, #f7f7f7, #d1d1d1);
+}
+
+.black-box .box-content {
+    background: radial-gradient(circle at 30% 30%, #4a4a4a, #1a1a1a);
+}
+
+.stone-count {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--dark-stone);
+}
+
+.black-box .stone-count {
+    color: #f0f0f0;
+}
+
+.status-panel {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(240, 235, 225, 0.2));
+    border: 1px solid var(--border-color);
+    padding: 12px 24px;
+    margin: 10px 0 20px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+.turn-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+}
+
+.current-player-indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin-right: 12px;
+    border: 2px solid var(--dark-stone);
+    background-color: var(--player1-color);
+}
+
+/* Church Board */
+.board-wrapper {
+    margin: 20px 0;
+    padding: 30px;
+    background: rgba(40, 30, 20, 0.1);
+    /* Slightly darker/different for indoors feel */
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+}
+
+.church-board {
+    display: grid;
+    /* 13x13 Grid */
+    grid-template-columns: repeat(13, var(--cell-size));
+    grid-template-rows: repeat(13, var(--cell-size));
+    gap: 0;
+}
+
+.cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    /* Basic tile floor pattern */
+    background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.1) 75%),
+        linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.1) 75%);
+    background-color: rgba(220, 215, 210, 0.5);
+    background-size: 10px 10px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+/* Center Field Differentiation (maybe Gold-ish tint?) */
+.cell.center-field {
+    background-color: rgba(230, 200, 150, 0.5);
+    border: 1px solid rgba(139, 69, 19, 0.2);
+}
+
+/* Valid grid positions will be populated, empty ones hidden or distinct */
+.cell.empty-space {
+    background: none;
+    border: none;
+    cursor: default;
+    pointer-events: none;
+}
+
+.cell:hover:not(.empty-space) {
+    background-color: rgba(255, 255, 255, 0.7);
+}
+
+.cell.valid-move {
+    background: rgba(16, 185, 129, 0.3) !important;
+    box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0.6);
+}
+
+.stone {
+    width: 70%;
+    height: 70%;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+}
+
+.stone.white {
+    background: var(--player1-color);
+    border: 2px solid #ccc;
+}
+
+.stone.black {
+    background: var(--player2-color);
+    border: 2px solid #000;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 16px;
+    margin: 20px 0;
+}
+
+.action-btn {
+    font-family: 'Cinzel', serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    padding: 10px 20px;
+    border: 2px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.3s;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.action-btn:hover {
+    background: rgba(255, 255, 255, 0.8);
+    transform: translateY(-2px);
+}
+
+.hidden {
+    display: none !important;
+}
+
+.message-box {
+    background: #333;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.game-footer {
+    margin-top: 40px;
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
