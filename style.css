@@ -225,11 +225,12 @@ body::before {
 .back-btn {
     font-size: 0.9rem;
     padding: 10px 25px;
-    opacity: 0.8;
+    opacity: 1;
 }
 
 .back-btn:hover {
     opacity: 1;
+    transform: translateY(-2px);
 }
 
 /* Product Section Styles */
