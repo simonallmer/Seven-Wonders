@@ -7,6 +7,7 @@
     <title>Colosseum - Seven Wonders</title>
     <meta name="description" content="Play Colosseum, an ancient strategy game from the Seven Wonders series">
     <link rel="stylesheet" href="colosseum-style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -21,24 +22,46 @@
 
     <!-- Stone Boxes -->
     <div class="stone-boxes">
-        <div class="stone-box white-box" id="white-box">
-            <div class="box-label">White Stones</div>
+        <div class="stone-box white-box active-turn" id="white-box">
+            <div class="box-label">White Player</div>
             <div class="box-content" data-color="white">
-                <div class="stone-count" id="white-count">∞</div>
-            </div>
-            <div class="manual-controls">
-                <button class="control-btn" onclick="adjustCount('white', 1)">+</button>
-                <button class="control-btn" onclick="adjustCount('white', -1)">-</button>
+                <!-- Status indicator only -->
             </div>
         </div>
-        <div class="stone-box black-box" id="black-box">
-            <div class="box-label">Black Stones</div>
-            <div class="box-content" data-color="black">
-                <div class="stone-count" id="black-count">∞</div>
+
+        <!-- Gladiator Strength Selection -->
+        <div class="strength-selector">
+            <div class="selector-label">Log in Strength</div>
+            <div class="strength-options">
+                <button class="strength-btn" data-strength="1" onclick="setStrength(1)">
+                    <span class="s-val">S:1</span>
+                    <span class="m-val">M:4</span>
+                </button>
+                <button class="strength-btn" data-strength="2" onclick="setStrength(2)">
+                    <span class="s-val">S:2</span>
+                    <span class="m-val">M:3</span>
+                </button>
+                <button class="strength-btn" data-strength="3" onclick="setStrength(3)">
+                    <span class="s-val">S:3</span>
+                    <span class="m-val">M:2</span>
+                </button>
+                <button class="strength-btn" data-strength="4" onclick="setStrength(4)">
+                    <span class="s-val">S:4</span>
+                    <span class="m-val">M:1</span>
+                </button>
+                <button class="strength-btn tiger-btn" onclick="setStrength('tiger')">
+                    <span class="tiger-icon">🐅</span>
+                    <span class="m-val">M:1</span>
+                </button>
             </div>
-            <div class="manual-controls">
-                <button class="control-btn" onclick="adjustCount('black', 1)">+</button>
-                <button class="control-btn" onclick="adjustCount('black', -1)">-</button>
+            <button class="auto-formation-btn" id="auto-formation" onclick="applyAutomaticFormation()">Automatic
+                Formation</button>
+        </div>
+
+        <div class="stone-box black-box" id="black-box">
+            <div class="box-label">Black Player</div>
+            <div class="box-content" data-color="black">
+                <!-- Status indicator only -->
             </div>
         </div>
     </div>
