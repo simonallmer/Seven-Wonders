@@ -240,6 +240,40 @@ body {
     box-shadow: 0 6px 15px rgba(212, 165, 116, 0.4);
 }
 
+.turn-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.moves-left {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #2a2520;
+    letter-spacing: 0.05em;
+}
+
+.end-turn-btn {
+    padding: 6px 16px;
+    background: rgba(255, 255, 255, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Cinzel', serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+}
+
+.end-turn-btn:hover {
+    background: #d4a574;
+    color: white;
+    border-color: #b08556;
+}
+
 /* Board */
 .board-wrapper {
     display: flex;
@@ -373,6 +407,12 @@ body.turn-black {
     font-size: 18px;
 }
 
+.die-selected .die-bg {
+    stroke: #d4a574;
+    stroke-width: 3;
+    filter: drop-shadow(0 0 5px #d4a574);
+}
+
 /* Center Circle */
 .center-circle {
     fill: var(--field-fill);
@@ -432,5 +472,27 @@ body.turn-black {
 
     .game-title {
         font-size: 2.2rem;
+    }
+}
+
+.field.danger-zone,
+.center-circle.danger-zone {
+    fill: #e57373 !important;
+    stroke: #d32f2f !important;
+    stroke-width: 3;
+    animation: danger-pulse 2s infinite;
+}
+
+@keyframes danger-pulse {
+    0% {
+        fill: #e57373;
+    }
+
+    50% {
+        fill: #ffcdd2;
+    }
+
+    100% {
+        fill: #e57373;
     }
 }

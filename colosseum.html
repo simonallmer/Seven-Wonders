@@ -35,27 +35,27 @@
             <div class="strength-options">
                 <button class="strength-btn" data-strength="1" onclick="setStrength(1)">
                     <span class="s-val">S:1</span>
-                    <span class="m-val">M:4</span>
+                    <span class="m-val">Cost: 1</span>
                 </button>
                 <button class="strength-btn" data-strength="2" onclick="setStrength(2)">
                     <span class="s-val">S:2</span>
-                    <span class="m-val">M:3</span>
+                    <span class="m-val">Cost: 2</span>
                 </button>
                 <button class="strength-btn" data-strength="3" onclick="setStrength(3)">
                     <span class="s-val">S:3</span>
-                    <span class="m-val">M:2</span>
-                </button>
-                <button class="strength-btn" data-strength="4" onclick="setStrength(4)">
-                    <span class="s-val">S:4</span>
-                    <span class="m-val">M:1</span>
+                    <span class="m-val">Cost: 3</span>
                 </button>
                 <button class="strength-btn tiger-btn" onclick="setStrength('tiger')">
                     <span class="tiger-icon">🐅</span>
-                    <span class="m-val">M:1</span>
+                    <span class="m-val">Cost: 3</span>
                 </button>
             </div>
             <button class="auto-formation-btn" id="auto-formation" onclick="applyAutomaticFormation()">Automatic
                 Formation</button>
+            <div class="turn-controls">
+                <div class="moves-left">Moves Left: <span id="moves-count">3</span></div>
+                <button class="end-turn-btn" onclick="switchTurn()">End Turn</button>
+            </div>
         </div>
 
         <div class="stone-box black-box" id="black-box">
