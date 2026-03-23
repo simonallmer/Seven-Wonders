@@ -32,8 +32,8 @@ let validMoves = [];
 let gameState = 'SELECT_STONE';
 let isInLeapChain = false;
 let leapChainStart = null;
-let isVsComputer = false;
-let computerDifficulty = 'easy';
+let isVsComputer = localStorage.getItem('templeVsComputer') === null ? true : localStorage.getItem('templeVsComputer') === 'true';
+let computerDifficulty = localStorage.getItem('templeDifficulty') || 'medium';
 let isAnimating = false; // Global flag to block all interaction during stone movement
 let moveHistory = []; // Track path directions for leap chaining constraint
 
@@ -1081,6 +1081,17 @@ if (cancelBtn) cancelBtn.addEventListener('click', cancelMove);
 // Opponent Menu Toggle Logic
 const opponentBtnText = document.getElementById('opponent-btn');
 const opponentMenu = document.getElementById('opponent-menu');
+
+// Set initial button text based on stored preferences
+if (opponentBtnText) {
+    if (isVsComputer) {
+        const levelLabel = computerDifficulty.charAt(0).toUpperCase() + computerDifficulty.slice(1);
+        opponentBtnText.textContent = `Computer: ${levelLabel}`;
+    } else {
+        opponentBtnText.textContent = 'Opponent: Human';
+    }
+}
+
 if (opponentBtnText && opponentMenu) {
     opponentBtnText.addEventListener('click', () => {
         opponentMenu.classList.toggle('show-menu');
@@ -1098,10 +1109,13 @@ if (opponentBtnText && opponentMenu) {
             
             if (opp === 'human') {
                 isVsComputer = false;
+                localStorage.setItem('templeVsComputer', 'false');
                 opponentBtnText.textContent = 'Opponent: Human';
             } else {
                 isVsComputer = true;
                 computerDifficulty = opp;
+                localStorage.setItem('templeVsComputer', 'true');
+                localStorage.setItem('templeDifficulty', opp);
                 const levelLabel = opp.charAt(0).toUpperCase() + opp.slice(1);
                 opponentBtnText.textContent = `Computer: ${levelLabel}`;
             }

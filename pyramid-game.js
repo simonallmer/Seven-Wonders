@@ -45,7 +45,7 @@ let selectedStone = null;
 let validMoves = [];
 let gameState = 'SELECT_STONE';
 let lastPush = null;
-let isVsComputer = false;
+let isVsComputer = localStorage.getItem('pyramidVsComputer') === null ? true : localStorage.getItem('pyramidVsComputer') === 'true';
 let isMoveInProgress = false; // Block input during move
 let turnInProgress = false;
 
@@ -130,11 +130,14 @@ function initializeUI() {
 
     opponentBtn.addEventListener('click', () => {
         isVsComputer = !isVsComputer;
+        localStorage.setItem('pyramidVsComputer', isVsComputer);
         opponentBtn.textContent = isVsComputer ? 'Opponent: Computer' : 'Opponent: Human';
         if (isVsComputer && currentPlayer === 'black' && gameState !== 'GAME_OVER') {
             setTimeout(makeAIMove, 600);
         }
     });
+    
+    opponentBtn.textContent = isVsComputer ? 'Opponent: Computer' : 'Opponent: Human';
 
     rulesBtn.addEventListener('click', () => {
         rulesModal.classList.remove('hidden');
