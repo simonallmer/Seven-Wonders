@@ -313,6 +313,9 @@ body.view-3d::before {
     padding: 5px;
     box-shadow: 0 10px 20px rgba(0,0,0,0.6);
     z-index: 100;
+    max-height: 50vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 .players-menu button.active {
     background: rgba(255, 255, 255, 0.3);

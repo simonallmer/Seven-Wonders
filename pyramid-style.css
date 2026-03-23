@@ -203,11 +203,14 @@ html, body {
     transform: translateX(100%);
     transition: transform var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
     backdrop-filter: blur(20px);
+    overflow: hidden;
 }
 
 .side-menu.open {
     transform: translateX(0);
     overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
 }
 
 .menu-content {
@@ -215,6 +218,8 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 24px;
+    min-height: 100%;
+    box-sizing: border-box;
 }
 
 .game-title {
