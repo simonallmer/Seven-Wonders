@@ -7,103 +7,125 @@
     <title>Mausoleum - Seven Wonders</title>
     <meta name="description" content="Play Mausoleum, an ancient strategy game from the Seven Wonders series">
     <link rel="stylesheet" href="mausoleum-style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
 </head>
 
-<body>
-    <!-- Back to Menu -->
-    <a href="index.html" class="back-link">← Back to Seven Wonders</a>
+<body class="view-3d">
+    <div id="game-container">
+        <div id="canvas3d" class="canvas-container"></div>
+    </div>
 
-    <!-- Header -->
-    <header class="game-header">
-        <h1 class="game-title">MAUSOLEUM</h1>
-        <p class="game-subtitle">The Mausoleum at Halicarnassus</p>
-    </header>
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <a href="index.html" class="top-bar-btn top-bar-link">← Menu</a>
+        <button id="menu-toggle" class="top-bar-btn menu-toggle-btn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
 
-    <!-- Game Status -->
-    <div class="status-panel">
-        <div class="turn-display">
-            <span>Current Turn: </span>
-            <span id="current-player" class="player-name">White</span>
+    <!-- Side Menu -->
+    <div id="side-menu" class="side-menu">
+        <div class="menu-content">
+            <h1 class="game-title">MAUSOLEUM</h1>
+            
+            <div class="player-info">
+                <div class="current-player-display">
+                    <div id="player-indicator" class="player-indicator"></div>
+                    <span id="player-name">White's Turn</span>
+                </div>
+            </div>
+
+            <div class="stone-counts-display">
+                <div class="count-item">
+                    <div class="count-stone white"></div>
+                    <span id="p1-count-hud">9</span>
+                </div>
+                <div class="count-item">
+                    <div class="count-stone black"></div>
+                    <span id="p2-count-hud">9</span>
+                </div>
+            </div>
+
+            <div class="menu-divider"></div>
+
+            <button id="player-count-btn" class="menu-btn">Players: 2</button>
+            <button id="opponent-btn" class="menu-btn">Opponent: Human</button>
+            <button id="rules-btn" class="menu-btn">Rules</button>
+            <button id="reset-button" class="menu-btn">Reset Game</button>
+            <button id="close-menu-btn" class="menu-btn">Close Menu</button>
+            
+            <div class="menu-footer">
+                <p>Design: Simon Allmer</p>
+                <p>3D Mode Active</p>
+            </div>
         </div>
-        <div class="stone-counts">
-            <span>White Stones: <strong id="player1-count">9</strong></span>
-            <span class="separator">•</span>
-            <span>Black Stones: <strong id="player2-count">9</strong></span>
-        </div>
     </div>
 
-    <!-- Game Board -->
-    <div class="board-wrapper">
-        <svg id="game-board" viewBox="0 0 100 100"></svg>
-    </div>
+    <!-- Game Message -->
+    <div id="game-message" class="game-message hidden"></div>
 
-    <!-- Reset / Rules Buttons -->
-    <div style="display:flex; gap:12px; justify-content:center;">
-        <button id="reset-button" class="action-btn">New Game</button>
-        <button id="opponent-btn" class="action-btn opponent-btn">Opponent: Human</button>
-        <button id="rules-btn" class="action-btn rules-btn">Rules</button>
-    </div>
-
-    <!-- Message Box (Game Over) -->
-    <div id="message-box" class="message-overlay">
-        <div class="message-content">
+    <!-- Game Over Overlay -->
+    <div id="message-box" class="message-overlay" onclick="this.classList.remove('visible')">
+        <div class="message-content" onclick="event.stopPropagation()">
             <h2 id="message-title" class="message-title"></h2>
             <p id="message-text" class="message-text"></p>
+            <div class="modal-buttons">
+                <button onclick="location.reload()" class="modal-btn">Play Again</button>
+                <a href="index.html" class="modal-btn secondary">Menu</a>
+            </div>
         </div>
     </div>
 
     <!-- Rules Modal -->
     <div id="rules-modal" class="rules-modal" style="display:none;">
-        <div class="rules-overlay" id="rules-overlay"></div>
+        <div class="rules-overlay" id="rules-overlay" onclick="document.getElementById('rules-modal').style.display='none'"></div>
         <div class="rules-content">
             <h2>Mausoleum Rules</h2>
             <div class="rules-body">
-                <p><strong>GOAL</strong>
-                    Reduce the opponent's stones to fewer than four by forming circles. The first player to achieve this
-                    wins.</p>
-
-                <p><strong>SETUP</strong>
-                    Each player receives 9 stones. They are automatically placed on the two shortest rows on each
-                    player's side of the board. The starting player is determined randomly.</p>
-
-                <p><strong>GLIDE</strong>
-                    On your turn, move one stone in a straight line. It continues in that direction until it hits the
-                    edge of the board or a stone blocks its path — stopping on the space immediately before. No two
-                    stones may share a space.</p>
-
-                <p><strong>CIRCLE</strong>
-                    A stone is fully encircled when it has no adjacent empty spaces. A fully encircled stone is removed
-                    if it is surrounded by more opponent stones than friendly stones. If a stone has only one free
-                    adjacent field remaining, it is trapped and unable to move.
-                    <br><em>Fewer stones are needed to complete a circle or trap along the edge of the board.</em>
-                    <br><em>If two circles are formed in one turn, both are resolved simultaneously.</em>
-                </p>
-
-                <p><strong>WINNING</strong>
-                    The game ends immediately when a player is reduced to fewer than 4 stones. That player loses. If
-                    both players fall below 4 stones on the same turn, the game is a draw.</p>
+                <p><strong>GOAL</strong><br>Reduce opponent to fewer than 4 stones.</p>
+                <p><strong>GLIDE</strong><br>Move stones in straight lines across the network until blocked by another stone or the edge.</p>
+                <p><strong>ENCIRCLE</strong><br>Remove stones by encircling them with more of your stones than they have friendly neighbors.</p>
+                <p><strong>TRAPPED</strong><br>A stone with only one empty neighbor cannot move.</p>
             </div>
             <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
         </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="game-footer">
-        <p><a href="https://sevenwondersgames.com"
-                style="color: inherit; text-decoration: none;">SevenWondersGames.com</a></p>
-        <p>Game Design: Simon Allmer</p>
-    </footer>
-
+    <script>window.is3DView = true;</script>
     <script src="mausoleum-game.js"></script>
+    <script src="mausoleum-3d.js"></script>
     <script>
-        document.getElementById('rules-btn').addEventListener('click', function () {
-            document.getElementById('rules-modal').style.display = 'flex';
+        const menuToggle = document.getElementById('menu-toggle');
+        const sideMenu = document.getElementById('side-menu');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+        const rulesBtn = document.getElementById('rules-btn');
+        const rulesModal = document.getElementById('rules-modal');
+        const rulesCloseBtn = document.getElementById('rules-close-btn');
+
+        function toggleMenu() {
+            menuToggle.classList.toggle('active');
+            sideMenu.classList.toggle('open');
+        }
+
+        menuToggle.addEventListener('click', toggleMenu);
+        closeMenuBtn.addEventListener('click', toggleMenu);
+
+        rulesBtn.addEventListener('click', () => {
+            rulesModal.style.display = 'flex';
+            if (sideMenu.classList.contains('open')) toggleMenu(); 
         });
-        document.getElementById('rules-close-btn').addEventListener('click', function () {
-            document.getElementById('rules-modal').style.display = 'none';
-        });
-        document.getElementById('rules-overlay').addEventListener('click', function () {
-            document.getElementById('rules-modal').style.display = 'none';
+        rulesCloseBtn.addEventListener('click', () => rulesModal.style.display = 'none');
+
+        // Spacebar shortcut for menu
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                toggleMenu();
+            }
         });
     </script>
 </body>
