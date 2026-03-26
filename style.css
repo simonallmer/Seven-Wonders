@@ -177,9 +177,9 @@ body::before {
 
 /* Coming Soon Games */
 .game-link.coming-soon {
-    color: rgba(42, 37, 32, 0.35);
-    cursor: not-allowed;
-    opacity: 0.5;
+    color: rgba(128, 128, 128, 0.6);
+    cursor: default;
+    opacity: 1;
 }
 
 .game-link.coming-soon:hover {

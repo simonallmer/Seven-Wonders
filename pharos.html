@@ -9,9 +9,57 @@
     <link rel="stylesheet" href="pharos-style.css">
 </head>
 
-<body>
-    <!-- Back to Menu -->
-    <a href="index.html" class="back-link">← Back to Seven Wonders</a>
+<body class="view-3d">
+    <!-- Overlay for side menu -->
+    <div id="overlay" class="overlay"></div>
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <a href="index.html" class="top-bar-btn top-bar-link">← Menu</a>
+        <button id="menu-toggle" class="top-bar-btn menu-toggle-btn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+
+    <!-- Side Menu -->
+    <div id="side-menu" class="side-menu">
+        <div class="menu-content">
+            <h1 class="game-title" style="text-align: center; font-size: 2.2rem; margin-bottom: 5px;">PHAROS</h1>
+            <p class="game-subtitle" style="text-align: center; margin-top: 0; opacity: 0.7; color: #d4cfc4; font-family: 'Cinzel', serif;">The Lighthouse of Alexandria</p>
+            
+            <div class="player-info">
+                <div class="current-player-display">
+                    <div id="player-indicator" class="count-stone white" style="width: 20px; height: 20px; margin-right: 10px; border-radius: 50%; border: 1px solid #2a2520;"></div>
+                    <span id="player-name">White's Turn</span>
+                </div>
+            </div>
+
+            <div class="menu-divider" style="height: 1px; background: rgba(100, 90, 80, 0.2); margin: 20px 0;"></div>
+
+            <div class="action-buttons-vertical" style="display: flex; flex-direction: column; gap: 10px;">
+                <button id="end-turn-menu" class="menu-btn hidden">End Turn</button>
+            </div>
+
+            <div class="menu-divider" style="height: 1px; background: rgba(100, 90, 80, 0.2); margin: 20px 0;"></div>
+
+            <button id="opponent-btn-menu" class="menu-btn">Opponent: Human</button>
+            <div class="view-dropdown">
+                <button id="view-toggle-btn" class="menu-btn">View: 3D</button>
+                <div id="view-dropdown-content" class="dropdown-content">
+                    <div class="dropdown-item active">3D View (Current)</div>
+                    <div class="dropdown-item">2D View <span class="coming-soon-tag">Coming Soon</span></div>
+                </div>
+            </div>
+            <button id="rules-btn-menu" class="menu-btn">Rules</button>
+            <button id="reset-button-menu" class="menu-btn">New Game</button>
+            <button id="close-menu-btn" class="menu-btn">Close</button>
+        </div>
+    </div>
+
+    <!-- Game Status Display (Floating Box) -->
+    <div id="game-message" class="game-message hidden"></div>
 
     <!-- Header -->
     <header class="game-header">
@@ -32,9 +80,10 @@
         <div class="board-container" id="game-board">
             <!-- Board cells will be generated here by JavaScript -->
         </div>
+        <div id="canvas3d"></div>
     </div>
 
-    <!-- Action Buttons -->
+    <!-- Action Buttons (Mobile/Legacy) -->
     <div class="action-buttons">
         <button id="end-turn-button" class="action-btn end-turn-btn hidden" disabled>
             End Turn
@@ -57,6 +106,10 @@
         <div class="message-content">
             <h2 id="modal-title">Game Over</h2>
             <p id="modal-text"></p>
+            <div class="modal-buttons">
+                <button id="modal-reset-btn" class="modal-btn">Play Again</button>
+                <a href="index.html" class="modal-btn">Main Menu</a>
+            </div>
         </div>
     </div>
 
@@ -76,7 +129,7 @@
                     activated.</p>
 
                 <p><strong>GAMEPLAY</strong>
-                    White begins and has to make a movement. Afterwards Black continues. Players can only move one stone per turn.</p>
+                    White begins and has to make a movement. After that, Red takes their turn. Players can move one stone per turn (chains/multiple moves are possible if light allows).</p>
 
                 <p><strong>MOVEMENT</strong>
                     Stones cannot move by themselves. Instead, stones of the same color can send off light horizontally
@@ -107,17 +160,98 @@
         <p>Game Design: Simon Allmer</p>
     </footer>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
     <script src="pharos-game.js"></script>
+    <script src="pharos-3d.js"></script>
     <script>
-        document.getElementById('rules-btn').addEventListener('click', function () {
+        // Init 3D by default
+        window.is3DView = true;
+        setTimeout(() => { if (typeof init3D === 'function') init3D(); }, 100);
+
+        // UI Side Menu Logic
+        const menuToggle = document.getElementById('menu-toggle');
+        const sideMenu = document.getElementById('side-menu');
+        const overlay = document.getElementById('overlay');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+        const rulesBtnMenu = document.getElementById('rules-btn-menu');
+        const resetBtnMenu = document.getElementById('reset-button-menu');
+        const endTurnMenu = document.getElementById('end-turn-menu');
+        const opponentBtnMenu = document.getElementById('opponent-btn-menu');
+        const viewToggleBtn = document.getElementById('view-toggle-btn');
+
+        function toggleMenu() {
+            sideMenu.classList.toggle('open');
+            menuToggle.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+        window.toggleMenu = toggleMenu; // Make globally accessible
+
+        if (menuToggle) menuToggle.addEventListener('click', toggleMenu);
+        if (overlay) overlay.addEventListener('click', toggleMenu);
+        if (closeMenuBtn) closeMenuBtn.addEventListener('click', toggleMenu);
+
+        if (rulesBtnMenu) rulesBtnMenu.addEventListener('click', () => {
             document.getElementById('rules-modal').style.display = 'flex';
+            toggleMenu();
         });
-        document.getElementById('rules-close-btn').addEventListener('click', function () {
+
+        if (resetBtnMenu) resetBtnMenu.addEventListener('click', () => {
+            if (typeof initializeBoard === 'function') initializeBoard();
+            toggleMenu();
+        });
+
+        if (endTurnMenu) endTurnMenu.addEventListener('click', () => {
+            if (typeof endTurn === 'function') {
+                showMessage(`${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)} chose to end their movement chain.`);
+                endTurn();
+            }
+            toggleMenu();
+        });
+        
+        if (opponentBtnMenu) opponentBtnMenu.addEventListener('click', () => {
+            showMessage("Computer Opponent: Coming Soon");
+        });
+
+        if (viewToggleBtn) viewToggleBtn.addEventListener('click', () => {
+            const dropdown = document.getElementById('view-dropdown-content');
+            if (dropdown) dropdown.classList.toggle('show');
+        });
+
+        if (rulesBtnMenu) rulesBtnMenu.addEventListener('click', () => {
+            const rulesModal = document.getElementById('rules-modal');
+            if (rulesModal) rulesModal.style.display = 'flex';
+        });
+
+        const rulesBtn = document.getElementById('rules-btn');
+        if (rulesBtn) rulesBtn.addEventListener('click', () => {
+            const rulesModal = document.getElementById('rules-modal');
+            if (rulesModal) rulesModal.style.display = 'flex';
+        });
+
+        const rulesCloseBtn = document.getElementById('rules-close-btn');
+        if (rulesCloseBtn) rulesCloseBtn.addEventListener('click', () => {
             document.getElementById('rules-modal').style.display = 'none';
         });
-        document.getElementById('rules-overlay').addEventListener('click', function () {
+
+        const rulesOverlayInModal = document.getElementById('rules-overlay');
+        if (rulesOverlayInModal) rulesOverlayInModal.addEventListener('click', () => {
             document.getElementById('rules-modal').style.display = 'none';
         });
+
+        // Sync menu buttons with main buttons
+        function updateMenuButtons() {
+            const endBtn = document.getElementById('end-turn-button');
+            if (endBtn && !endBtn.classList.contains('hidden')) {
+                endTurnMenu.classList.remove('hidden');
+            } else {
+                endTurnMenu.classList.add('hidden');
+            }
+        }
+        
+        // Polling for UI sync
+        setInterval(updateMenuButtons, 500);
     </script>
 </body>
 

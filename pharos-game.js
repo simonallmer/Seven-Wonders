@@ -49,6 +49,14 @@ const opponentButton = document.getElementById('opponent-btn');
 const gameOverModal = document.getElementById('game-over-modal');
 const modalTitle = document.getElementById('modal-title');
 const modalText = document.getElementById('modal-text');
+const modalResetBtn = document.getElementById('modal-reset-btn');
+
+if (modalResetBtn) {
+    modalResetBtn.addEventListener('click', () => {
+        hideGameOverModal();
+        initializeBoard();
+    });
+}
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -120,7 +128,7 @@ function initializeBoard() {
         board[BOARD_SIZE - 1][c].piece = 'white';
     }
 
-    // Black stones (Col 0 and 8)
+    // Red stones (Col 0 and 8)
     for (let r = START_INDEX; r <= END_INDEX; r++) {
         board[r][0].piece = 'black';
     }
@@ -135,7 +143,7 @@ function initializeBoard() {
     // Check for game start condition
     if (!canMove('white')) {
         gameState = 'GAME_OVER';
-        showMessage(`Game Over! White has no legal moves. Black wins!`, true);
+        showMessage(`Game Over! White has no legal moves. Red wins!`, true);
     } else {
         resetMoveState(true);
     }
@@ -145,6 +153,8 @@ function initializeBoard() {
     updateUI();
     hideMessage();
     hideGameOverModal();
+
+    if (window.is3DView && typeof sync3D === 'function') sync3D();
 }
 
 function showGameOverModal(title, text) {
@@ -179,6 +189,18 @@ function resetMoveState(fullReset = false) {
     drawBoard();
     updateStatus();
     updateUI();
+    
+    // Update indicator color based on current player
+    const indicator = document.getElementById('player-indicator');
+    if (indicator) {
+        indicator.className = 'count-stone ' + currentPlayer;
+        if (currentPlayer === 'black') {
+            indicator.style.backgroundColor = '#8b0000';
+        } else {
+            indicator.style.backgroundColor = '#ffffff';
+        }
+    }
+    if (window.is3DView && typeof sync3D === 'function') sync3D();
 }
 
 function drawBoard() {
@@ -197,8 +219,9 @@ function drawBoard() {
             // Add beacon visual indicators
             if (isBeaconField(r, c)) {
                 if (litBeacons[key]) {
+                    const displayColorClass = litBeacons[key] === 'black' ? 'red' : litBeacons[key];
                     const litIndicator = document.createElement('div');
-                    litIndicator.classList.add('beacon-lit-indicator', `beacon-lit-${litBeacons[key]}`);
+                    litIndicator.classList.add('beacon-lit-indicator', `beacon-lit-${displayColorClass}`);
                     cell.appendChild(litIndicator);
                 } else {
                     const unlitIndicator = document.createElement('div');
@@ -248,27 +271,56 @@ function drawBoard() {
             boardElement.appendChild(cell);
         }
     }
+    if (window.is3DView && typeof update3DViews === 'function') update3DViews();
 }
 
 function updateStatus(message = null) {
-    playerColorElement.className = `current-player-indicator`;
-    playerColorElement.style.backgroundColor = currentPlayer === 'white' ? '#ffffff' : '#1a1a1a';
-    playerColorElement.style.borderColor = currentPlayer === 'white' ? '#1a1a1a' : '#ffffff';
+    const statusEl = document.getElementById('game-status');
+    const playerEl = document.getElementById('player-name');
+    const playerColorEl = document.getElementById('current-player-color');
+    const playerIndicatorEl = document.getElementById('player-indicator');
+    
+    const displayColor = currentPlayer === 'white' ? 'White' : 'Red';
+    const activeColor = currentPlayer === 'white' ? '#ffffff' : '#ff4d4d'; // Match Skyscraper/3D Red
+    const borderColor = currentPlayer === 'white' ? '#1a1a1a' : '#ffd700';
 
-    if (gameState === 'GAME_OVER') return;
+    if (gameState === 'GAME_OVER') {
+        if (playerEl) playerEl.textContent = `${displayColor} Wins!`;
+        if (statusEl) statusEl.textContent = "Game Over! Select New Game to restart.";
+        if (playerColorEl) {
+            playerColorEl.style.backgroundColor = activeColor;
+            playerColorEl.style.borderColor = borderColor;
+        }
+        if (playerIndicatorEl) {
+            playerIndicatorEl.style.backgroundColor = activeColor;
+            playerIndicatorEl.style.borderColor = borderColor;
+        }
+        return;
+    }
+
+    if (playerEl) playerEl.textContent = `${displayColor}'s Turn`;
+    
+    if (playerColorEl) {
+        playerColorEl.style.backgroundColor = activeColor;
+        playerColorEl.style.borderColor = borderColor;
+    }
+    if (playerIndicatorEl) {
+        playerIndicatorEl.style.backgroundColor = activeColor;
+        playerIndicatorEl.style.borderColor = borderColor;
+    }
 
     if (message) {
-        statusElement.textContent = message;
+        if (statusEl) statusEl.textContent = message;
     } else {
         let statusText = ``;
         if (gameState === 'SELECT_MOVE_STONE') {
             statusText = `to move. Select a stone to start the move.`;
         } else if (gameState === 'SELECT_LIGHT_SOURCE') {
-            statusText = `to move. Select the Light Source (pulsing blue) to enable the move.`;
+            statusText = `to move. Select the Light Source (pulsing blue).`;
         } else if (gameState === 'SELECT_TARGET_CELL') {
-            statusText = `to move. Select the Target Cell (green highlight) or click the moving stone/End Turn.`;
+            statusText = `to move. Select the Target Cell (green) or click the moving stone.`;
         }
-        statusElement.textContent = `${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)} ${statusText}`;
+        if (statusEl) statusEl.textContent = `${displayColor} ${statusText}`;
     }
 }
 
@@ -483,6 +535,7 @@ function handleCellClick(r, c) {
                     drawBoard();
                     updateStatus();
                 }
+                if (window.is3DView && typeof sync3D === 'function') sync3D();
             } else {
                 showMessage(`Stone at (${r},${c}) cannot move: no available light source found. Select another stone.`, true);
             }
@@ -506,6 +559,7 @@ function handleCellClick(r, c) {
             gameState = 'SELECT_TARGET_CELL';
             drawBoard();
             updateStatus();
+            if (window.is3DView && typeof sync3D === 'function') sync3D();
             return;
         }
 
@@ -529,6 +583,16 @@ function handleCellClick(r, c) {
 }
 
 function executeMove(targetPos) {
+    if (window.is3DView && typeof animate3DMove === 'function') {
+        animate3DMove(moveSource.r, moveSource.c, targetPos.r, targetPos.c).then(() => {
+            finalizeMove(targetPos);
+        });
+    } else {
+        finalizeMove(targetPos);
+    }
+}
+
+function finalizeMove(targetPos) {
     const { r: sourceR, c: sourceC } = moveSource;
     const { r: targetR, c: targetC } = targetPos;
 
@@ -571,7 +635,6 @@ function executeMove(targetPos) {
     if (isBeaconField(targetR, targetC)) {
         const key = `${targetR},${targetC}`;
         const oldBeaconOwner = litBeacons[key];
-
         litBeacons[key] = movingPiece;
 
         if (oldBeaconOwner !== movingPiece) {
@@ -618,6 +681,8 @@ function executeMove(targetPos) {
         showMessage(`${message}No more available light sources for the stone at (${targetR},${targetC}). Turn ends.`, false);
         endTurn();
     }
+    
+    if (window.is3DView && typeof sync3D === 'function') sync3D();
 }
 
 function endTurn() {
@@ -627,13 +692,20 @@ function endTurn() {
     resetMoveState(true);
 
     if (!canMove(losingPlayer)) {
-        updateStatus(`Game Over! ${winningPlayer.charAt(0).toUpperCase() + winningPlayer.slice(1)} wins!`);
         gameState = 'GAME_OVER';
-        showGameOverModal(
-            `${winningPlayer.charAt(0).toUpperCase() + winningPlayer.slice(1)} Wins!`,
-            `${winningPlayer.charAt(0).toUpperCase() + winningPlayer.slice(1)} wins because ${losingPlayer} has no legal moves!`
-        );
+        const winTitle = winningPlayer === 'white' ? "White Wins!" : "Red Wins!";
+        const winnerName = winningPlayer === 'white' ? "White" : "Red";
+        const loserName = winningPlayer === 'white' ? "Red" : "White";
+        const winText = `${winnerName} wins because ${loserName} has no legal moves!`;
+        
+        showGameOverModal(winTitle, winText);
+        updateStatus(`Game Over! ${winTitle}`);
         drawBoard();
+        
+        // Open the side menu automatically to show results and buttons
+        if (typeof toggleMenu === 'function') {
+            setTimeout(() => toggleMenu(), 1000);
+        }
         return;
     }
 
@@ -689,9 +761,7 @@ endTurnButton.addEventListener('click', () => {
 });
 let _opponentBtnTimeout = null;
 opponentButton.addEventListener('click', () => {
-    clearTimeout(_opponentBtnTimeout);
-    isVsComputer = !isVsComputer;
-    opponentButton.textContent = isVsComputer ? 'Opponent: Computer' : 'Opponent: Human';
+    showMessage("Computer Opponent: Coming Soon");
 });
 
 
