@@ -312,15 +312,7 @@ function updateStatus(message = null) {
     if (message) {
         if (statusEl) statusEl.textContent = message;
     } else {
-        let statusText = ``;
-        if (gameState === 'SELECT_MOVE_STONE') {
-            statusText = `to move.`;
-        } else if (gameState === 'SELECT_LIGHT_SOURCE') {
-            statusText = `to move. Select a light source.`;
-        } else if (gameState === 'SELECT_TARGET_CELL') {
-            statusText = `to move. Select a target cell.`;
-        }
-        if (statusEl) statusEl.textContent = `${displayColor} ${statusText}`;
+        if (statusEl) statusEl.textContent = `${displayColor}'s Turn`;
     }
 }
 
@@ -529,7 +521,7 @@ function handleCellClick(r, c) {
                     potentialLightSources = [];
                     gameState = 'SELECT_TARGET_CELL';
                     drawBoard();
-                    updateStatus('Select target.');
+                    updateStatus();
                 } else {
                     gameState = 'SELECT_LIGHT_SOURCE';
                     drawBoard();
@@ -671,11 +663,11 @@ function finalizeMove(targetPos) {
             potentialLightSources = [];
             gameState = 'SELECT_TARGET_CELL';
             drawBoard();
-            updateStatus(`Select next target.`);
+            updateStatus();
         } else {
             gameState = 'SELECT_LIGHT_SOURCE';
             drawBoard();
-            updateStatus(`Select next light source.`);
+            updateStatus();
         }
     } else {
         showMessage(`${message}No more available light sources for the stone at (${targetR},${targetC}). Turn ends.`, false);
