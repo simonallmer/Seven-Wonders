@@ -71,7 +71,7 @@
     <div class="status-panel">
         <div class="turn-display">
             <div class="current-player-indicator" id="current-player-color"></div>
-            <span id="game-status">White's Turn</span>
+            <span id="game-status"></span>
         </div>
     </div>
 
@@ -168,7 +168,7 @@
     <script>
         // Init 3D by default
         window.is3DView = true;
-        setTimeout(() => { if (typeof init3D === 'function') init3D(); }, 100);
+        setTimeout(() => { if (typeof init3D === 'function') init3D(); }, 0);
 
         // UI Side Menu Logic
         const menuToggle = document.getElementById('menu-toggle');

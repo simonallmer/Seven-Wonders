@@ -325,7 +325,7 @@ function updateStatus(msg) {
     if (msg) statusElement.textContent = msg;
     else {
         const player = currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1);
-        statusElement.textContent = `${player} to move.`;
+        statusElement.textContent = `${player}'s Turn`;
     }
     playerColorElement.style.backgroundColor = currentPlayer === 'white' ? '#fff' : '#1a1a1a';
 }

@@ -385,7 +385,19 @@ body.view-3d {
     padding: 0;
     margin: 0;
     overflow: hidden;
-    background: #050505;
+    background: #050510;
+    transition: background-color 0.5s ease;
+}
+
+body.view-3d .status-panel {
+    opacity: 0;
+    transform: translate(-50%, 20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+body.view-3d .status-panel.visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
 }
 
 body.view-3d .game-header {

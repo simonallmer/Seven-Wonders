@@ -150,7 +150,11 @@ function initializeBoard() {
 
     drawBoard();
     updateUI();
-    updateUI();
+    
+    // Ensure the status panel is hidden initially
+    const statusElPanel = document.getElementById('game-status')?.closest('.status-panel');
+    if (statusElPanel) statusElPanel.classList.remove('visible');
+    
     hideMessage();
     hideGameOverModal();
 
@@ -312,7 +316,23 @@ function updateStatus(message = null) {
     if (message) {
         if (statusEl) statusEl.textContent = message;
     } else {
-        if (statusEl) statusEl.textContent = `${displayColor}'s Turn`;
+        let statusText = ``;
+        if (gameState === 'SELECT_MOVE_STONE') {
+            statusText = `to move. Select a stone to start the move.`;
+        } else if (gameState === 'SELECT_LIGHT_SOURCE') {
+            statusText = `to move. Select the Light Source (pulsing blue).`;
+        } else if (gameState === 'SELECT_TARGET_CELL') {
+            statusText = `to move. Select the Target Cell (green) or click the moving stone.`;
+        }
+        if (statusEl) {
+            statusEl.textContent = `${displayColor} ${statusText}`;
+            
+            // Add visible class with a tiny delay to ensure a clean fade-in
+            setTimeout(() => {
+                const panel = statusEl.closest('.status-panel');
+                if (panel) panel.classList.add('visible');
+            }, 100);
+        }
     }
 }
 
@@ -521,7 +541,7 @@ function handleCellClick(r, c) {
                     potentialLightSources = [];
                     gameState = 'SELECT_TARGET_CELL';
                     drawBoard();
-                    updateStatus();
+                    updateStatus('Single light source automatically used. Select a move target (green highlight) or End Turn.');
                 } else {
                     gameState = 'SELECT_LIGHT_SOURCE';
                     drawBoard();
@@ -663,11 +683,11 @@ function finalizeMove(targetPos) {
             potentialLightSources = [];
             gameState = 'SELECT_TARGET_CELL';
             drawBoard();
-            updateStatus();
+            updateStatus(`Move continued: Single light source automatically used. Select next move target (green).`);
         } else {
             gameState = 'SELECT_LIGHT_SOURCE';
             drawBoard();
-            updateStatus();
+            updateStatus(`Move continued: Select next Light Source (pulsing blue).`);
         }
     } else {
         showMessage(`${message}No more available light sources for the stone at (${targetR},${targetC}). Turn ends.`, false);
