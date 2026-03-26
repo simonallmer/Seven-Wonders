@@ -7,68 +7,105 @@
     <title>Statue - Seven Wonders</title>
     <meta name="description" content="Play Statue, an ancient strategy game from the Seven Wonders series">
     <link rel="stylesheet" href="statue-style.css">
+
 </head>
 
-<body>
+<body class="view-3d">
     <!-- Back to Menu -->
-    <a href="index.html" class="back-link">← Back to Seven Wonders</a>
 
-    <!-- Header -->
-    <header class="game-header">
-        <h1 class="game-title">STATUE</h1>
-        <p class="game-subtitle">The Statue of Zeus at Olympia</p>
-    </header>
 
-    <!-- Game Status -->
-    <div class="status-panel">
-        <div class="turn-display" id="turn-info">Player 1 (White) Turn</div>
-        <div class="reserve-info">
-            <span>Reserve: P1 <strong id="p1-reserve">8</strong> | P2 <strong id="p2-reserve">8</strong></span>
-            <span class="separator">•</span>
-            <span>Board: P1 <strong id="p1-board-count">0</strong> | P2 <strong id="p2-board-count">0</strong></span>
+    <div id="game-container">
+        <div id="canvas-3d" class="canvas-container">
+            <div id="canvas3d"></div>
+        </div>
+        <div id="board-container" class="game-board hidden"></div>
+        <div id="turn-info" class="hidden"></div>
+    </div>
+
+    <div class="top-bar">
+        <a href="index.html" class="top-bar-btn top-bar-link">← Menu</a>
+        <button id="menu-toggle" class="top-bar-btn menu-toggle-btn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+
+    <div id="side-menu" class="side-menu">
+        <div class="menu-content">
+            <h1 class="game-title">STATUE</h1>
+            <p class="game-subtitle" style="text-align: center; margin-top: -15px; opacity: 0.7;">The Statue of Zeus at Olympia</p>
+            
+            <div class="player-info">
+                <div class="current-player-display">
+                    <div id="player-indicator" class="player-indicator"></div>
+                    <span id="player-name">White's Turn</span>
+                </div>
+            </div>
+
+            <div class="stone-counts-display">
+                <div class="count-item">
+                    <div class="count-stone white"></div>
+                    <span id="p1-reserve">8</span>
+                </div>
+                <div class="count-item">
+                    <div class="count-stone black"></div>
+                    <span id="p2-reserve">8</span>
+                </div>
+                <div class="count-item">
+                    <span style="font-size: 0.7rem; opacity: 0.6; margin-right: 4px;">Board</span>
+                    <span id="p1-board-count">0</span>
+                    <span id="p2-board-count" style="margin-left: 8px;">0</span>
+                </div>
+            </div>
+
+            <div class="menu-divider"></div>
+
+            <div class="action-buttons-vertical" style="display: flex; flex-direction: column; gap: 10px;">
+                <button id="action-place" class="menu-btn" style="display: none;">Place Die (3D)</button>
+                <button id="action-cancel" class="menu-btn cancel-btn" style="display: none;">Cancel Action</button>
+            </div>
+
+            <div class="menu-divider"></div>
+
+            <button id="opponent-btn" class="menu-btn" style="opacity: 0.6; cursor: not-allowed;">Opponent: Human (Coming Soon)</button>
+            <button id="view-toggle-btn" class="menu-btn" style="opacity: 0.6; cursor: not-allowed;">View: 3D (2D Coming Soon)</button>
+            <button id="rules-btn" class="menu-btn rules-btn">Rules</button>
+            <button id="reset-button-main" class="menu-btn">New Game</button>
+            <button id="close-from-menu-btn" class="menu-btn">Close</button>
         </div>
     </div>
 
-    <!-- Action Buttons -->
-    <div class="action-panel">
-        <button id="action-place" class="action-btn">Place Die (Value 1)</button>
-        <button id="action-diminish" class="action-btn">Diminish</button>
-        <button id="action-cancel" class="action-btn cancel-btn" style="display: none;">Cancel Action</button>
-    </div>
 
-    <!-- Game Board -->
-    <div class="board-wrapper">
-        <div id="board-container" class="game-board"></div>
-    </div>
 
-    <!-- Message Box -->
-    <div id="message-box" class="message-box">
-        Player 1's turn. Click a die to move, or choose an action.
-    </div>
-
-    <!-- Game Over Modal -->
-    <div id="game-over-modal" class="message-overlay hidden">
-        <div class="message-content">
-            <p id="modal-text" class="message-text"></p>
-            <button id="new-game-btn" class="action-btn reset-btn">NEW GAME</button>
+    <!-- Game Over Overlay -->
+    <div id="game-over-modal" class="modal">
+        <div class="modal-content">
+            <h2 id="modal-title">Game Over!</h2>
+            <p id="modal-text"></p>
+            <button id="new-game-btn" class="modal-btn">Play Again</button>
+            <button id="menu-btn-modal" class="modal-btn secondary">Menu</button>
         </div>
     </div>
 
-    <!-- Reset / Rules Buttons -->
-    <div style="display:flex; gap:12px; justify-content:center; margin-top:20px;">
-        <button id="reset-button-main" class="action-btn reset-btn">New Game</button>
-        <button id="opponent-btn" class="action-btn opponent-btn">Opponent: Human</button>
-        <button id="rules-btn" class="action-btn rules-btn">Rules</button>
-    </div>
+    <!-- Floating Diminish Button (appears over selected stone) -->
+    <button id="floating-diminish-btn" class="floating-diminish-btn hidden" onclick="console.log('Diminish UI: Inline Click!'); if(window.diminishSelectedStone) window.diminishSelectedStone(); else console.error('diminishSelectedStone not found!'); this.classList.add('hidden'); event.stopPropagation();">Diminish</button>
+    
+    <!-- Game Message (Required for status updates) -->
+    <div id="game-message" class="game-message hidden"></div>
+
+    <!-- Overlay for closing menus -->
+    <div id="overlay" class="overlay"></div>
+
 
     <!-- Rules Modal -->
     <div id="rules-modal" class="rules-modal hidden">
         <div class="rules-overlay" id="rules-overlay"></div>
-        <div class="rules-content">
+        <div class="rules-panel">
             <h2>Statue Rules</h2>
-            <div class="rules-body">
-                <p><strong>GOAL</strong>
-                    Reduce your opponent's dice on the board to fewer than three through attacks.</p>
+            <div class="rules-scroll" style="overflow-x: hidden; word-wrap: break-word; overflow-wrap: break-word;">
+                <p><strong>OBJECTIVE</strong>
+                    Reduce your opponent's dice on the board to fewer than 4 through attacks.</p>
 
                 <p><strong>SETUP</strong>
                     Both players receive 8 dice of their color. All dice begin in the Statue of Zeus reserve (off the
@@ -83,10 +120,7 @@
 
                 <p><strong>2 — STRIDE WITH A DIE</strong>
                     Move one of your dice horizontally or vertically a number of spaces equal to its face value. If it
-                    lands on an opponent's die, that die is removed — the moving die may continue its remaining movement
-                    and attack multiple opponents in one turn. After each move, the die's value increases by 1. Reaching
-                    6 resets it back to 1.
-                    <br><em>Dice cannot move through or land on dice of the same color. Only one die per field.</em>
+                    lands on an opponent's die, that die is removed. After each move, the die's value increases by 1 (6 resets to 1).
                 </p>
 
                 <p><strong>3 — DIMINISH</strong>
@@ -95,32 +129,87 @@
                     has dice showing 1 that are able to move.</p>
 
                 <p><strong>WINNING</strong>
-                    The game ends immediately when a player is reduced to fewer than 3 dice on the board. That player
+                    The game ends immediately when a player is reduced to fewer than 4 dice on the board. That player
                     loses.</p>
             </div>
-            <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
+            <button class="menu-btn close-rules-btn" id="rules-close-btn">Close</button>
         </div>
     </div>
 
     <!-- Footer -->
-    <footer class="game-footer">
-        <p><a href="https://sevenwondersgames.com"
-                style="color: inherit; text-decoration: none;">SevenWondersGames.com</a></p>
-        <p>Game Design: Simon Allmer</p>
+    <footer class="game-footer" style="position: fixed; bottom: 10px; left: 0; right: 0; text-align: center; z-index: 10; font-family: 'Cinzel', serif; font-size: 0.7rem; color: rgba(197, 160, 89, 0.6); pointer-events: none;">
+        <p>Design: Simon Allmer</p>
     </footer>
 
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    
+    <script src="statue-3d.js"></script>
     <script src="statue-game.js"></script>
     <script>
-        document.getElementById('rules-btn').addEventListener('click', function () {
-            document.getElementById('rules-modal').classList.remove('hidden');
+        // UI Interaction Script
+        const menuToggle = document.getElementById('menu-toggle');
+        const sideMenu = document.getElementById('side-menu');
+        const closeMenuBtn = document.getElementById('close-from-menu-btn');
+        const rulesBtn = document.getElementById('rules-btn');
+        const rulesModal = document.getElementById('rules-modal');
+        const closeRulesBtn = document.getElementById('rules-close-btn');
+        const rulesOverlay = document.getElementById('rules-overlay');
+
+        function toggleSideMenu() {
+            sideMenu.classList.toggle('open');
+            menuToggle.classList.toggle('active');
+        }
+
+        // Hamburger button toggles the side menu
+        menuToggle.addEventListener('click', () => {
+            sideMenu.classList.toggle('open');
+            menuToggle.classList.toggle('active');
         });
-        document.getElementById('rules-close-btn').addEventListener('click', function () {
-            document.getElementById('rules-modal').classList.add('hidden');
+
+
+
+        closeMenuBtn.addEventListener('click', () => {
+            sideMenu.classList.remove('open');
+            menuToggle.classList.remove('active');
         });
-        document.getElementById('rules-overlay').addEventListener('click', function () {
-            document.getElementById('rules-modal').classList.add('hidden');
+
+        rulesBtn.addEventListener('click', () => {
+            rulesModal.classList.remove('hidden');
         });
+
+        closeRulesBtn.addEventListener('click', () => {
+            rulesModal.classList.add('hidden');
+        });
+
+        rulesOverlay.addEventListener('click', () => {
+            rulesModal.classList.add('hidden');
+        });
+
+        // View Toggle (Disabled - 2D Coming Soon)
+        const viewToggleBtn = document.getElementById('view-toggle-btn');
+        if (viewToggleBtn) {
+            viewToggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('2D View Coming Soon! Please play in 3D mode.');
+            });
+        }
+
+        // Opponent Toggle (Disabled - AI Coming Soon)
+        const opponentBtn = document.getElementById('opponent-btn');
+        if (opponentBtn) {
+            opponentBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('Computer Opponent Coming Soon! Please play against a human.');
+            });
+        }
+
+        // Side Menu and Rules initialization
+        // Diminish UI is handled by inline onclick in the HTML for better reliability.
     </script>
 </body>
+
 
 </html>
