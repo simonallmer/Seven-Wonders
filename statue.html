@@ -32,7 +32,8 @@
     </div>
 
     <div id="side-menu" class="side-menu">
-        <div class="menu-content">
+        <div class="menu-content" id="statue-menu-content">
+            <div id="game-menu-timer-container"></div>
             <h1 class="game-title">STATUE</h1>
             <p class="game-subtitle" style="text-align: center; margin-top: -15px; opacity: 0.7;">The Statue of Zeus at Olympia</p>
             
@@ -68,8 +69,8 @@
 
             <div class="menu-divider"></div>
 
-            <button id="opponent-btn" class="menu-btn" style="opacity: 0.6; cursor: not-allowed;">Opponent: Human (Coming Soon)</button>
-            <button id="view-toggle-btn" class="menu-btn" style="opacity: 0.6; cursor: not-allowed;">View: 3D (2D Coming Soon)</button>
+            <button id="opponent-btn" class="menu-btn">Opponent: Human</button>
+            <button id="view-toggle-btn" class="menu-btn">View: 3D</button>
             <button id="rules-btn" class="menu-btn rules-btn">Rules</button>
             <button id="reset-button-main" class="menu-btn">New Game</button>
             <button id="close-from-menu-btn" class="menu-btn">Close</button>
@@ -79,12 +80,17 @@
 
 
     <!-- Game Over Overlay -->
-    <div id="game-over-modal" class="modal">
-        <div class="modal-content">
+    <div id="game-over-modal" class="game-over-overlay hidden">
+        <div class="game-over-content">
             <h2 id="modal-title">Game Over!</h2>
-            <p id="modal-text"></p>
-            <button id="new-game-btn" class="modal-btn">Play Again</button>
-            <button id="menu-btn-modal" class="modal-btn secondary">Menu</button>
+            <div class="winner-display">
+                <span id="modal-winner-icon" class="winner-icon"></span>
+                <p id="modal-text"></p>
+            </div>
+            <div class="modal-actions">
+                <button id="new-game-btn" class="menu-btn primary-btn">Play Again</button>
+                <button id="menu-btn-modal" class="menu-btn secondary-btn">Menu</button>
+            </div>
         </div>
     </div>
 
@@ -102,7 +108,7 @@
     <div id="rules-modal" class="rules-modal hidden">
         <div class="rules-overlay" id="rules-overlay"></div>
         <div class="rules-panel">
-            <h2>Statue Rules</h2>
+            <h2>STATUE RULES</h2>
             <div class="rules-scroll" style="overflow-x: hidden; word-wrap: break-word; overflow-wrap: break-word;">
                 <p><strong>OBJECTIVE</strong>
                     Reduce your opponent's dice on the board to fewer than 4 through attacks.</p>
@@ -157,28 +163,40 @@
         const rulesModal = document.getElementById('rules-modal');
         const closeRulesBtn = document.getElementById('rules-close-btn');
         const rulesOverlay = document.getElementById('rules-overlay');
+        const overlay = document.getElementById('overlay');
 
         function toggleSideMenu() {
-            sideMenu.classList.toggle('open');
+            const isOpen = sideMenu.classList.toggle('open');
             menuToggle.classList.toggle('active');
+            overlay.classList.toggle('active');
         }
 
         // Hamburger button toggles the side menu
-        menuToggle.addEventListener('click', () => {
-            sideMenu.classList.toggle('open');
-            menuToggle.classList.toggle('active');
+        menuToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleSideMenu();
         });
 
+        if (closeMenuBtn) {
+            closeMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (sideMenu.classList.contains('open')) toggleSideMenu();
+            });
+        }
 
-
-        closeMenuBtn.addEventListener('click', () => {
-            sideMenu.classList.remove('open');
-            menuToggle.classList.remove('active');
+        // Click on overlay closes menu
+        overlay.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (sideMenu.classList.contains('open')) toggleSideMenu();
         });
 
-        rulesBtn.addEventListener('click', () => {
-            rulesModal.classList.remove('hidden');
-        });
+        if (rulesBtn) {
+            rulesBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                rulesModal.classList.remove('hidden');
+                if (sideMenu.classList.contains('open')) toggleSideMenu();
+            });
+        }
 
         closeRulesBtn.addEventListener('click', () => {
             rulesModal.classList.add('hidden');
@@ -191,18 +209,8 @@
         // View Toggle (Disabled - 2D Coming Soon)
         const viewToggleBtn = document.getElementById('view-toggle-btn');
         if (viewToggleBtn) {
-            viewToggleBtn.addEventListener('click', (e) => {
-                e.preventDefault();
+            viewToggleBtn.addEventListener('click', () => {
                 alert('2D View Coming Soon! Please play in 3D mode.');
-            });
-        }
-
-        // Opponent Toggle (Disabled - AI Coming Soon)
-        const opponentBtn = document.getElementById('opponent-btn');
-        if (opponentBtn) {
-            opponentBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                alert('Computer Opponent Coming Soon! Please play against a human.');
             });
         }
 

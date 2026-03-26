@@ -139,7 +139,7 @@ function init3D() {
         // Add click listener to canvas (single registration only — avoid duplicate fire)
         const canvas = renderer.domElement;
         canvas.addEventListener('pointerdown', onMouseDown);
-        canvas.addEventListener('click', onCanvasClick);
+        canvas.addEventListener('pointerup', onCanvasClick);
         canvas.addEventListener('pointermove', onCanvasMouseMove);
 
         window.addEventListener('keydown', (e) => { if (e.key === 'Escape') cancelSelection(); });
@@ -581,6 +581,7 @@ function buildThrone() {
     );
     head.position.y = 48;
     head.scale.set(1, 1.1, 1);
+    head.userData.isZeusHead = true; // Keepable tag
     zeusGroup.add(head);
     
     // Angry/intense eyes indication (small spheres) - glass
@@ -592,10 +593,12 @@ function buildThrone() {
     });
     const leftEye = new THREE.Mesh(new THREE.SphereGeometry(1.5, 8, 8), eyeMat);
     leftEye.position.set(-4, 50, 8);
+    leftEye.userData.isZeusHead = true;
     zeusGroup.add(leftEye);
     
     const rightEye = new THREE.Mesh(new THREE.SphereGeometry(1.5, 8, 8), eyeMat);
     rightEye.position.set(4, 50, 8);
+    rightEye.userData.isZeusHead = true;
     zeusGroup.add(rightEye);
     
     // Majestic beard - long and curly
@@ -605,6 +608,7 @@ function buildThrone() {
     );
     beard.position.set(0, 32, 6);
     beard.rotation.x = -Math.PI / 3;
+    beard.userData.isZeusHead = true;
     zeusGroup.add(beard);
     
     // Curly hair strands - flowing Greek god style
@@ -616,6 +620,7 @@ function buildThrone() {
         curl.position.set(-9 + i * 2.5, 54, -3);
         curl.rotation.z = (i - 3.5) * 0.15;
         curl.rotation.y = Math.PI;
+        curl.userData.isZeusHead = true;
         zeusGroup.add(curl);
     }
     
@@ -664,6 +669,7 @@ function buildThrone() {
         matGold
     );
     crown.position.y = 58;
+    crown.userData.isZeusHead = true;
     zeusGroup.add(crown);
     
     // Lightning bolts on sides of crown
@@ -671,11 +677,13 @@ function buildThrone() {
     const leftBolt = new THREE.Mesh(boltGeom, new THREE.MeshStandardMaterial({ color: 0xFFFF88, emissive: 0xFFFF44, emissiveIntensity: 0.5 }));
     leftBolt.position.set(-8, 62, 0);
     leftBolt.rotation.z = Math.PI / 4;
+    leftBolt.userData.isZeusHead = true;
     zeusGroup.add(leftBolt);
     
     const rightBolt = new THREE.Mesh(boltGeom, new THREE.MeshStandardMaterial({ color: 0xFFFF88, emissive: 0xFFFF44, emissiveIntensity: 0.5 }));
     rightBolt.position.set(8, 62, 0);
     rightBolt.rotation.z = -Math.PI / 4;
+    rightBolt.userData.isZeusHead = true;
     zeusGroup.add(rightBolt);
 
     // THE STAFF - Zeus's lightning bolt
@@ -1204,6 +1212,21 @@ function updateHoverEffect() {
     
     raycaster.setFromCamera(mouse, camera);
     
+    // Check for statue head hover to give feedback it's clickable (only if not already triggered to hide)
+    if (!window.statuePermanentlyHidden) {
+        const headIntersects = raycaster.intersectObjects([groupThrone], true);
+        if (headIntersects.length > 0) {
+            let headCheck = headIntersects[0].object;
+            while (headCheck) {
+                if (headCheck.userData && headCheck.userData.isZeusHead) {
+                    document.body.style.cursor = 'pointer';
+                    return;
+                }
+                headCheck = headCheck.parent;
+            }
+        }
+    }
+    
     // Use click plane for field detection (most reliable)
     let r = null, c = null;
     if (clickPlane) {
@@ -1378,9 +1401,11 @@ let mouseDownY = 0;
 let cameraStartAzimuth = 0;
 let cameraStartPolar = 0;
 let cameraStartDistance = 0;
-const DRAG_THRESHOLD_PX = 25;
+const DRAG_THRESHOLD_PX = 40; // Increased for better mobile tolerance
+let isTouch = false;
 
 function onMouseDown(event) {
+    isTouch = event.pointerType === 'touch';
     mouseDownX = event.clientX;
     mouseDownY = event.clientY;
     // Store camera state to detect if it was rotated/zoomed
@@ -1391,6 +1416,12 @@ function onMouseDown(event) {
     }
 }
 function onCanvasClick(event) {
+    // If it's AI's turn, block human input
+    if (window.isAIGame && window.isAIGame() && window.getCurrentPlayer && window.getCurrentPlayer() === 2) {
+        console.log('Interaction blocked: Computer is thinking...');
+        return;
+    }
+    
     console.log('onCanvasClick fired', event.clientX, event.clientY);
     if (!window.is3DView || !scene || !camera || !renderer) return;
     if (event.target !== renderer.domElement) return;
@@ -1398,10 +1429,21 @@ function onCanvasClick(event) {
     // Drag detection check
     const dx = event.clientX - mouseDownX;
     const dy = event.clientY - mouseDownY;
-    const isDrag = (dx * dx + dy * dy) > (DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX);
+    const distSq = dx * dx + dy * dy;
+    const threshold = isTouch ? DRAG_THRESHOLD_PX * 1.5 : DRAG_THRESHOLD_PX;
+    const isDrag = distSq > (threshold * threshold);
     
-    if (isDrag) {
-        console.log('Click ignored: mouse dragged');
+    // Also check if camera moved significantly to prevent accidental clicks
+    let cameraMoved = false;
+    if (controls) {
+        const deltaAzimuth = Math.abs(controls.getAzimuthalAngle() - cameraStartAzimuth);
+        const deltaPolar = Math.abs(controls.getPolarAngle() - cameraStartPolar);
+        if (deltaAzimuth > 0.05 || deltaPolar > 0.05) cameraMoved = true;
+    }
+
+    if (isDrag || cameraMoved) {
+        // Only log if it was a significant move to avoid spam
+        if (distSq > 100) console.log('Interaction ignored: drag or camera move detected');
         return;
     }
 
@@ -1412,13 +1454,29 @@ function onCanvasClick(event) {
     raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
 
     // Get all board tiles for click detection
-    const allTargets = [...cachedBoardMeshes, ...groupPieces.children];
+    // Get all board tiles for click detection, plus throne for accessibility (if not hidden)
+    const allBoardTargets = [...cachedBoardMeshes, ...groupPieces.children];
+    const allTargets = window.statuePermanentlyHidden ? allBoardTargets : [...allBoardTargets, groupThrone];
+    
     console.log('Click targets:', cachedBoardMeshes.length, 'tiles,', groupPieces.children.length, 'pieces');
     const intersects = raycaster.intersectObjects(allTargets, true);
     console.log('Intersects found:', intersects.length);
     
     if (intersects.length > 0) {
         let hitObj = intersects[0].object;
+        
+        // Check if we clicked on Zeus's head for the secret fade-out (only if not already hidden)
+        if (!window.statuePermanentlyHidden) {
+            let headCheck = hitObj;
+            while (headCheck) {
+                if (headCheck.userData && headCheck.userData.isZeusHead) {
+                    console.log("Zeus head clicked! Fading out statue...");
+                    triggerStatueFadeOut();
+                    return; // Consume the click
+                }
+                headCheck = headCheck.parent;
+            }
+        }
         
         // Walk up to find userData with r and c
         while (hitObj && hitObj.userData && hitObj.userData.r === undefined) {
@@ -1740,6 +1798,23 @@ function animate(time) {
     }
 }
 
+window.statueClickFade = 1.0;
+window.statuePermanentlyHidden = false;
+
+function triggerStatueFadeOut() {
+    if (window.statuePermanentlyHidden) return;
+    window.statuePermanentlyHidden = true;
+    
+    new TWEEN.Tween({ opacity: 1.0 })
+        .to({ opacity: 0.0 }, 1500)
+        .easing(TWEEN.Easing.Quadratic.Out)
+        .onUpdate((obj) => {
+            window.statueClickFade = obj.opacity;
+            needsRender = true;
+        })
+        .start();
+}
+
 /**
  * Fades out the Statue of Zeus as the camera zooms in for better board clarity.
  */
@@ -1750,26 +1825,54 @@ function updateStatueFade() {
     const distance = camera.position.distanceTo(controls.target);
     
     // Settings for the fade range:
-    // Fully opaque at 400+, fully transparent at 180-
-    const fadeStart = 400; 
-    const fadeEnd = 180;   
+    // Fully opaque at 450+, fully transparent at 220-
+    const fadeStart = 450; 
+    const fadeEnd = 220;   
     
     let opacity = (distance - fadeEnd) / (fadeStart - fadeEnd);
     opacity = Math.max(0, Math.min(1, opacity));
     
+    // Apply permanent click-to-fade multiplier
+    if (window.statueClickFade !== undefined) {
+        opacity *= window.statueClickFade;
+    }
+    
     groupThrone.traverse(child => {
+        // Handle Lights fading
+        if (child.isLight) {
+            if (child.userData.baseIntensity === undefined) {
+                child.userData.baseIntensity = child.intensity || 0.5;
+            }
+            child.intensity = opacity * child.userData.baseIntensity;
+            child.visible = child.intensity > 0.01;
+            return;
+        }
+
         if (child.isMesh && child.material) {
             const materials = Array.isArray(child.material) ? child.material : [child.material];
             materials.forEach(mat => {
-                if (mat.userData.baseOpacity === undefined) {
-                    mat.userData.baseOpacity = (mat.opacity !== undefined) ? mat.opacity : 1.0;
+                // To prevent shared materials (like matGold on board trim) from fading,
+                // we isolate/clone them once the first time we start fading.
+                if (mat.userData.isIsolated === undefined) {
+                    if (mat === matGold || mat === matMarble) {
+                        child.material = mat.clone();
+                        // re-fetch it if it was an array... simplified for now
+                        const newMat = Array.isArray(child.material) ? child.material[0] : child.material;
+                        newMat.userData.isIsolated = true;
+                        newMat.userData.baseOpacity = (newMat.opacity !== undefined) ? newMat.opacity : 1.0;
+                        newMat.transparent = true;
+                    } else {
+                        mat.userData.isIsolated = true;
+                        mat.userData.baseOpacity = (mat.opacity !== undefined) ? mat.opacity : 1.0;
+                        mat.transparent = true;
+                    }
                 }
                 
-                mat.transparent = true;
-                mat.opacity = opacity * mat.userData.baseOpacity;
+                const m = Array.isArray(child.material) ? child.material[materials.indexOf(mat)] : child.material;
+                m.opacity = opacity * (m.userData.baseOpacity || 1.0);
                 
                 // Optimization: hide entirely if transparent
-                child.visible = mat.opacity > 0.005;
+                child.visible = m.opacity > 0.005;
             });
         }
     });
