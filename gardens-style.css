@@ -36,6 +36,57 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    position: relative;
+    overflow-x: hidden;
+}
+
+body.view-3d {
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    background: #87ceeb; /* Sky blue matching 3D scene */
+    transition: background-color 0.5s ease;
+}
+
+body.view-3d .game-header,
+body.view-3d .legacy-2d,
+body.view-3d .game-footer {
+    display: none !important;
+}
+
+body.view-3d .status-panel {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.85); /* Lighter background for status in 3D */
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(122, 156, 111, 0.5);
+    color: #2a2520; /* Dark text for light background */
+    margin: 0;
+    width: auto;
+    min-width: 350px;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+body.view-3d .status-panel.visible {
+    opacity: 1;
+}
+
+#canvas3d {
+    width: 100vw;
+    height: 100vh;
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 0;
+}
+
+body.view-3d #canvas3d {
+    display: block;
 }
 
 .back-link {
@@ -552,6 +603,46 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+#game-over-modal .message-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.82);
+    backdrop-filter: blur(8px);
+    z-index: 2500;
+}
+
+#game-over-modal .message-content {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(145deg, #2e4a31, #1e3a21); /* Dark garden green */
+    border: 3px solid #5a7c4f;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    padding: 40px;
+    border-radius: 4px;
+    z-index: 2600;
+    max-width: 450px;
+    width: 90%;
+    text-align: center;
+    color: #f5f1e8;
+}
+
+#game-over-modal #modal-title {
+    font-family: 'Cinzel', serif;
+    font-size: 2rem;
+    letter-spacing: 0.15em;
+    margin-bottom: 20px;
+    color: #ffd700; /* Gold victory title */
+}
+
+#game-over-modal #modal-text {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    margin-bottom: 10px;
+    opacity: 0.95;
+}
+
 .game-footer {
     margin-top: 20px;
     text-align: center;
@@ -566,5 +657,204 @@ body {
 
     :root {
         --cell-size: min(6vmin, 40px);
+    }
+}
+/* Side Menu Content */
+.side-menu {
+    position: fixed;
+    top: 0;
+    right: -320px;
+    width: 320px;
+    height: 100%;
+    background: rgba(10, 20, 10, 0.95);
+    backdrop-filter: blur(10px);
+    z-index: 2000;
+    transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    border-left: 1px solid rgba(122, 156, 111, 0.2);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+    padding: 40px 30px;
+    color: #f5f1e8;
+}
+
+.side-menu.open {
+    right: 0;
+}
+
+.menu-btn {
+    background: transparent;
+    border: 1px solid rgba(122, 156, 111, 0.3);
+    color: #f5f1e8;
+    padding: 12px;
+    font-family: 'Cinzel', serif;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+    text-align: center;
+    width: 100%;
+}
+
+.menu-btn:hover {
+    background: rgba(122, 156, 111, 0.15);
+    border-color: var(--garden-light);
+}
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    z-index: 1999;
+    transition: all 0.3s;
+}
+
+.overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Top Bar */
+.top-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 60px;
+    padding: 0 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 1500;
+    pointer-events: none;
+}
+
+body:not(.view-3d) .top-bar {
+    display: none;
+}
+
+.top-bar-btn {
+    pointer-events: auto;
+    background: rgba(10, 20, 10, 0.6);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(122, 156, 111, 0.2);
+    color: #f5f1e8;
+    padding: 8px 15px;
+    font-family: 'Cinzel', serif;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.menu-toggle-btn {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+}
+
+.menu-toggle-btn span {
+    width: 24px;
+    height: 2px;
+    background: #f5f1e8;
+    transition: all 0.3s;
+}
+
+.menu-toggle-btn.active span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+.menu-toggle-btn.active span:nth-child(2) { opacity: 0; }
+.menu-toggle-btn.active span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+/* Hand Display in 3D */
+.hand-display-3d {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: rgba(25, 35, 25, 0.85); /* Slightly lighter for contrast */
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(122, 156, 111, 0.4);
+    color: #f5f1e8;
+    padding: 15px;
+    border-radius: 8px;
+    z-index: 1000;
+    font-family: 'Cinzel', serif;
+    min-width: 150px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.hand-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.hand-stones-3d {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.hand-stone-3d {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.hand-stone-3d.white { background: #fff; box-shadow: 0 0 5px rgba(255,255,255,0.2); }
+.hand-stone-3d.black { 
+    background: #444; /* Brighter than 1a1a1a for visibility */
+    border: 1.5px solid rgba(255, 255, 255, 0.5); 
+    box-shadow: inset 0 0 4px rgba(0,0,0,0.8);
+}
+
+/* Modal Adjustments */
+.rules-modal.hidden, #game-over-modal.hidden {
+    display: none !important;
+}
+
+.dropdown-content {
+    display: none;
+    background: rgba(20, 30, 20, 0.95);
+    border: 1px solid rgba(122, 156, 111, 0.3);
+    border-radius: 4px;
+    margin-top: 5px;
+    padding: 5px;
+}
+
+.dropdown-content.show {
+    display: flex;
+    flex-direction: column;
+}
+
+.dropdown-item {
+    padding: 10px;
+    color: #d4cfc4;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.dropdown-item:hover {
+    background: rgba(122, 156, 111, 0.2);
+    color: white;
+}
+
+.coming-soon-tag {
+    font-size: 0.7rem;
+    color: #ffd700;
+    margin-left: 10px;
+    opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+    .side-menu {
+        width: 100%;
+        right: -100%;
     }
 }

@@ -7,10 +7,69 @@
     <title>Gardens - Seven Wonders</title>
     <meta name="description" content="Play Gardens, an ancient strategy game from the Seven Wonders series">
     <link rel="stylesheet" href="gardens-style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/all.min.css">
 </head>
 
-<body>
-    <a href="index.html" class="back-link">← Back to Seven Wonders</a>
+<body class="view-3d">
+    <!-- Overlay for side menu -->
+    <div id="overlay" class="overlay"></div>
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <a href="index.html" class="top-bar-btn top-bar-link">← Menu</a>
+        <button id="menu-toggle" class="top-bar-btn menu-toggle-btn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+
+    <!-- Side Menu -->
+    <div id="side-menu" class="side-menu">
+        <div class="menu-content">
+            <h1 class="game-title" style="text-align: center; font-size: 2.2rem; margin-bottom: 5px;">GARDENS</h1>
+            <p class="game-subtitle" style="text-align: center; margin-top: 0; opacity: 0.7; color: #d4cfc4; font-family: 'Cinzel', serif;">Hanging Gardens of Babylon</p>
+            
+            <div class="player-info" style="margin-top: 20px;">
+                <div class="current-player-display" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <div id="player-indicator" class="count-stone white" style="width: 20px; height: 20px; border-radius: 50%; border: 1px solid #2a2520;"></div>
+                    <span id="player-name" style="font-family: 'Cinzel', serif;">White's Turn</span>
+                </div>
+                <div class="score-display" style="display: flex; justify-content: space-around; margin-top: 15px; font-family: 'Cinzel', serif; font-size: 0.9rem;">
+                    <div>White: <span id="white-count-menu">0</span>/7</div>
+                    <div>Black: <span id="black-count-menu">0</span>/7</div>
+                </div>
+            </div>
+
+            <div class="menu-divider" style="height: 1px; background: rgba(100, 90, 80, 0.2); margin: 20px 0;"></div>
+
+            <div class="action-buttons-vertical" style="display: flex; flex-direction: column; gap: 10px;">
+                <button id="cancel-button-menu" class="menu-btn hidden">Cancel Move</button>
+            </div>
+
+            <div class="menu-divider" style="height: 1px; background: rgba(100, 90, 80, 0.2); margin: 20px 0;"></div>
+
+            <button id="opponent-btn-menu" class="menu-btn">Opponent: Human</button>
+            <div class="view-dropdown">
+                <button id="view-toggle-btn" class="menu-btn">View: 3D</button>
+                <div id="view-dropdown-content" class="dropdown-content">
+                    <div class="dropdown-item active">3D View (Current)</div>
+                    <div class="dropdown-item">2D View <span class="coming-soon-tag">Coming Soon</span></div>
+                </div>
+            </div>
+            <button id="rules-btn-menu" class="menu-btn">Rules</button>
+            <button id="reset-button-menu" class="menu-btn">New Game</button>
+            <button id="close-menu-btn" class="menu-btn">Close</button>
+        </div>
+    </div>
+
+    <!-- Hand Display in 3D -->
+    <div id="hand-display-3d" class="hand-display-3d hidden">
+        <div class="hand-content">
+            <span id="hand-count">0</span> stones in hand
+            <div id="hand-stones-3d" class="hand-stones-3d"></div>
+        </div>
+    </div>
 
     <header class="game-header">
         <h1 class="game-title">GARDENS</h1>
@@ -24,13 +83,14 @@
         </div>
 
         <div class="stone-counts">
-            <span>White: <span id="white-count">0</span></span>
-            <span>Black: <span id="black-count">0</span></span>
+            <span>White: <span id="white-count">0</span>/7</span>
+            <span>Black: <span id="black-count">0</span>/7</span>
         </div>
     </div>
 
     <div class="board-container">
-        <div class="gardens-board">
+        <div id="canvas3d"></div>
+        <div class="gardens-board legacy-2d">
             <!-- Left garden fields -->
             <div class="garden-column left-gardens">
                 <div class="garden-field" data-garden="0"></div>
@@ -57,17 +117,16 @@
                 <div class="garden-field" data-garden="2"></div>
             </div>
         </div>
-
     </div>
 
-    <div class="hand-display" id="hand-display">
+    <div class="hand-display legacy-2d" id="hand-display">
         <div class="hand-label">Next in Hand <span style="font-size: 1.2em;">&rarr;</span></div>
         <div class="hand-stones" id="hand-stones">
             <!-- Stones in hand will appear here -->
         </div>
     </div>
 
-    <div class="action-buttons">
+    <div class="action-buttons legacy-2d">
         <button id="cancel-button" class="action-btn cancel-btn hidden">Cancel Move</button>
         <button id="reset-button" class="action-btn reset-btn">New Game</button>
         <button id="opponent-btn" class="action-btn opponent-btn">Opponent: Human</button>
@@ -78,10 +137,14 @@
 
     <!-- Game Over Modal -->
     <div id="game-over-modal" class="hidden">
-        <div class="message-overlay"></div>
-        <div class="message-content">
+        <div class="message-overlay" onclick="document.getElementById('game-over-modal').classList.add('hidden')"></div>
+        <div class="modal-content">
             <h2 id="modal-title">Game Over</h2>
             <p id="modal-text"></p>
+            <div class="modal-buttons" style="display: flex; gap: 15px; justify-content: center; margin-top: 25px;">
+                <button id="modal-reset-btn" class="menu-btn" style="margin-bottom: 0; min-width: 140px; background: #5a7c4f;">Play Again</button>
+                <a href="index.html" class="menu-btn" style="margin-bottom: 0; min-width: 140px; text-decoration: none; display: flex; align-items: center; justify-content: center;">Main Menu</a>
+            </div>
         </div>
     </div>
 
@@ -140,23 +203,134 @@
         </div>
     </div>
 
-    <footer class="game-footer">
-        <p><a href="https://sevenwondersgames.com"
-                style="color: inherit; text-decoration: none;">SevenWondersGames.com</a></p>
-        <p>Game Design: Simon Allmer</p>
-    </footer>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
     <script src="gardens-game.js"></script>
+    <script src="gardens-3d.js"></script>
     <script>
-        document.getElementById('rules-btn').addEventListener('click', function () {
+        // Init 3D by default
+        window.is3DView = true;
+        setTimeout(() => { if (typeof init3D === 'function') init3D(); }, 100);
+
+        // UI Side Menu Logic
+        const menuToggle = document.getElementById('menu-toggle');
+        const sideMenu = document.getElementById('side-menu');
+        const overlay = document.getElementById('overlay');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+        const rulesBtnMenu = document.getElementById('rules-btn-menu');
+        const resetButtonMenu = document.getElementById('reset-button-menu');
+        const cancelButtonMenu = document.getElementById('cancel-button-menu');
+        const opponentBtnMenu = document.getElementById('opponent-btn-menu');
+        const viewToggleBtn = document.getElementById('view-toggle-btn');
+        const rulesBtn = document.getElementById('rules-btn');
+        const rulesCloseBtn = document.getElementById('rules-close-btn');
+        const rulesOverlayInModal = document.getElementById('rules-overlay');
+
+        function toggleMenu() {
+            sideMenu.classList.toggle('open');
+            menuToggle.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+        window.toggleMenu = toggleMenu;
+
+        if (menuToggle) menuToggle.addEventListener('click', toggleMenu);
+        if (overlay) overlay.addEventListener('click', toggleMenu);
+        if (closeMenuBtn) closeMenuBtn.addEventListener('click', toggleMenu);
+
+        // Access context menu (side menu) with Spacebar
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault(); // Prevent scrolling
+                toggleMenu();
+            }
+        });
+
+        if (rulesBtnMenu) rulesBtnMenu.addEventListener('click', () => {
+            document.getElementById('rules-modal').classList.remove('hidden');
+            toggleMenu();
+        });
+
+        if (resetButtonMenu) resetButtonMenu.addEventListener('click', () => {
+            if (typeof initializeGame === 'function') initializeGame();
+            toggleMenu();
+        });
+
+        if (cancelButtonMenu) cancelButtonMenu.addEventListener('click', () => {
+            if (typeof resetTurnState === 'function') {
+                resetTurnState();
+                if (typeof drawBoard === 'function') drawBoard();
+                if (typeof updateStatus === 'function') updateStatus();
+            }
+            toggleMenu();
+        });
+
+        if (opponentBtnMenu) opponentBtnMenu.addEventListener('click', () => {
+            isVsComputer = !isVsComputer;
+            const mode = isVsComputer ? 'Computer' : 'Human';
+            opponentBtnMenu.textContent = `Opponent: ${mode}`;
+            
+            // Sync with legacy button
+            const legacyBtn = document.getElementById('opponent-btn');
+            if (legacyBtn) legacyBtn.textContent = `Opponent: ${mode}`;
+
+            if (isVsComputer && currentPlayer === 'black' && typeof turnPhase !== 'undefined' && turnPhase !== 'GAME_OVER') {
+                if (typeof makeAIMove === 'function') setTimeout(makeAIMove, 600);
+            }
+            toggleMenu(); // Optional: close menu after selection? Or keep open? Let's stay open to allow other changes.
+        });
+
+        if (viewToggleBtn) viewToggleBtn.addEventListener('click', () => {
+            const dropdown = document.getElementById('view-dropdown-content');
+            if (dropdown) dropdown.classList.toggle('show');
+        });
+
+        if (rulesBtn) rulesBtn.addEventListener('click', () => {
             document.getElementById('rules-modal').classList.remove('hidden');
         });
-        document.getElementById('rules-close-btn').addEventListener('click', function () {
+
+        if (rulesCloseBtn) rulesCloseBtn.addEventListener('click', () => {
             document.getElementById('rules-modal').classList.add('hidden');
         });
-        document.getElementById('rules-overlay').addEventListener('click', function () {
+
+        if (rulesOverlayInModal) rulesOverlayInModal.addEventListener('click', () => {
             document.getElementById('rules-modal').classList.add('hidden');
         });
+
+        // Modal Reset Button
+        const modalResetBtn = document.getElementById('modal-reset-btn');
+        if (modalResetBtn) modalResetBtn.addEventListener('click', () => {
+            if (typeof initializeGame === 'function') initializeGame();
+        });
+
+        // Sync counts with menu
+        function syncMenuCounts() {
+            const whiteCount = document.getElementById('white-count')?.innerText;
+            const blackCount = document.getElementById('black-count')?.innerText;
+            
+            if (whiteCount && document.getElementById('white-count-menu')) {
+                // If whiteCount is "0/7", extract only the number to avoid "0/7/7"
+                document.getElementById('white-count-menu').innerText = whiteCount.split('/')[0];
+            }
+            if (blackCount && document.getElementById('black-count-menu')) {
+                document.getElementById('black-count-menu').innerText = blackCount.split('/')[0];
+            }
+
+            // Sync cancel button
+            const cancelBtnOrig = document.getElementById('cancel-button');
+            if (cancelBtnOrig && !cancelBtnOrig.classList.contains('hidden')) {
+                cancelButtonMenu?.classList.remove('hidden');
+            } else {
+                cancelButtonMenu?.classList.add('hidden');
+            }
+
+            // Sync opponent mode
+            if (typeof isVsComputer !== 'undefined') {
+                const mode = isVsComputer ? 'Computer' : 'Human';
+                if (opponentBtnMenu) opponentBtnMenu.textContent = `Opponent: ${mode}`;
+            }
+        }
+        setInterval(syncMenuCounts, 500);
     </script>
 </body>
 

@@ -576,7 +576,14 @@ function executeMoveStep(area, row, col) {
 
     // 4. Check if hand empty
     if (hand.length === 0) {
-        endTurn();
+        // Trigger 3D Animation hook if exists
+        if (typeof animate3DMove === 'function') {
+            animate3DMove(moveHistory, () => {
+                endTurn();
+            });
+        } else {
+            endTurn();
+        }
     } else {
         // Continue moving
         updateStatus(`Dropped stone. ${hand.length} left. Select next field.`);
@@ -687,8 +694,8 @@ const evaluateBoardState = () => {
     // Correct Full Loop:
     // White starts G1(BL) -> G2(BR) Launchpad -> G3(TR) Upstairs -> G0(TL) WIN
     // Black starts G2(BR) -> G1(BL) Launchpad -> G0(TL) Upstairs -> G3(TR) WIN
-    score += board.gardens[G_TOP_RIGHT].filter(s => s === 'black').length * 12000;
-    score -= board.gardens[G_TOP_LEFT].filter(s => s === 'white').length * 12000;
+    score += board.gardens[G_TOP_RIGHT].filter(s => s === 'black').length * 50000;
+    score -= board.gardens[G_TOP_LEFT].filter(s => s === 'white').length * 50000;
 
     // 2. Launchpad/Staircase Progress
     // Black MUST enter G_BOT_LEFT (1) to reach G_TOP_LEFT (0)
@@ -1085,22 +1092,56 @@ function updateStatus(msg) {
     }
 
     playerColorElement.style.backgroundColor = currentPlayer === 'white' ? '#fff' : '#333';
+    
+    // Sync with Side Menu
+    if (document.getElementById('player-name')) {
+        document.getElementById('player-name').innerText = `${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)}'s Turn`;
+    }
+    const indicator = document.getElementById('player-indicator');
+    if (indicator) {
+        indicator.className = `count-stone ${currentPlayer}`;
+    }
 
-    // Update Hand Display
+    // Update Hand Display (Legacy 2D)
     const handDisplay = document.getElementById('hand-display');
     const handStones = document.getElementById('hand-stones');
 
     if (hand.length > 0) {
-        handDisplay.classList.add('visible');
-        handStones.innerHTML = '';
-        hand.forEach(color => {
-            const s = document.createElement('div');
-            s.className = `hand-stone ${color}`;
-            handStones.appendChild(s);
-        });
+        if (handDisplay) handDisplay.classList.add('visible');
+        if (handStones) {
+            handStones.innerHTML = '';
+            hand.forEach(color => {
+                const s = document.createElement('div');
+                s.className = `hand-stone ${color}`;
+                handStones.appendChild(s);
+            });
+        }
     } else {
-        handDisplay.classList.remove('visible');
+        if (handDisplay) handDisplay.classList.remove('visible');
     }
+
+    // Update Hand Display (3D)
+    const handDisplay3D = document.getElementById('hand-display-3d');
+    const handCount3D = document.getElementById('hand-count');
+    const handStones3D = document.getElementById('hand-stones-3d');
+
+    if (handDisplay3D && hand.length > 0) {
+        handDisplay3D.classList.remove('hidden');
+        if (handCount3D) handCount3D.innerText = hand.length;
+        if (handStones3D) {
+            handStones3D.innerHTML = '';
+            hand.forEach(color => {
+                const s = document.createElement('div');
+                s.className = `hand-stone-3d ${color}`;
+                handStones3D.appendChild(s);
+            });
+        }
+    } else if (handDisplay3D) {
+        handDisplay3D.classList.add('hidden');
+    }
+
+    // Trigger 3D Sync
+    if (typeof sync3D === 'function') sync3D();
 }
 
 function processStaircases() {
@@ -1270,6 +1311,9 @@ function drawBoard() {
     drawGrid('top', board.topField);
     drawGrid('bottom', board.bottomField);
     drawGardens();
+
+    // Trigger 3D Sync
+    if (typeof sync3D === 'function') sync3D();
 }
 
 function drawGrid(area, grid) {
@@ -1431,15 +1475,19 @@ function createStackElement(stack) {
 }
 
 function updateCounts() {
-    // Count stones in High Gardens
-    // Full Loop targets:
-    // White Win: G0 (Top Left)
-    // Black Win: G3 (Top Right)
     const wScore = board.gardens[G_TOP_LEFT].filter(s => s === 'white').length;
     const bScore = board.gardens[G_TOP_RIGHT].filter(s => s === 'black').length;
 
-    whiteCountElement.textContent = `${wScore}/${BOARD_CONFIG.winCount}`;
-    blackCountElement.textContent = `${bScore}/${BOARD_CONFIG.winCount}`;
+    const wEl = document.getElementById('white-count');
+    const bEl = document.getElementById('black-count');
+    if (wEl) wEl.textContent = `${wScore}/${BOARD_CONFIG.winCount}`;
+    if (bEl) bEl.textContent = `${bScore}/${BOARD_CONFIG.winCount}`;
+
+    // Sync with side menu - clear the existing content to avoid 0/7/7
+    const wMenu = document.getElementById('white-count-menu');
+    const bMenu = document.getElementById('black-count-menu');
+    if (wMenu) wMenu.textContent = `${wScore}`;
+    if (bMenu) bMenu.textContent = `${bScore}`;
 }
 
 function showMessage(text) {
