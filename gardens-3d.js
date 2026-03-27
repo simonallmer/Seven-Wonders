@@ -72,7 +72,7 @@ function init3D() {
 
     // Controls
     controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.target.set(-100, 0, 0); // Bias target towards the white starting area
+    controls.target.set(0, 0, 0); // Rotation center remains in the middle of the field
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.enablePan = false; // Forbid panning as requested
