@@ -42,7 +42,7 @@ function init3D() {
     scene = new THREE.Scene();
     
     // 1. ATMospheric Effects: Fog for depth and a misty ancient morning feel
-    scene.fog = new THREE.FogExp2(0x87ceeb, 0.0015);
+    scene.fog = new THREE.FogExp2(0x87ceeb, 0.001);
     
     // 2. SKY: Cinematic gradient background
     const canvas = document.createElement('canvas');
@@ -60,7 +60,7 @@ function init3D() {
 
     // Camera Setup
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 5000);
-    camera.position.set(350, 450, 550);
+    camera.position.set(-350, 450, 550); // Moved to negative X to center on White side
 
     // Renderer Setup
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -72,6 +72,7 @@ function init3D() {
 
     // Controls
     controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.target.set(-100, 0, 0); // Bias target towards the white starting area
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.enablePan = false; // Forbid panning as requested
@@ -99,8 +100,10 @@ function init3D() {
 
     // Event Listeners
     window.addEventListener('resize', onWindowResize);
-    renderer.domElement.addEventListener('click', onDocumentClick);
-    renderer.domElement.addEventListener('mousemove', onDocumentMouseMove);
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    renderer.domElement.addEventListener('pointerup', onPointerUp);
+    renderer.domElement.addEventListener('pointermove', onPointerMove);
+    renderer.domElement.style.touchAction = 'none';
 
     animate();
 }
@@ -760,8 +763,8 @@ function updateHighlights() {
 function animate3DMove(path, callback) { setTimeout(callback, 300); }
 
 function onDocumentClick(event) {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    // Normal interaction logic
+    updateMousePos(event);
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(objects);
     if (intersects.length > 0) {
@@ -773,9 +776,31 @@ function onDocumentClick(event) {
     }
 }
 
-function onDocumentMouseMove(event) {
+let pointerStartTime = 0;
+let pointerStartPos = new THREE.Vector2();
+
+function onPointerDown(event) {
+    pointerStartTime = Date.now();
+    pointerStartPos.set(event.clientX, event.clientY);
+}
+
+function onPointerUp(event) {
+    const duration = Date.now() - pointerStartTime;
+    const moveDist = pointerStartPos.distanceTo(new THREE.Vector2(event.clientX, event.clientY));
+    
+    // Forgiving tap detection: short duration and minimal movement
+    if (duration < 300 && moveDist < 15) {
+        onDocumentClick(event);
+    }
+}
+
+function updateMousePos(event) {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+}
+
+function onPointerMove(event) {
+    updateMousePos(event);
 }
 
 function onWindowResize() {

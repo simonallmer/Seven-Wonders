@@ -83,6 +83,7 @@ body.view-3d .status-panel.visible {
     top: 0;
     left: 0;
     z-index: 0;
+    touch-action: none;
 }
 
 body.view-3d #canvas3d {
