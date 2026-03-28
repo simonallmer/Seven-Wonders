@@ -1,5 +1,4 @@
 // COLOSSUS GAME - Seven Wonders Series
-// Game Design: Simon Allmer
 
 // ============================================
 // CONSTANTS & BOARD STRUCTURE
@@ -31,6 +30,8 @@ let isVsComputer = false;
 // Track AI behavior to prevent loops
 let aiLastMovedStone = null; // {r, c}
 let aiConsecutiveMoveCount = 0;
+let lastMovedStonePos = null; // {row, col}
+let gravityOptions = []; // [{row, col, dir}]
 
 // ============================================
 // DOM ELEMENTS
@@ -45,8 +46,12 @@ const resetButton = document.getElementById('reset-button');
 const cancelButton = document.getElementById('cancel-button');
 const opponentButton = document.getElementById('opponent-btn');
 const gameOverModal = document.getElementById('game-over-modal');
+const modalOverlay = document.getElementById('modal-overlay');
 const modalTitle = document.getElementById('modal-title');
 const modalText = document.getElementById('modal-text');
+const modalWinnerIcon = document.getElementById('modal-winner-icon');
+const newGameBtnModal = document.getElementById('new-game-btn');
+const menuBtnModal = document.getElementById('menu-btn-modal');
 
 // ============================================
 // BOARD INITIALIZATION
@@ -96,6 +101,8 @@ function initializeBoard() {
     validMoves = [];
     gameState = 'SELECT_STONE';
     lastPushedStone = null;
+    lastMovedStonePos = null;
+    gravityOptions = [];
 
     drawBoard();
     updateStatus();
@@ -103,15 +110,28 @@ function initializeBoard() {
     updateStoneCounts();
     hideMessage();
     hideGameOverModal();
+
+    // 3D Sync
+    if (window.is3DView && typeof sync3D === 'function') {
+        sync3D();
+    }
 }
 
-function showGameOverModal(title, text) {
+function showGameOverModal(title, text, winner = null) {
     modalTitle.textContent = title;
     modalText.textContent = text;
+    
+    if (winner && modalWinnerIcon) {
+        modalWinnerIcon.className = `winner-icon ${winner}`;
+    }
+    
     gameOverModal.classList.remove('hidden');
     // Trigger reflow to enable transition
     void gameOverModal.offsetWidth;
     gameOverModal.classList.add('visible');
+    
+    // In game over, ensure we sync 3D one last time
+    if (window.is3DView && typeof sync3D === 'function') sync3D();
 }
 
 function hideGameOverModal() {
@@ -165,7 +185,7 @@ function drawBoard() {
     for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
             const cell = document.createElement('div');
-            cell.className = 'cell';
+            cell.className = `cell ${(r + c) % 2 === 0 ? 'cell-light' : 'cell-dark'}`;
             cell.dataset.row = r;
             cell.dataset.col = c;
 
@@ -182,6 +202,8 @@ function drawBoard() {
                     cell.classList.add('valid-move');
                 }
 
+
+
                 if (cellData.piece) {
                     const stone = document.createElement('div');
                     stone.classList.add('stone', cellData.piece);
@@ -193,27 +215,18 @@ function drawBoard() {
                     cell.appendChild(stone);
                 }
 
-                // Add clickable arrow if in gravity selection mode
-                // Appended AFTER stone to ensure it's on top in DOM order
-                if (gameState === 'SELECT_GRAVITY_ORDER' &&
-                    cellData.directionField &&
-                    pendingGravityDirections.includes(cellData.directionField)) {
-                    console.log('Creating overlay for:', cellData.directionField); // Debug log
-                    const arrow = document.createElement('div');
-                    arrow.classList.add('gravity-arrow-overlay', `arrow-${cellData.directionField}`);
-                    arrow.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        console.log('Arrow clicked:', cellData.directionField); // Debug log
-                        handleGravityChoice(cellData.directionField);
-                    });
-                    cell.appendChild(arrow);
-                }
+
 
                 cell.addEventListener('click', () => handleCellClick(r, c));
             }
 
             boardElement.appendChild(cell);
         }
+    }
+
+    // 3D View Update
+    if (window.is3DView && typeof update3DViews === 'function') {
+        update3DViews();
     }
 }
 
@@ -225,12 +238,22 @@ function updateStatus(message = null) {
 
     if (message) {
         statusElement.textContent = message;
+        // Also show in floating message box if 3D
+        if (window.is3DView) showMessage(message);
     } else {
         const playerName = currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1);
-        if (gameState === 'SELECT_STONE') {
-            statusElement.textContent = `${playerName} to move. Select a stone to move.`;
-        } else if (gameState === 'SELECT_MOVE') {
-            statusElement.textContent = `${playerName} selected. Choose where to move (green highlights).`;
+        const statusText = gameState === 'SELECT_STONE' 
+            ? `${playerName} to move. Select a stone to move.`
+            : `${playerName} selected. Choose where to move (green highlights).`;
+            
+        statusElement.textContent = statusText;
+        
+        // Update Side Menu
+        const menuPlayerName = document.getElementById('player-name');
+        const menuPlayerIndicator = document.getElementById('player-indicator');
+        if (menuPlayerName) menuPlayerName.textContent = `${playerName}'s Turn`;
+        if (menuPlayerIndicator) {
+            menuPlayerIndicator.className = `count-stone ${currentPlayer}`;
         }
     }
 }
@@ -249,16 +272,21 @@ function updateStoneCounts() {
     whiteCountElement.textContent = whiteCount;
     blackCountElement.textContent = blackCount;
 
-    // Check win condition
+    // Update Side Menu
+    const whiteCountMenu = document.getElementById('white-count-menu');
+    const blackCountMenu = document.getElementById('black-count-menu');
+    if (whiteCountMenu) whiteCountMenu.textContent = whiteCount;
+    if (blackCountMenu) blackCountMenu.textContent = blackCount;
+
     // Check win condition
     if (whiteCount < 4) {
         gameState = 'GAME_OVER';
         updateStatus('Game Over! Black wins!');
-        showGameOverModal('Black Wins!', 'Black wins! White has fewer than 4 stones.');
+        showGameOverModal('Black Wins!', 'Black wins! White has fewer than 4 stones.', 'black');
     } else if (blackCount < 4) {
         gameState = 'GAME_OVER';
         updateStatus('Game Over! White wins!');
-        showGameOverModal('White Wins!', 'White wins! Black has fewer than 4 stones.');
+        showGameOverModal('White Wins!', 'White wins! Black has fewer than 4 stones.', 'white');
     }
 }
 
@@ -276,10 +304,40 @@ function hideMessage() {
 function updateUI() {
     if (selectedStone) {
         cancelButton.classList.remove('hidden');
+        const cancelMenu = document.getElementById('cancel-button-menu');
+        if (cancelMenu) cancelMenu.classList.remove('hidden');
     } else {
         cancelButton.classList.add('hidden');
+        const cancelMenu = document.getElementById('cancel-button-menu');
+        if (cancelMenu) cancelMenu.classList.add('hidden');
     }
 }
+
+function handleCancelMove() {
+    selectedStone = null;
+    validMoves = [];
+    gameState = 'SELECT_STONE';
+    drawBoard();
+    updateStatus();
+    updateUI();
+}
+
+function toggleOpponent() {
+    isVsComputer = !isVsComputer;
+    const text = `Opponent: ${isVsComputer ? 'CPU' : 'Human'}`;
+    opponentButton.textContent = text;
+    const opponentMenu = document.getElementById('opponent-btn-menu');
+    if (opponentMenu) opponentMenu.textContent = text;
+    
+    if (isVsComputer && currentPlayer === 'black' && gameState === 'SELECT_STONE') {
+        setTimeout(makeAIMove, 500);
+    }
+}
+
+// Export for menu
+window.handleCancelMove = handleCancelMove;
+window.toggleOpponent = toggleOpponent;
+window.initializeBoard = initializeBoard;
 
 // ============================================
 // GAME LOGIC
@@ -367,13 +425,7 @@ async function handleCellClick(row, col) {
 
     const cellData = board[row][col];
 
-    // Handle Gravity Selection (Fallback if overlay click is missed)
-    if (gameState === 'SELECT_GRAVITY_ORDER') {
-        if (cellData.directionField && pendingGravityDirections.includes(cellData.directionField)) {
-            await handleGravityChoice(cellData.directionField);
-        }
-        return;
-    }
+
 
     if (gameState === 'SELECT_STONE') {
         if (cellData.piece === currentPlayer) {
@@ -442,22 +494,39 @@ async function executeMove(move) {
         if (board[move.row][move.col].directionField) {
             newlyActivatedDir = board[move.row][move.col].directionField;
         }
+
+        lastMovedStonePos = { row: move.row, col: move.col };
+
+        // 3D Animation
+        if (window.is3DView && typeof animate3DMove === 'function') {
+            await animate3DMove(selectedStone.row, selectedStone.col, move.row, move.col);
+        }
     } else if (move.type === 'push') {
         // Animate both the pushed stone and the pushing stone
         const pushedPiece = board[move.row][move.col].piece;
 
-        const pushAnimations = [
-            {
-                from: { row: move.row, col: move.col },
-                to: { row: move.pushTo.row, col: move.pushTo.col }
-            },
-            {
-                from: { row: selectedStone.row, col: selectedStone.col },
-                to: { row: move.row, col: move.col }
-            }
-        ];
-
-        await animateMoves(pushAnimations);
+        // 3D Animation (Push)
+        if (window.is3DView && typeof animate3DMove === 'function') {
+            // Simultaneous push in 3D is handled by calling two animations if we want,
+            // or we just call them sequentially. animateGravityShift handles multiple.
+            // For a single push, let's just do them.
+            await Promise.all([
+                animate3DMove(move.row, move.col, move.pushTo.row, move.pushTo.col),
+                animate3DMove(selectedStone.row, selectedStone.col, move.row, move.col)
+            ]);
+        } else {
+            const pushAnimations = [
+                {
+                    from: { row: move.row, col: move.col },
+                    to: { row: move.pushTo.row, col: move.pushTo.col }
+                },
+                {
+                    from: { row: selectedStone.row, col: selectedStone.col },
+                    to: { row: move.row, col: move.col }
+                }
+            ];
+            await animateMoves(pushAnimations);
+        }
 
         // Apply push movement to board
         board[move.pushTo.row][move.pushTo.col].piece = pushedPiece;
@@ -470,10 +539,14 @@ async function executeMove(move) {
         // Record pushed stone to prevent immediate push-back
         lastPushedStone = { row: move.pushTo.row, col: move.pushTo.col };
 
-        // Check if pushed stone landed on direction field
+        // Check if either stone landed on a direction field to set prioritizing
         if (board[move.pushTo.row][move.pushTo.col].directionField) {
             newlyActivatedDir = board[move.pushTo.row][move.pushTo.col].directionField;
+        } else if (board[move.row][move.col].directionField) {
+            newlyActivatedDir = board[move.row][move.col].directionField;
         }
+
+        lastMovedStonePos = { row: move.row, col: move.col };
     }
 
     // Track AI consecutive moves with the same stone (across turns)
@@ -534,57 +607,69 @@ async function resolveGravity(prioritizedDir = null) {
         return;
     }
 
-    // 3. Apply prioritized direction first if it exists
+    // 3. Priority: If we just activated a field, it goes first, then others follow automatically
     if (prioritizedDir && effectiveDirections.includes(prioritizedDir)) {
+        // Tilt the prioritized field first
         await tiltBoard(prioritizedDir);
-        effectiveDirections = effectiveDirections.filter(d => d !== prioritizedDir);
-
-        if (effectiveDirections.length === 0) {
-            checkAndRemoveHades();
-            endTurn();
-            return;
+        
+        // Tilt any remaining active fields sequentially
+        const remaining = effectiveDirections.filter(d => d !== prioritizedDir);
+        for (const dir of remaining) {
+            await tiltBoard(dir);
         }
+        
+        checkAndRemoveHades();
+        endTurn();
+        return;
     }
 
-    // 4. Handle remaining directions
+    // 4. Handle remaining cases (No prioritized field activated)
     if (effectiveDirections.length === 1) {
         await tiltBoard(effectiveDirections[0]);
         checkAndRemoveHades();
         endTurn();
-    } else if (effectiveDirections.length > 1) {
-        // Multiple non-opposing directions (e.g., Up + Left)
-        // Player must choose order
-        gameState = 'SELECT_GRAVITY_ORDER';
-        pendingGravityDirections = effectiveDirections;
-        updateStatus(`Gravity Conflict! Click a directional field to choose which direction applies first.`);
-        drawBoard(); // Redraw to show arrows
-        if (isVsComputer && currentPlayer === 'black') {
-            setTimeout(makeAIMove, 800);
+    } else if (effectiveDirections.length === 2) {
+        // DIAGONAL SLIDE
+        // Perpendicular directions (e.g., Up + Right) combine into a diagonal move
+        const combo = effectiveDirections.join('_');
+        await tiltBoard(combo);
+        checkAndRemoveHades();
+        endTurn();
+    } else {
+        checkAndRemoveHades();
+        endTurn();
+    }
+}
+
+// Helper to simulate tilt for just one stone (to show destination)
+function simulateSingleStoneTilt(row, col, direction) {
+    let dr = 0, dc = 0;
+    if (direction === 'up') dr = -1;
+    if (direction === 'down') dr = 1;
+    if (direction === 'left') dc = -1;
+    if (direction === 'right') dc = 1;
+
+    const moves = [];
+    let r = row;
+    let c = col;
+    
+    // We need to account for other stones! 
+    // This is a simplified simulation for visual hint.
+    while (true) {
+        let nextR = r + dr;
+        let nextC = c + dc;
+        if (isInBounds(nextR, nextC) && !board[nextR][nextC].piece) {
+            moves.push({ from: {row: r, col: c}, to: {row: nextR, col: nextC} });
+            r = nextR;
+            c = nextC;
+        } else {
+            break;
         }
     }
+    return moves;
 }
 
-let pendingGravityDirections = [];
 
-// Removed - arrows now shown on board via drawBoard
-
-async function handleGravityChoice(firstDirection) {
-    if (gameState !== 'SELECT_GRAVITY_ORDER') return;
-
-    hideMessage(); // Hide any previous messages
-
-    // Apply first direction
-    await tiltBoard(firstDirection);
-
-    // Apply remaining directions
-    const remainingDirections = pendingGravityDirections.filter(d => d !== firstDirection);
-    for (const dir of remainingDirections) {
-        await tiltBoard(dir);
-    }
-
-    checkAndRemoveHades();
-    endTurn();
-}
 
 async function tiltBoard(direction) {
     const previousState = gameState;
@@ -613,6 +698,13 @@ async function tiltBoard(direction) {
         updates.forEach(update => {
             board[update.to.row][update.to.col].piece = update.piece;
         });
+
+        // 3D Animation
+        if (window.is3DView && typeof animateGravityShift === 'function') {
+            await animateGravityShift(direction, moves);
+        } else {
+            await animateMoves(moves);
+        }
     }
 
     // 4. Redraw to snap everything to grid and remove transforms
@@ -650,10 +742,10 @@ function simulateTilt(direction) {
     }
 
     let dr = 0, dc = 0;
-    if (direction === 'up') dr = -1;
-    if (direction === 'down') dr = 1;
-    if (direction === 'left') dc = -1;
-    if (direction === 'right') dc = 1;
+    if (direction.includes('up')) dr = -1;
+    if (direction.includes('down')) dr = 1;
+    if (direction.includes('left')) dc = -1;
+    if (direction.includes('right')) dc = 1;
 
     let moved = true;
     let iterations = 0;
@@ -759,6 +851,11 @@ function checkAndRemoveHades() {
         });
         showMessage(`Hades formed! ${toRemove.length} stone(s) removed.`);
         updateStoneCounts();
+        
+        // 3D Sync for removed stones
+        if (window.is3DView && typeof sync3D === 'function') {
+            sync3D();
+        }
     }
 }
 
@@ -814,6 +911,7 @@ function cancelMove() {
 }
 
 function endTurn() {
+    if (gameState === 'GAME_OVER') return;
     selectedStone = null;
     validMoves = [];
     currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
@@ -822,6 +920,11 @@ function endTurn() {
     updateStatus();
     updateStoneCounts();
     updateUI();
+
+    // Final 3D sync for turn
+    if (window.is3DView && typeof sync3D === 'function') {
+        sync3D();
+    }
 
     if (isVsComputer && currentPlayer === 'black' && gameState !== 'GAME_OVER') {
         setTimeout(makeAIMove, 600);
@@ -842,6 +945,12 @@ opponentButton.addEventListener('click', () => {
     }
 });
 
+// Modal Actions
+if (newGameBtnModal) newGameBtnModal.addEventListener('click', initializeBoard);
+if (menuBtnModal) menuBtnModal.addEventListener('click', () => window.location.href = 'index.html');
+if (modalOverlay) modalOverlay.addEventListener('click', hideGameOverModal);
+
+
 // ============================================
 // AI LOGIC
 // ============================================
@@ -849,12 +958,7 @@ opponentButton.addEventListener('click', () => {
 function makeAIMove() {
     if (gameState === 'GAME_OVER' || currentPlayer !== 'black') return;
 
-    if (gameState === 'SELECT_GRAVITY_ORDER') {
-        // AI chooses random gravity order
-        const dir = pendingGravityDirections[Math.floor(Math.random() * pendingGravityDirections.length)];
-        handleGravityChoice(dir);
-        return;
-    }
+
 
     if (gameState !== 'SELECT_STONE') return;
 
