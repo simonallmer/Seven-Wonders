@@ -64,6 +64,7 @@ function init3D() {
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
+    controls.enablePan = false;
     controls.minDistance = 200;
     controls.maxDistance = 1500;
     controls.maxPolarAngle = Math.PI / 1.5;
