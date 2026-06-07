@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keywords - Seven Wonders</title>
+    <meta name="description"
+        content="The Seven Wonders register of keywords — every movement, attack and action across the series. Many carry across games.">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* This page needs more room than the default 600px container for the tables. */
+        .container {
+            max-width: 960px;
+        }
+
+        .keywords-container {
+            max-width: 880px;
+            margin: 0 auto 40px;
+            width: 100%;
+            text-align: left;
+        }
+
+        .keywords-intro {
+            text-align: center;
+            color: rgba(227, 218, 201, 0.7);
+            font-size: 0.9rem;
+            letter-spacing: 0.04em;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .wip-note {
+            display: inline-block;
+            margin: 0 auto 40px;
+            padding: 6px 18px;
+            font-size: 0.72rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: #C5A059;
+            border: 1px solid rgba(197, 160, 89, 0.4);
+            background: rgba(197, 160, 89, 0.06);
+        }
+
+        .keyword-section {
+            margin-bottom: 50px;
+        }
+
+        .keyword-section h2 {
+            font-family: 'Ancient Tulip', serif;
+            color: #C5A059;
+            font-size: 1.6rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            text-align: left;
+            margin-bottom: 18px;
+            text-shadow: 0 0 18px rgba(197, 160, 89, 0.3);
+        }
+
+        .keyword-table-wrap {
+            background: linear-gradient(135deg, #1a1612 0%, #110f0d 100%);
+            border: 1px solid #C5A059;
+            border-radius: 2px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5),
+                inset 0 0 100px rgba(197, 160, 89, 0.05);
+            overflow-x: auto;
+        }
+
+        table.keywords {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Cinzel', serif;
+            min-width: 560px;
+        }
+
+        table.keywords thead th {
+            text-align: left;
+            color: #C5A059;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(197, 160, 89, 0.5);
+        }
+
+        table.keywords tbody td {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(197, 160, 89, 0.12);
+            vertical-align: top;
+            color: #E3DAC9;
+            font-size: 0.92rem;
+            line-height: 1.5;
+        }
+
+        table.keywords tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        table.keywords tbody tr:hover td {
+            background: rgba(197, 160, 89, 0.06);
+        }
+
+        td.kw-name {
+            color: #FDF5E6;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        td.kw-desc {
+            color: rgba(227, 218, 201, 0.85);
+            font-weight: 400;
+        }
+
+        td.kw-game {
+            line-height: 1.9;
+        }
+
+        td.kw-game a {
+            color: #C5A059;
+            text-decoration: none;
+            letter-spacing: 0.06em;
+            border-bottom: 1px solid transparent;
+            transition: all 0.25s ease;
+            white-space: nowrap;
+        }
+
+        td.kw-game .kw-general {
+            color: rgba(227, 218, 201, 0.3);
+        }
+
+        /* ---- Game filter bar ---- */
+        .filter-bar {
+            margin: 0 auto 44px;
+            text-align: center;
+        }
+
+        .filter-label {
+            display: block;
+            color: #C5A059;
+            font-size: 0.72rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .filter-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .game-filter {
+            background: #110f0d;
+            color: rgba(227, 218, 201, 0.7);
+            border: 1px solid rgba(197, 160, 89, 0.3);
+            padding: 7px 16px;
+            font-family: 'Cinzel', serif;
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .game-filter:hover {
+            color: #FDF5E6;
+            border-color: #C5A059;
+        }
+
+        .game-filter.active {
+            color: #0d0b09;
+            background: #C5A059;
+            border-color: #C5A059;
+            font-weight: 700;
+        }
+
+        .filter-reset {
+            margin-top: 18px;
+            background: transparent;
+            color: rgba(227, 218, 201, 0.5);
+            border: none;
+            border-bottom: 1px solid transparent;
+            font-family: 'Cinzel', serif;
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .filter-reset:hover {
+            color: #C5A059;
+            border-bottom-color: #C5A059;
+        }
+
+        .filter-reset.hidden {
+            display: none;
+        }
+
+        .no-results {
+            text-align: center;
+            color: rgba(227, 218, 201, 0.5);
+            font-style: italic;
+            letter-spacing: 0.05em;
+            padding: 30px 0;
+            display: none;
+        }
+
+        td.kw-game a:hover {
+            color: #FDF5E6;
+            border-bottom-color: #C5A059;
+            text-shadow: 0 0 12px rgba(197, 160, 89, 0.5);
+        }
+
+        td.kw-game .sep {
+            color: rgba(227, 218, 201, 0.4);
+        }
+
+        @media (max-width: 768px) {
+            .keyword-section h2 {
+                font-size: 1.3rem;
+            }
+
+            table.keywords tbody td,
+            table.keywords thead th {
+                padding: 13px 14px;
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <a href="index.html" class="back-link">← Menu</a>
+
+    <div class="container">
+        <header class="main-header">
+            <h1 class="title">KEYWORDS</h1>
+        </header>
+
+        <div class="keywords-container">
+            <p class="keywords-intro">
+                A register of every movement, attack and action in the Seven Wonders series.<br>
+                Each game is unique, yet many keywords carry across titles.
+            </p>
+            <div style="text-align:center;">
+                <span class="wip-note">Work in progress — incomplete &amp; under review</span>
+            </div>
+
+            <!-- ============ GAME FILTER ============ -->
+            <div class="filter-bar">
+                <span class="filter-label">Filter by game</span>
+                <div class="filter-chips">
+                    <button class="game-filter" data-game="pyramid">Pyramid</button>
+                    <button class="game-filter" data-game="gardens">Gardens</button>
+                    <button class="game-filter" data-game="temple">Temple</button>
+                    <button class="game-filter" data-game="statue">Statue</button>
+                    <button class="game-filter" data-game="mausoleum">Mausoleum</button>
+                    <button class="game-filter" data-game="colossus">Colossus</button>
+                    <button class="game-filter" data-game="pharos">Pharos</button>
+                    <button class="game-filter" data-game="great_wall">Great Wall</button>
+                    <button class="game-filter" data-game="skyscraper">Skyscraper</button>
+                </div>
+                <button class="filter-reset hidden" id="filter-reset">Show all</button>
+            </div>
+
+            <p class="no-results" id="no-results">No keywords for the selected game(s).</p>
+
+            <!-- ============ GENERAL ============ -->
+            <section class="keyword-section">
+                <h2>General</h2>
+                <div class="keyword-table-wrap">
+                    <table class="keywords">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Game</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="kw-name">Stone</td>
+                                <td class="kw-desc">Game piece in four colors.</td>
+                                <td class="kw-game"><a href="pyramid.html">Pyramid</a><span class="sep">, </span><a href="gardens.html">Gardens</a><span class="sep">, </span><a href="temple.html">Temple</a><span class="sep">, </span><a href="mausoleum.html">Mausoleum</a><span class="sep">, </span><a href="colossus.html">Colossus</a><span class="sep">, </span><a href="pharos.html">Pharos</a><span class="sep">, </span><a href="great_wall.html">Great Wall</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Die</td>
+                                <td class="kw-desc">A game piece whose value indicates the number of fields for movement.</td>
+                                <td class="kw-game"><a href="statue.html">Statue</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Reservoir</td>
+                                <td class="kw-desc">Game pieces not yet on the field. A player may place one when wished.</td>
+                                <td class="kw-game"><a href="statue.html">Statue</a><span class="sep">, </span><a href="great_wall.html">Great Wall</a></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ============ MOVEMENTS ============ -->
+            <section class="keyword-section">
+                <h2>Movements</h2>
+                <div class="keyword-table-wrap">
+                    <table class="keywords">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Game</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="kw-name">Run</td>
+                                <td class="kw-desc">A stone runs to any accessible field on the same or on lower levels.</td>
+                                <td class="kw-game"><a href="pyramid.html">Pyramid</a><span class="sep">, </span><a href="colossus.html">Colossus</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Jump</td>
+                                <td class="kw-desc">A stone jumps to an adjacent unoccupied field.</td>
+                                <td class="kw-game"><a href="pyramid.html">Pyramid</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Push</td>
+                                <td class="kw-desc">An adjacent stone on the same level is pushed one field.</td>
+                                <td class="kw-game"><a href="pyramid.html">Pyramid</a><span class="sep">, </span><a href="colossus.html">Colossus</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Stack</td>
+                                <td class="kw-desc">Single stones of the same color stack to form a tower.</td>
+                                <td class="kw-game"><a href="gardens.html">Gardens</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Trail</td>
+                                <td class="kw-desc">Stones are moved with at least one stone from the bottom being placed per field.</td>
+                                <td class="kw-game"><a href="gardens.html">Gardens</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Walk</td>
+                                <td class="kw-desc">Movement equals one field.</td>
+                                <td class="kw-game"><a href="temple.html">Temple</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Leap</td>
+                                <td class="kw-desc">Adjacent stones are leaped over if next field in line is free.</td>
+                                <td class="kw-game"><a href="temple.html">Temple</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Place</td>
+                                <td class="kw-desc">Stone or die is placed on an unoccupied field from the reservoir (out of game).</td>
+                                <td class="kw-game"><a href="statue.html">Statue</a><span class="sep">, </span><a href="great_wall.html">Great Wall</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Stride</td>
+                                <td class="kw-desc">Movement equals die.</td>
+                                <td class="kw-game"><a href="statue.html">Statue</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Glide</td>
+                                <td class="kw-desc">A stone moves in one line until an object stops the movement.</td>
+                                <td class="kw-game"><a href="mausoleum.html">Mausoleum</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Beam</td>
+                                <td class="kw-desc">Stones in an unbroken horizontal or vertical line of sight may send one move to a stone of their color.</td>
+                                <td class="kw-game"><a href="pharos.html">Pharos</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Light</td>
+                                <td class="kw-desc">A field is lit up in the player's color, requiring an unbroken line of sight through the structure and no higher than the elevator.</td>
+                                <td class="kw-game"><a href="skyscraper.html">Skyscraper</a></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ============ ATTACKS & ACTIONS ============ -->
+            <section class="keyword-section">
+                <h2>Attacks &amp; Actions</h2>
+                <div class="keyword-table-wrap">
+                    <table class="keywords">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Game</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="kw-name">Smash</td>
+                                <td class="kw-desc">Stone from higher level falls on stone from lower level through a run. Smashed stone is removed.</td>
+                                <td class="kw-game"><a href="pyramid.html">Pyramid</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Fall</td>
+                                <td class="kw-desc">Stone on the edge field of the lowest level is pushed out of the game field. Fallen stone is removed.</td>
+                                <td class="kw-game"><a href="pyramid.html">Pyramid</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Osiris</td>
+                                <td class="kw-desc">Stones of the same color get surrounded by the opposing color on the same level and in one line. These stones get removed.</td>
+                                <td class="kw-game"><a href="pyramid.html">Pyramid</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Hades</td>
+                                <td class="kw-desc">Stones of the same color get surrounded by the opposing color horizontally and vertically with no adjacent empty fields. These stones get removed.</td>
+                                <td class="kw-game"><a href="colossus.html">Colossus</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Hit</td>
+                                <td class="kw-desc">Stone or die of the opposing color enters an occupied field. Hit game piece is removed.</td>
+                                <td class="kw-game"><a href="statue.html">Statue</a><span class="sep">, </span><a href="pharos.html">Pharos</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Diminish</td>
+                                <td class="kw-desc">Lower die by 1 to force opponents invincible die to move.</td>
+                                <td class="kw-game"><a href="statue.html">Statue</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Circle</td>
+                                <td class="kw-desc">A fully encircled stone is removed if the number of opponent's stones exceeds the number of player's stones.</td>
+                                <td class="kw-game"><a href="mausoleum.html">Mausoleum</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Collapse</td>
+                                <td class="kw-desc">A captured stone's field collapses into a permanent pit. The pit blocks movement and counts as a wall when encircling.</td>
+                                <td class="kw-game"><a href="mausoleum.html">Mausoleum</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Trap</td>
+                                <td class="kw-desc">If a stone has only 1 liberty left, it is unable to move.</td>
+                                <td class="kw-game"><a href="mausoleum.html">Mausoleum</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Tilting</td>
+                                <td class="kw-desc">If a stone ends its move on a direction field, the board tilts that way and all stones slide until blocked. A new direction field reached during the slide tilts the board again.</td>
+                                <td class="kw-game"><a href="colossus.html">Colossus</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Row</td>
+                                <td class="kw-desc">Completing a full sequence of 5 windows (horizontally or vertically) on the same block initiates a Row. The player holding the majority of illuminated fields within that sequence secures the entire line.</td>
+                                <td class="kw-game"><a href="skyscraper.html">Skyscraper</a></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <footer class="copyright">
+            <p><a href="https://sevenwondersgames.com" style="color: inherit; text-decoration: none;">SevenWondersGames.com</a></p>
+            <p>&copy; 2020-2026 Simon Allmer Entertainment</p>
+        </footer>
+    </div>
+
+    <script>
+        (function () {
+            const chips = [...document.querySelectorAll('.game-filter')];
+            const reset = document.getElementById('filter-reset');
+            const noResults = document.getElementById('no-results');
+            const sections = [...document.querySelectorAll('.keyword-section')];
+            const rows = [...document.querySelectorAll('table.keywords tbody tr')];
+
+            // Tag each row with the games it belongs to (derived from its links).
+            rows.forEach(row => {
+                const games = [...row.querySelectorAll('.kw-game a')]
+                    .map(a => a.getAttribute('href').replace('.html', ''));
+                row.dataset.games = games.join(' ');
+            });
+
+            const activeGames = () => chips.filter(c => c.classList.contains('active')).map(c => c.dataset.game);
+
+            function apply() {
+                const sel = activeGames();
+                rows.forEach(row => {
+                    const games = row.dataset.games ? row.dataset.games.split(' ') : [];
+                    // No filter: show all. Otherwise show only rows that include a selected game.
+                    const show = sel.length === 0 || games.some(g => sel.includes(g));
+                    row.style.display = show ? '' : 'none';
+                });
+                // Hide any section whose rows are all hidden.
+                let anyVisible = false;
+                sections.forEach(sec => {
+                    const visible = [...sec.querySelectorAll('tbody tr')].some(r => r.style.display !== 'none');
+                    sec.style.display = visible ? '' : 'none';
+                    if (visible) anyVisible = true;
+                });
+                reset.classList.toggle('hidden', sel.length === 0);
+                noResults.style.display = (sel.length > 0 && !anyVisible) ? 'block' : 'none';
+            }
+
+            chips.forEach(c => c.addEventListener('click', () => {
+                c.classList.toggle('active');
+                apply();
+            }));
+            reset.addEventListener('click', () => {
+                chips.forEach(c => c.classList.remove('active'));
+                apply();
+            });
+
+            apply();
+        })();
+    </script>
+</body>
+
+</html>
