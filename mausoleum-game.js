@@ -7,12 +7,14 @@
 var PLAYER_1 = 1;
 var PLAYER_2 = 2;
 var EMPTY = 0;
+var HOLE = 3; // Collapsed field: a permanent pit. Blocks movement; acts as a neutral wall for encirclement.
 var ROW_LENGTHS = [4, 5, 6, 7, 8, 7, 6, 5, 4];
 var TOTAL_ROWS = 9;
 
 window.PLAYER_1 = PLAYER_1;
 window.PLAYER_2 = PLAYER_2;
 window.EMPTY = EMPTY;
+window.HOLE = HOLE;
 window.ROW_LENGTHS = ROW_LENGTHS;
 window.TOTAL_ROWS = TOTAL_ROWS;
 
@@ -106,7 +108,7 @@ function drawBoard() {
     for (let r = 0; r < TOTAL_ROWS; r++) {
         for (let c = 0; c < ROW_LENGTHS[r]; c++) {
             const stoneValue = board[r][c];
-            if (stoneValue !== EMPTY) {
+            if (stoneValue === PLAYER_1 || stoneValue === PLAYER_2) {
                 stoneCounts[stoneValue]++;
             }
         }
@@ -324,6 +326,13 @@ function performMoveLogic(r1, c1, r2, c2) {
     }
 
     currentPlayer = currentPlayer === PLAYER_1 ? PLAYER_2 : PLAYER_1;
+
+    // The new player may have been sealed in by the spreading pits.
+    if (checkStalemate(currentPlayer)) {
+        drawBoard();
+        return;
+    }
+
     drawBoard();
 
     if (!gameOver && isVsComputer && currentPlayer === PLAYER_2) {
@@ -338,12 +347,13 @@ function resolveEncirclements() {
     for (let r = 0; r < TOTAL_ROWS; r++) {
         for (let c = 0; c < ROW_LENGTHS[r]; c++) {
             const val = board[r][c];
-            if (val === EMPTY) continue;
+            if (val === EMPTY || val === HOLE) continue;
 
             const neighbors = getNeighbors(r, c);
+            // A cell counts as "surrounding" if it is occupied by a stone OR is a pit (deadly wall).
             const occupied = neighbors.filter(n => board[n.r][n.c] !== EMPTY);
-            
-            if (occupied.length === neighbors.length) { // Fully encircled
+
+            if (occupied.length === neighbors.length) { // Fully encircled (stones and/or pits on every side)
                 const opponent = val === PLAYER_1 ? PLAYER_2 : PLAYER_1;
                 const friendlies = neighbors.filter(n => board[n.r][n.c] === val).length;
                 const enemies = neighbors.filter(n => board[n.r][n.c] === opponent).length;
@@ -360,13 +370,14 @@ function resolveEncirclements() {
         }
     }
 
-    toRemove.forEach(p => { board[p.r][p.c] = EMPTY; });
-    if (captured) resolveEncirclements(); // Recursive check for chain reactions
+    // The stone falls to its death and the field collapses into a permanent pit.
+    toRemove.forEach(p => { board[p.r][p.c] = HOLE; });
+    if (captured) resolveEncirclements(); // Recursive check for chain reactions (collapse cascades)
 }
 
 function checkWinCondition() {
     const counts = { [PLAYER_1]: 0, [PLAYER_2]: 0 };
-    board.forEach(row => row.forEach(val => { if(val !== EMPTY) counts[val]++; }));
+    board.forEach(row => row.forEach(val => { if (val === PLAYER_1 || val === PLAYER_2) counts[val]++; }));
 
     if (counts[PLAYER_1] < 4) {
         showEndGameMessage("Black Wins!", "White has fewer than four stones.");
@@ -377,6 +388,33 @@ function checkWinCondition() {
         return true;
     }
     return false;
+}
+
+// Does the given player have at least one legal move? (No move = entombed = loss.)
+function playerHasAnyMove(player) {
+    for (let r = 0; r < TOTAL_ROWS; r++) {
+        for (let c = 0; c < ROW_LENGTHS[r]; c++) {
+            if (board[r][c] !== player) continue;
+            calculateValidMoves(r, c);
+            if (validMoves.length > 0) {
+                validMoves = [];
+                return true;
+            }
+        }
+    }
+    validMoves = [];
+    return false;
+}
+
+// Returns true if the game ended because `player` has no legal move (entombed).
+function checkStalemate(player) {
+    if (playerHasAnyMove(player)) return false;
+    if (player === PLAYER_1) {
+        showEndGameMessage("Black Wins!", "White is entombed — no possible moves remain.");
+    } else {
+        showEndGameMessage("White Wins!", "Black is entombed — no possible moves remain.");
+    }
+    return true;
 }
 
 function showEndGameMessage(title, text) {
@@ -393,6 +431,10 @@ function initGame() {
     selectedStone = null;
     validMoves = [];
     gameOver = false;
+    // Rebuild the 3D fields so any pits from the previous game are sealed back up.
+    if (window.is3DView && typeof window.rebuild3DBoard === 'function') {
+        window.rebuild3DBoard();
+    }
     drawBoard();
 }
 

@@ -1,1 +1,6 @@
 .DS_Store
+
+# Nested standalone repos kept inside this folder for convenience.
+# They have their own git history/remotes and must never be committed here.
+Seven Wonders Developer/
+Seven Wonders Demo/

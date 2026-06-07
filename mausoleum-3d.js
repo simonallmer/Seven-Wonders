@@ -15,10 +15,12 @@ const groupHighlights = new THREE.Group();
 const groupEnvironment = new THREE.Group();
 const groupTown = new THREE.Group();
 const groupShips = new THREE.Group();
+const groupHoles = new THREE.Group();
 
 // Maps for easy access
 const stoneMeshes = new Map();
 const fieldMeshes = new Map();
+const holeMeshes = new Map(); // "r,c" -> THREE.Group (permanent collapsed pit)
 
 // Materials
 const matMarbleBase = new THREE.MeshStandardMaterial({ color: 0xeae6df, roughness: 0.8, metalness: 0.1 });
@@ -35,6 +37,10 @@ const matGrass = new THREE.MeshStandardMaterial({ color: 0x4a5d23, roughness: 0.
 const matHouseWall = new THREE.MeshStandardMaterial({ color: 0xfffcf5, roughness: 0.8 });
 const matHouseRoof = new THREE.MeshStandardMaterial({ color: 0xa85d32, roughness: 0.9 }); 
 const matWood = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.8 });
+// Collapsed pit: rough broken stone walls and a void you can still faintly see into ("see in darkness").
+const matPitWall = new THREE.MeshStandardMaterial({ color: 0x6b6258, roughness: 1.0, metalness: 0.0, side: THREE.DoubleSide });
+const matPitVoid = new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 1.0, metalness: 0.0, emissive: 0x07070a, emissiveIntensity: 1.0 });
+const matLooseBrick = new THREE.MeshStandardMaterial({ color: 0xb8ae9c, roughness: 0.9, metalness: 0.05 });
 
 // Initialize 3D Engine
 function init3D() {
@@ -176,6 +182,7 @@ function buildMausoleumEnvironment() {
     scene.add(groupPieces);
     scene.add(groupConnectors);
     scene.add(groupHighlights);
+    scene.add(groupHoles);
     scene.add(groupTown);
     scene.add(groupShips);
 
@@ -314,8 +321,10 @@ function get3DCoord(r, c) {
 
 function build3DBoard() {
     fieldMeshes.clear();
+    holeMeshes.clear();
     while(groupBoard.children.length > 0) groupBoard.remove(groupBoard.children[0]);
     while(groupConnectors.children.length > 0) groupConnectors.remove(groupConnectors.children[0]);
+    while(groupHoles.children.length > 0) groupHoles.remove(groupHoles.children[0]);
 
     if (typeof board === 'undefined') return;
 
@@ -360,7 +369,7 @@ function sync3DPieces(animate = false) {
     const currentKeys = new Set();
     board.forEach((row, r) => {
         row.forEach((val, c) => {
-            if (val !== EMPTY) currentKeys.add(`${r},${c}`);
+            if (val === PLAYER_1 || val === PLAYER_2) currentKeys.add(`${r},${c}`);
         });
     });
 
@@ -376,7 +385,7 @@ function sync3DPieces(animate = false) {
     for (let r = 0; r < TOTAL_ROWS; r++) {
         for (let c = 0; c < ROW_LENGTHS[r]; c++) {
             const val = board[r][c];
-            if (val === EMPTY) continue;
+            if (val !== PLAYER_1 && val !== PLAYER_2) continue; // skip EMPTY and HOLE
             const key = `${r},${c}`;
             const { x, z, y } = get3DCoord(r, c);
 
@@ -452,17 +461,19 @@ function triggerTrapdoorCapture(r, c) {
     const key = `${r},${c}`;
     const stone = stoneMeshes.get(key);
     const field = fieldMeshes.get(key);
-    
+
     if (!stone || !field) return;
     stone.userData.animatingRemoval = true;
 
+    // The floor gives way...
     new TWEEN.Tween(field.rotation)
         .to({ x: Math.PI / 2 }, 400)
         .easing(TWEEN.Easing.Back.In)
         .start();
 
+    // ...and the stone falls to its death in the dark.
     new TWEEN.Tween(stone.position)
-        .to({ y: stone.position.y - 150 }, 800)
+        .to({ y: stone.position.y - 200 }, 900)
         .easing(TWEEN.Easing.Quadratic.In)
         .onComplete(() => {
             groupPieces.remove(stone);
@@ -470,10 +481,89 @@ function triggerTrapdoorCapture(r, c) {
         })
         .start();
 
+    // The collapsed tile drops away into the void and the pit is laid bare for good.
     setTimeout(() => {
-        new TWEEN.Tween(field.rotation).to({ x: 0 }, 400).easing(TWEEN.Easing.Quadratic.Out).start();
-    }, 1000);
-        
+        new TWEEN.Tween(field.position)
+            .to({ y: field.position.y - 60 }, 500)
+            .easing(TWEEN.Easing.Quadratic.In)
+            .onComplete(() => {
+                field.visible = false; // The lid is gone; the pit remains.
+            })
+            .start();
+        createPit(r, c);
+    }, 450);
+
+    needsRender = true;
+}
+
+// Build a permanent, inaccessible pit at (r,c): broken shaft walls, a faintly-glowing
+// void you can still see into, and loose bricks tumbled around the rim.
+function createPit(r, c) {
+    const key = `${r},${c}`;
+    if (holeMeshes.has(key)) return;
+
+    const { x, z, y } = get3DCoord(r, c);
+    const pit = new THREE.Group();
+    pit.position.set(x, y, z);
+
+    const radius = 6;
+    const depth = 55;
+
+    // Shaft walls (rough broken stone), open at the top.
+    const shaft = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius * 0.8, depth, 20, 1, true),
+        matPitWall
+    );
+    shaft.position.y = -depth / 2 + 1;
+    shaft.receiveShadow = true;
+    pit.add(shaft);
+
+    // The void floor far below — slight emissive so it reads even in shadow.
+    const voidFloor = new THREE.Mesh(
+        new THREE.CircleGeometry(radius * 0.85, 20),
+        matPitVoid
+    );
+    voidFloor.rotation.x = -Math.PI / 2;
+    voidFloor.position.y = -depth + 2;
+    pit.add(voidFloor);
+
+    // A dark collar just under the rim to deepen the sense of falling away.
+    const collar = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius * 0.98, radius * 0.9, 8, 20, 1, true),
+        matPitVoid
+    );
+    collar.position.y = -4;
+    pit.add(collar);
+
+    // Loose bricks tumbled at the rim — some settling in as the pit forms.
+    const brickCount = 5 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < brickCount; i++) {
+        const bw = 1.6 + Math.random() * 1.8;
+        const bh = 1.2 + Math.random() * 1.2;
+        const bd = 1.6 + Math.random() * 1.8;
+        const brick = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), matLooseBrick);
+        const ang = Math.random() * Math.PI * 2;
+        const rad = radius * (0.55 + Math.random() * 0.5);
+        const restY = 1 + Math.random() * 1.5;
+        brick.position.set(Math.cos(ang) * rad, restY, Math.sin(ang) * rad);
+        brick.rotation.set(Math.random() * 0.8, Math.random() * Math.PI, Math.random() * 0.8);
+        brick.castShadow = true;
+        brick.receiveShadow = true;
+        pit.add(brick);
+
+        // A couple of them tumble in as the floor breaks.
+        if (i % 2 === 0) {
+            const startY = brick.position.y;
+            brick.position.y = startY + 6 + Math.random() * 4;
+            new TWEEN.Tween(brick.position)
+                .to({ y: startY }, 400 + Math.random() * 200)
+                .easing(TWEEN.Easing.Bounce.Out)
+                .start();
+        }
+    }
+
+    groupHoles.add(pit);
+    holeMeshes.set(key, pit);
     needsRender = true;
 }
 
