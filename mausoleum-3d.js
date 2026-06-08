@@ -30,6 +30,8 @@ const matWhitePiece = new THREE.MeshStandardMaterial({ color: 0xffffff, roughnes
 const matBlackPiece = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3, metalness: 0.3 });
 const matHighlight = new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.5, depthTest: false });
 const matSelection = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.6, depthTest: false });
+const matPushRing = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.8, depthTest: false }); // reposition push (blue)
+const matKillRing = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.9, depthTest: false }); // shove-into-pit kill (red)
 const matBevel = new THREE.MeshStandardMaterial({ color: 0xD4AF37, roughness: 0.2, metalness: 0.8, emissive: 0x332200, emissiveIntensity: 0.1 });
 const matRoof = new THREE.MeshStandardMaterial({ color: 0xd1c9bc, roughness: 0.9, metalness: 0.05 });
 const matSea = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.3, metalness: 0.6, transparent: true, opacity: 0.85 });
@@ -38,9 +40,10 @@ const matHouseWall = new THREE.MeshStandardMaterial({ color: 0xfffcf5, roughness
 const matHouseRoof = new THREE.MeshStandardMaterial({ color: 0xa85d32, roughness: 0.9 }); 
 const matWood = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.8 });
 // Collapsed pit: rough broken stone walls and a void you can still faintly see into ("see in darkness").
-const matPitWall = new THREE.MeshStandardMaterial({ color: 0x6b6258, roughness: 1.0, metalness: 0.0, side: THREE.DoubleSide });
-const matPitVoid = new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 1.0, metalness: 0.0, emissive: 0x07070a, emissiveIntensity: 1.0 });
+const matPitWall = new THREE.MeshStandardMaterial({ color: 0x4a4138, roughness: 1.0, metalness: 0.0, side: THREE.DoubleSide });
+const matPitVoid = new THREE.MeshBasicMaterial({ color: 0x040405, side: THREE.DoubleSide }); // unlit: always reads as a black abyss
 const matLooseBrick = new THREE.MeshStandardMaterial({ color: 0xb8ae9c, roughness: 0.9, metalness: 0.05 });
+const matCrack = new THREE.MeshBasicMaterial({ color: 0x07060a }); // dark fracture lines on the board surface
 
 // Initialize 3D Engine
 function init3D() {
@@ -355,6 +358,7 @@ function build3DBoard() {
                     const meshConn = new THREE.Mesh(geomConn, matField);
                     meshConn.position.set(x + dx/2, y + 0.2, z + dz/2);
                     meshConn.rotation.y = angle;
+                    meshConn.userData = { a: `${r},${c}`, b: `${n.r},${n.c}` };
                     groupConnectors.add(meshConn);
                 }
             });
@@ -450,11 +454,72 @@ function animateMove3D(r1, c1, r2, c2, onComplete) {
     new TWEEN.Tween(mesh.position)
         .to({ x: tx, z: tz }, 600)
         .easing(TWEEN.Easing.Quadratic.Out)
-        .onComplete(() => { 
-            if(onComplete) onComplete(); 
+        .onComplete(() => {
+            if(onComplete) onComplete();
             needsRender = true;
         })
         .start();
+}
+
+// PUSH: pusher (r1,c1) advances into the adjacent cell (ar,ac); the pushed stone there
+// slides one field further to (tr,tc). If kill, (tr,tc) is a pit and the pushed stone
+// plunges in and is removed.
+function animatePush3D(r1, c1, ar, ac, tr, tc, kill, onComplete) {
+    const pusherKey = `${r1},${c1}`;
+    const pushedKey = `${ar},${ac}`;
+    const pusher = stoneMeshes.get(pusherKey);
+    const pushed = stoneMeshes.get(pushedKey);
+
+    const adjPos = get3DCoord(ar, ac);
+    const toPos = get3DCoord(tr, tc);
+
+    let remaining = 0;
+    const finish = () => { remaining--; if (remaining <= 0 && onComplete) onComplete(); needsRender = true; };
+
+    // 1. Move the pushed stone out of the adjacent cell first.
+    if (pushed) {
+        stoneMeshes.delete(pushedKey);
+        remaining++;
+        if (kill) {
+            pushed.userData.animatingRemoval = true;
+            new TWEEN.Tween(pushed.position)
+                .to({ x: toPos.x, z: toPos.z }, 380)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .onComplete(() => {
+                    new TWEEN.Tween(pushed.position)
+                        .to({ y: pushed.position.y - 200 }, 700)
+                        .easing(TWEEN.Easing.Quadratic.In)
+                        .onComplete(() => { groupPieces.remove(pushed); finish(); })
+                        .start();
+                })
+                .start();
+        } else {
+            const newKey = `${tr},${tc}`;
+            stoneMeshes.set(newKey, pushed);
+            pushed.userData.r = tr; pushed.userData.c = tc; pushed.userData.key = newKey;
+            new TWEEN.Tween(pushed.position)
+                .to({ x: toPos.x, z: toPos.z }, 440)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .onComplete(finish)
+                .start();
+        }
+    }
+
+    // 2. Advance the pusher into the now-vacated adjacent cell.
+    if (pusher) {
+        stoneMeshes.delete(pusherKey);
+        stoneMeshes.set(pushedKey, pusher);
+        pusher.userData.r = ar; pusher.userData.c = ac; pusher.userData.key = pushedKey;
+        remaining++;
+        new TWEEN.Tween(pusher.position)
+            .to({ x: adjPos.x, z: adjPos.z }, 440)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .onComplete(finish)
+            .start();
+    }
+
+    if (remaining === 0 && onComplete) onComplete();
+    needsRender = true;
 }
 
 function triggerTrapdoorCapture(r, c) {
@@ -506,60 +571,99 @@ function createPit(r, c) {
     const pit = new THREE.Group();
     pit.position.set(x, y, z);
 
-    const radius = 6;
-    const depth = 55;
+    const radius = 7;
 
-    // Shaft walls (rough broken stone), open at the top.
-    const shaft = new THREE.Mesh(
-        new THREE.CylinderGeometry(radius, radius * 0.8, depth, 20, 1, true),
+    // Break the bridges that ran into this field — the collapse takes them with it.
+    groupConnectors.children.forEach(conn => {
+        if (conn.userData && (conn.userData.a === key || conn.userData.b === key)) conn.visible = false;
+    });
+
+    // The board platform is a solid slab, so we build a CRATER rather than a recess:
+    // a black interior framed by a raised, broken stone rim reads as looking into a void.
+
+    // 1. Black interior disc sitting just above the platform top, hiding the cream beneath.
+    const voidDisc = new THREE.Mesh(new THREE.CircleGeometry(radius * 0.96, 28), matPitVoid);
+    voidDisc.rotation.x = -Math.PI / 2;
+    voidDisc.position.y = 0.9;
+    pit.add(voidDisc);
+
+    // 2. A dark inner wall rising from the void to the rim, deepening the sense of a pit.
+    const innerWall = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius * 0.9, 6, 28, 1, true),
+        matPitVoid
+    );
+    innerWall.position.y = 3.4;     // spans roughly +0.4 .. +6.4 (above the surface, around the void)
+    pit.add(innerWall);
+
+    // 3. A raised, broken stone rim around the crater (the buckled-up floor edge).
+    const wall = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius * 1.12, radius * 1.18, 7, 28, 1, true),
         matPitWall
     );
-    shaft.position.y = -depth / 2 + 1;
-    shaft.receiveShadow = true;
-    pit.add(shaft);
+    wall.position.y = 3;
+    wall.receiveShadow = true;
+    wall.castShadow = true;
+    pit.add(wall);
 
-    // The void floor far below — slight emissive so it reads even in shadow.
-    const voidFloor = new THREE.Mesh(
-        new THREE.CircleGeometry(radius * 0.85, 20),
-        matPitVoid
-    );
-    voidFloor.rotation.x = -Math.PI / 2;
-    voidFloor.position.y = -depth + 2;
-    pit.add(voidFloor);
+    const rimCap = new THREE.Mesh(new THREE.RingGeometry(radius, radius * 1.2, 28, 1), matPitWall);
+    rimCap.rotation.x = -Math.PI / 2;
+    rimCap.position.y = 6.4;
+    pit.add(rimCap);
 
-    // A dark collar just under the rim to deepen the sense of falling away.
-    const collar = new THREE.Mesh(
-        new THREE.CylinderGeometry(radius * 0.98, radius * 0.9, 8, 20, 1, true),
-        matPitVoid
-    );
-    collar.position.y = -4;
-    pit.add(collar);
-
-    // Loose bricks tumbled at the rim — some settling in as the pit forms.
-    const brickCount = 5 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < brickCount; i++) {
-        const bw = 1.6 + Math.random() * 1.8;
-        const bh = 1.2 + Math.random() * 1.2;
-        const bd = 1.6 + Math.random() * 1.8;
-        const brick = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), matLooseBrick);
-        const ang = Math.random() * Math.PI * 2;
-        const rad = radius * (0.55 + Math.random() * 0.5);
-        const restY = 1 + Math.random() * 1.5;
-        brick.position.set(Math.cos(ang) * rad, restY, Math.sin(ang) * rad);
-        brick.rotation.set(Math.random() * 0.8, Math.random() * Math.PI, Math.random() * 0.8);
-        brick.castShadow = true;
-        brick.receiveShadow = true;
-        pit.add(brick);
-
-        // A couple of them tumble in as the floor breaks.
-        if (i % 2 === 0) {
-            const startY = brick.position.y;
-            brick.position.y = startY + 6 + Math.random() * 4;
-            new TWEEN.Tween(brick.position)
-                .to({ y: startY }, 400 + Math.random() * 200)
-                .easing(TWEEN.Easing.Bounce.Out)
-                .start();
+    // 4. Jagged stone teeth jutting up from the broken rim of the crater.
+    const shardCount = 9 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < shardCount; i++) {
+        const ang = (i / shardCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+        const upright = Math.random() < 0.6;
+        const len = upright ? 3 + Math.random() * 4 : 2 + Math.random() * 2.5;
+        const shard = new THREE.Mesh(
+            new THREE.ConeGeometry(0.7 + Math.random() * 1.0, len, 3),  // 3-sided = angular stone splinter
+            Math.random() < 0.5 ? matLooseBrick : matPitWall
+        );
+        const rad = radius * (1.08 + Math.random() * 0.18);   // on the rim, never over the void
+        shard.position.set(Math.cos(ang) * rad, 5.5 + Math.random() * 1.5, Math.sin(ang) * rad);
+        if (upright) {
+            shard.rotation.set((Math.random() - 0.3) * 0.7, Math.random() * Math.PI, (Math.random() - 0.5) * 0.7);
+        } else {
+            shard.rotation.set(Math.PI / 2 + (Math.random() - 0.5) * 1.0, Math.random() * Math.PI, (Math.random() - 0.5) * 1.2);
         }
+        shard.castShadow = true;
+        shard.receiveShadow = true;
+        pit.add(shard);
+    }
+
+    // 5. Fractures clawing out across the board into the neighbouring fields.
+    const crackCount = 5 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < crackCount; i++) {
+        const ang = (i / crackCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+        const len = 7 + Math.random() * 9;
+        const crack = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.4, len), matCrack);
+        const mid = radius * 1.18 + len / 2;   // start just outside the raised rim
+        crack.position.set(Math.cos(ang) * mid, 1.55, Math.sin(ang) * mid);
+        crack.rotation.y = -ang + Math.PI / 2;
+        crack.rotation.x = (Math.random() - 0.5) * 0.1;
+        pit.add(crack);
+    }
+
+    // 6. A few dark chunks clinging to the broken rim (kept dark and shallow so they don't
+    //    fill the void).
+    const brickCount = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < brickCount; i++) {
+        const brick = new THREE.Mesh(
+            new THREE.BoxGeometry(1.2 + Math.random() * 1.2, 0.9 + Math.random(), 1.2 + Math.random() * 1.2),
+            matPitWall
+        );
+        const ang = Math.random() * Math.PI * 2;
+        const rad = radius * (1.05 + Math.random() * 0.18);
+        const endY = 5.5 + Math.random() * 1.2;
+        brick.position.set(Math.cos(ang) * rad, endY + 7 + Math.random() * 4, Math.sin(ang) * rad);
+        brick.rotation.set(Math.random(), Math.random() * Math.PI, Math.random());
+        brick.castShadow = true;
+        pit.add(brick);
+        new TWEEN.Tween(brick.position)
+            .to({ y: endY }, 450 + Math.random() * 250)
+            .easing(TWEEN.Easing.Bounce.Out)
+            .start();
     }
 
     groupHoles.add(pit);
@@ -597,10 +701,27 @@ function update3DViews() {
     }
     validMoves.forEach(move => {
         const { x, z, y } = get3DCoord(move.r, move.c);
-        const ring = new THREE.Mesh(new THREE.RingGeometry(6, 7, 24), matHighlight);
-        ring.rotation.x = -Math.PI / 2;
-        ring.position.set(x, y + 1.1, z);
-        groupHighlights.add(ring);
+        if (move.type === 'push') {
+            // Ring around the stone that can be shoved: red = into a pit (kill), blue = reposition.
+            const mat = move.kill ? matKillRing : matPushRing;
+            const ring = new THREE.Mesh(new THREE.RingGeometry(6.5, 8.2, 24), mat);
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.set(x, y + 1.2, z);
+            groupHighlights.add(ring);
+            if (move.kill) {
+                // Mark the doomed pit it will fall into.
+                const tp = get3DCoord(move.pushTo.r, move.pushTo.c);
+                const mark = new THREE.Mesh(new THREE.RingGeometry(2.5, 5.5, 24), matKillRing);
+                mark.rotation.x = -Math.PI / 2;
+                mark.position.set(tp.x, tp.y + 1.2, tp.z);
+                groupHighlights.add(mark);
+            }
+        } else {
+            const ring = new THREE.Mesh(new THREE.RingGeometry(6, 7, 24), matHighlight);
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.set(x, y + 1.1, z);
+            groupHighlights.add(ring);
+        }
     });
     needsRender = true;
 }
@@ -627,6 +748,7 @@ window.init3DSystem = init3D;
 window.rebuild3DBoard = build3DBoard;
 window.sync3D = sync3DPieces;
 window.animate3DMove = animateMove3D;
+window.animate3DPush = animatePush3D;
 window.update3DViews = update3DViews;
 window.trigger3DCapture = triggerTrapdoorCapture;
 

@@ -39,6 +39,9 @@ window.gameOver = gameOver;
 let aiLastMovedStone = null; // {r, c}
 let aiConsecutiveMoveCount = 0;
 
+// Prevents a pushed stone from being immediately shoved straight back next turn.
+let lastPushedStone = null; // {r, c}
+
 // Game data maps
 let fieldElements = new Map(); // "r,c" -> { spot, hitbox }
 let neighborMap = new Map(); // "r,c" -> [{r,c}, ...]
@@ -256,21 +259,61 @@ function isInBounds(r, c) {
 
 function calculateValidMoves(r, c) {
     validMoves = [];
+
+    // A stone with one liberty or fewer is Trapped: it can neither glide NOR push.
+    // This keeps encirclement achievable — a near-surrounded stone cannot fight its
+    // way out or thin the ring with a last-ditch shove.
     if (isTrapped(r, c)) return;
+
     const paths = directionMap.get(`${r},${c}`);
     if (!paths) return;
 
+    // GLIDE: slide along each line until blocked, landing on the last empty field.
     for (const path of paths) {
         let lastEmpty = null;
         for (const pos of path) {
             if (board[pos.r][pos.c] === EMPTY) {
                 lastEmpty = pos;
             } else {
-                break; // Blocked
+                break; // Blocked by a stone or a pit
             }
         }
-        if (lastEmpty) validMoves.push(lastEmpty);
+        if (lastEmpty) validMoves.push({ r: lastEmpty.r, c: lastEmpty.c, type: 'glide' });
     }
+
+    // PUSH: shove an adjacent stone one field along the line.
+    for (const push of calculatePushMoves(r, c)) {
+        validMoves.push(push);
+    }
+}
+
+// A stone may push the adjacent stone (own or enemy) one field further along any of the
+// 6 directions, provided the field beyond is empty (reposition) or a pit (the pushed
+// stone falls in and dies). Mirrors the Push mechanic of Pyramid and Colossus.
+function calculatePushMoves(r, c) {
+    const pushes = [];
+    const paths = directionMap.get(`${r},${c}`);
+    if (!paths) return pushes;
+
+    for (const path of paths) {
+        if (path.length < 2) continue;            // need an adjacent stone AND a field beyond it
+        const adj = path[0];
+        const beyond = path[1];
+        const adjVal = board[adj.r][adj.c];
+        if (adjVal !== PLAYER_1 && adjVal !== PLAYER_2) continue; // must be a stone to push
+
+        // Don't allow shoving the just-pushed stone straight back.
+        if (lastPushedStone && lastPushedStone.r === adj.r && lastPushedStone.c === adj.c) continue;
+
+        const beyondVal = board[beyond.r][beyond.c];
+        if (beyondVal === EMPTY) {
+            pushes.push({ r: adj.r, c: adj.c, type: 'push', kill: false, pushTo: { r: beyond.r, c: beyond.c } });
+        } else if (beyondVal === HOLE) {
+            pushes.push({ r: adj.r, c: adj.c, type: 'push', kill: true, pushTo: { r: beyond.r, c: beyond.c } });
+        }
+        // beyond is another stone -> blocked, no push that way
+    }
+    return pushes;
 }
 
 function isTrapped(r, c) {
@@ -283,10 +326,17 @@ function onCellClick(r, c) {
     if (gameOver) return;
     const val = board[r][c];
 
-    // 1. Execute move
-    if (selectedStone && validMoves.some(m => m.r === r && m.c === c)) {
-        moveStone(selectedStone.r, selectedStone.c, r, c);
-        return;
+    // 1. Execute move (glide or push)
+    if (selectedStone) {
+        const chosen = validMoves.find(m => m.r === r && m.c === c);
+        if (chosen) {
+            if (chosen.type === 'push') {
+                pushStone(selectedStone, chosen);
+            } else {
+                moveStone(selectedStone.r, selectedStone.c, r, c);
+            }
+            return;
+        }
     }
 
     // 2. Select stone
@@ -314,7 +364,41 @@ function moveStone(r1, c1, r2, c2) {
 function performMoveLogic(r1, c1, r2, c2) {
     board[r2][c2] = board[r1][c1];
     board[r1][c1] = EMPTY;
+    lastPushedStone = null; // a glide clears the push-back lock
+    finishTurn();
+}
 
+// PUSH: the pusher advances into the adjacent cell; the pushed stone moves one field
+// further — into an empty field, or into a pit where it falls to its death.
+function pushStone(from, mv) {
+    if (window.is3DView && typeof window.animate3DPush === 'function') {
+        window.animate3DPush(from.r, from.c, mv.r, mv.c, mv.pushTo.r, mv.pushTo.c, mv.kill, () => {
+            performPushLogic(from, mv);
+        });
+    } else {
+        performPushLogic(from, mv);
+    }
+}
+
+function performPushLogic(from, mv) {
+    const pusher = board[from.r][from.c];
+
+    if (mv.kill) {
+        // The pushed stone falls into the pit and is gone; the pit remains.
+        board[mv.pushTo.r][mv.pushTo.c] = HOLE;
+        lastPushedStone = null;
+    } else {
+        board[mv.pushTo.r][mv.pushTo.c] = board[mv.r][mv.c];
+        lastPushedStone = { r: mv.pushTo.r, c: mv.pushTo.c };
+    }
+    board[mv.r][mv.c] = pusher;     // pusher advances into the vacated field
+    board[from.r][from.c] = EMPTY;
+
+    finishTurn();
+}
+
+// Shared end-of-turn resolution for both glide and push.
+function finishTurn() {
     selectedStone = null;
     validMoves = [];
 
@@ -431,6 +515,7 @@ function initGame() {
     selectedStone = null;
     validMoves = [];
     gameOver = false;
+    lastPushedStone = null;
     // Rebuild the 3D fields so any pits from the previous game are sealed back up.
     if (window.is3DView && typeof window.rebuild3DBoard === 'function') {
         window.rebuild3DBoard();
@@ -481,13 +566,23 @@ function makeAIMove() {
     
     if (possibleActions.length === 0) return;
 
-    // Simple evaluation: try to capture or just move randomly
+    // Randomise, then prefer shoving an enemy stone into a pit when the chance arises.
     shuffle(possibleActions);
-    
-    // Choose the selected move
-    const bestAction = possibleActions[0]; 
+    possibleActions.sort((a, b) => killScore(b) - killScore(a));
+
+    const bestAction = possibleActions[0];
     onCellClick(bestAction.from.r, bestAction.from.c); // Select
-    setTimeout(() => onCellClick(bestAction.to.r, bestAction.to.c), 400); // Move
+    setTimeout(() => onCellClick(bestAction.to.r, bestAction.to.c), 400); // Execute
+}
+
+// Rates an action for the AI: shoving an enemy into a pit is best; never volunteer your own.
+function killScore(action) {
+    const mv = action.to;
+    if (mv.type === 'push' && mv.kill) {
+        const victim = board[mv.r][mv.c];
+        return victim === PLAYER_1 ? 2 : -1; // enemy in = great; self in = avoid
+    }
+    return 0;
 }
 
 function shuffle(array) {
