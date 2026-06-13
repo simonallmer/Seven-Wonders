@@ -1,91 +1,1308 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Colosseum - Seven Wonders</title>
-    <meta name="description" content="Play Colosseum, an ancient strategy game from the Seven Wonders series">
-    <link rel="stylesheet" href="colosseum-style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Seven Wonders</title>
+<style>
+  :root{
+    --ink:#2a2018;
+    --red:#c0392b;
+    --yellow:#d4a017;
+    --green:#3a9d3a;
+    --parch:#e9dcc0;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;font-family:"Trebuchet MS","Segoe UI",sans-serif;color:var(--ink);}
+  body{background:linear-gradient(180deg,#f3ead6 0%,#cdb98f 100%);}
+  #home{overflow-y:auto;}
+  .screen{display:none;}
+  .screen.active{display:block;}
+  #game.active{display:flex;}
+
+  /* ---------- HOME ---------- */
+  #home{padding:28px 20px 60px;text-align:center;}
+  .bigtitle{
+    font-family:"Papyrus","Trebuchet MS",fantasy;
+    font-size:clamp(40px,8vw,84px);
+    letter-spacing:6px;
+    margin:6px 0 4px;
+    text-shadow:2px 2px 0 #fff8, 0 3px 6px #0003;
+  }
+  .subtitle{font-size:18px;margin:0 0 28px;color:#4a3c2c;}
+  .columns{
+    display:flex;gap:48px;justify-content:center;flex-wrap:wrap;
+    max-width:1100px;margin:0 auto;
+  }
+  .col{flex:1;min-width:320px;max-width:520px;}
+  .colhead{
+    font-weight:bold;font-size:24px;letter-spacing:3px;
+    border-bottom:3px solid var(--ink);padding-bottom:6px;margin-bottom:14px;
+  }
+
+  /* Game status frame */
+  .frame{
+    display:flex;align-items:stretch;gap:0;
+    border:4px solid var(--red);
+    border-radius:8px;
+    background:#fffaf0cc;
+    margin:10px 0;
+    overflow:hidden;
+    min-height:74px;
+    box-shadow:0 2px 5px #0002;
+  }
+  .frame.status-yellow{border-color:var(--yellow);}
+  .frame.status-green{border-color:var(--green);}
+  .frame.status-red{border-color:var(--red);}
+  .frame.clickable{cursor:pointer;transition:transform .12s, box-shadow .12s;}
+  .frame.clickable:hover{transform:translateY(-2px) scale(1.01);box-shadow:0 6px 16px #0003;}
+  .frame .name{
+    flex:0 0 150px;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:bold;font-size:19px;text-align:center;
+    padding:6px;color:#fff;letter-spacing:1px;
+  }
+  .status-red  .name{background:var(--red);}
+  .status-yellow .name{background:var(--yellow);}
+  .status-green .name{background:var(--green);}
+  .attrs{flex:1;display:flex;}
+  .pgroup{
+    flex:1;border-left:1px solid #d8c9a8;padding:4px 6px;
+    display:flex;flex-direction:column;align-items:center;
+  }
+  .pgroup .plabel{font-size:11px;font-weight:bold;letter-spacing:.5px;margin-bottom:3px;color:#5a4a36;}
+  .media{display:flex;gap:6px;}
+  .mcell{display:flex;flex-direction:column;align-items:center;width:46px;}
+  .mcell .mlabel{font-size:9px;color:#6a5a44;margin-bottom:2px;}
+  .swatch{width:38px;height:18px;border-radius:3px;border:1px solid #00000022;}
+  .sw-red{background:var(--red);}
+  .sw-yellow{background:var(--yellow);}
+  .sw-green{background:var(--green);}
+  .play-hint{font-size:10px;color:#3a9d3a;font-weight:bold;margin-top:2px;}
+
+  /* ---------- GAME ---------- */
+  #game{height:100vh;flex-direction:column;overflow:hidden;padding:0;}
+  .topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex-shrink:0;padding:8px 16px;}
+  .btn{
+    border:2px solid var(--ink);background:#f7efdd;color:var(--ink);
+    padding:8px 14px;border-radius:6px;font-size:15px;font-weight:bold;cursor:pointer;
+    transition:background .1s;
+  }
+  .btn:hover{background:#fff6e2;}
+  .btn.active{background:var(--ink);color:#f7efdd;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn.small{padding:5px 10px;font-size:13px;}
+  .turnbadge{
+    font-weight:bold;font-size:17px;padding:6px 14px;border-radius:20px;border:2px solid var(--ink);
+  }
+  .turnbadge.W{background:#f5f0e6;color:#222;}
+  .turnbadge.B{background:#1a1a1a;color:#f5f0e6;}
+
+  /* board + inforow stacked, centered */
+  .layout{
+    flex:1;min-height:0;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    gap:10px;padding:8px 20px 12px;
+    overflow:hidden;
+  }
+
+  .boardwrap{
+    background:linear-gradient(160deg,#e7c98f,#d8b574);
+    padding:12px;border-radius:10px;border:6px solid #6b4a22;
+    box-shadow:0 6px 20px #0004, inset 0 0 30px #00000022;
+    flex-shrink:0;
+  }
+  #board{position:relative;}
+  .cell{
+    position:absolute;border:1px solid #00000033;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .cell.red{background:#c0392b3a;}
+  .cell.selectable:hover{background:#ffffff55;cursor:pointer;}
+  .cell.valid-place{background:rgba(50,170,60,.18);cursor:pointer;}
+  .cell.valid-place:hover{background:rgba(50,170,60,.36);outline:2px dashed #3a7d3a;}
+  .cell.valid-move{background:rgba(60,120,220,.18);cursor:pointer;}
+  .cell.valid-move:hover{background:rgba(60,120,220,.36);outline:2px dashed #2a6db0;}
+  .cell.hl-vuln{background:#c0392b33;}
+  .cell.hl-shield{background:#2a6db033;}
+  .cell.sel{box-shadow:inset 0 0 0 3px #d4a017;}
+  .cell.cursor{outline:3px solid #f0c040;outline-offset:-3px;z-index:6;}
+  .cell.cursor.valid-place{outline-color:#50dd60;}
+  .cell.cursor.valid-move{outline-color:#50aaff;}
+  /* legendary fields */
+  .cell.legendary{
+    background:radial-gradient(ellipse at center,#6b1a08 0%,#2e0a04 100%);
+    border:2px solid #c8900a;
+    box-shadow:inset 0 0 14px #00000077, 0 0 6px #c8900a55;
+  }
+  .cell.legendary.valid-place{background:rgba(50,170,60,.45);}
+  .cell.legendary.valid-move {background:rgba(60,120,220,.45);}
+  .cell.legendary.hl-vuln   {background:#c0392b55;}
+  .leg-star{
+    position:absolute;font-size:48%;color:#d4a01766;
+    pointer-events:none;user-select:none;z-index:1;
+    letter-spacing:0;line-height:1;
+  }
+  .stone{width:84%;height:84%;cursor:pointer;}
+  .stone svg{width:100%;height:100%;display:block;}
+  .stone.ghost{opacity:.42;pointer-events:none;}
+  .stone.dying{animation:die .5s forwards;}
+  @keyframes die{to{transform:scale(.1) rotate(60deg);opacity:0;}}
+  .projectile{
+    position:absolute;width:12px;height:12px;border-radius:50%;
+    background:radial-gradient(circle at 35% 35%,#fff,#cc2b2b);
+    box-shadow:0 0 8px #cc2b2b;
+    transform:translate(-50%,-50%);transition:left .07s linear,top .07s linear;
+    pointer-events:none;z-index:50;display:none;
+  }
+
+  /* info strip below board */
+  .inforow{
+    display:flex;gap:10px;align-items:stretch;
+    width:100%;
+  }
+  .panel{background:#fffaf0;border:2px solid #c8b48a;border-radius:8px;padding:10px 12px;}
+  .panel.forces-panel{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;gap:4px;}
+  .panel.log-panel{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
+  .panel h3{margin:0 0 4px;font-size:13px;letter-spacing:1px;color:#6a5a44;}
+  .forces-row{display:flex;gap:24px;font-size:13.5px;flex-wrap:wrap;}
+  .frc{display:flex;align-items:center;gap:6px;}
+  #log{height:64px;overflow-y:auto;font-size:12px;line-height:1.45;}
+  #log .ev{padding:1px 0;border-bottom:1px dashed #e2d6ba;}
+  #log .ev.turn{font-weight:bold;color:#4a3c2c;}
+  #log .ev.kill{color:#c0392b;}
+  .rules{font-size:11.5px;line-height:1.5;color:#3a3024;margin-top:4px;}
+  .rules summary{cursor:pointer;font-size:12px;font-weight:bold;}
+
+  /* direction picker */
+  #dirpicker{
+    position:fixed;inset:0;background:#0006;display:none;align-items:center;justify-content:center;z-index:100;
+  }
+  #dirpicker .box{background:#fffaf0;border:3px solid var(--ink);border-radius:12px;padding:18px;text-align:center;}
+  #dirpicker h3{margin:0 0 10px;}
+  .dirgrid{display:grid;grid-template-columns:repeat(3,60px);grid-template-rows:repeat(3,60px);gap:6px;}
+  .dirbtn{
+    border:2px solid var(--ink);background:#f7efdd;border-radius:8px;font-size:24px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .dirbtn:hover{background:var(--ink);color:#f7efdd;}
+  .dirbtn.center{visibility:hidden;}
+  .hint{font-size:13px;color:#6a5a44;margin-top:8px;}
+
+  /* touch facing picker — Great Wall place mode */
+  #touch-dirpicker{display:none;align-items:center;margin-left:auto;}
+  .touch-dirgrid{display:grid;grid-template-columns:repeat(3,38px);grid-template-rows:repeat(3,38px);gap:3px;}
+  .touch-dirbtn{border:1.5px solid var(--ink);background:#f7efdd;border-radius:6px;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;padding:0;}
+  .touch-dirbtn:active{background:var(--ink);color:#f7efdd;}
+  .touch-dir-cur{background:#e8dfc8;border:1.5px solid #9a8e74;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:bold;color:#4a3c2c;}
+
+  /* ---------- COLOSSEUM ---------- */
+  #colosseum{height:100vh;flex-direction:column;overflow:hidden;padding:0;}
+  #colosseum.active{display:flex;}
+  .col-cell{fill:#b8b0a0;cursor:pointer;transition:fill .1s;}
+  .col-cell:hover{fill:#ccc5b0;}
+  .col-cell.col-sel{fill:#f0d060;}
+  .col-cell.col-valid-w{fill:#b8ddb8;}
+  .col-cell.col-valid-b{fill:#b8b8dd;}
+  .col-cell.col-sel:hover{fill:#f5da70;}
+  .col-cell.col-valid-w:hover{fill:#a8cda8;}
+  .col-cell.col-valid-b:hover{fill:#a8a8cd;}
+  .col-cell.col-safe{fill:#cec4ad;stroke:#5a4a30;}
+  .col-cell.col-safe:hover{fill:#ddd3bb;}
+</style>
 </head>
+<body onload="startColosseum()">
 
-<body>
-    <!-- Back to Menu -->
-    <a href="index.html?menu=new" class="back-link">← Back to Seven Wonders</a>
+<!-- ===================== HOME ===================== -->
+<section id="home" class="screen active">
+  <h1 class="bigtitle">SEVEN WONDERS</h1>
+  <p class="subtitle">A journey through the ages awaits you.<br/>Click on a wonder to play its prototype.</p>
+  <div class="columns">
+    <div class="col">
+      <div class="colhead">OLD</div>
+      <div id="col-old"></div>
+    </div>
+    <div class="col">
+      <div class="colhead">NEW</div>
+      <div id="col-new"></div>
+    </div>
+  </div>
+</section>
 
-    <!-- Header -->
-    <header class="game-header">
-        <h1 class="game-title">COLOSSEUM</h1>
-        <p class="game-subtitle">The Colosseum of Rome</p>
-    </header>
+<!-- ===================== GAME ===================== -->
+<section id="game" class="screen">
+  <div class="topbar">
+    <button class="btn small" onclick="goHome()">&larr; Wonders</button>
+    <strong style="font-size:18px;letter-spacing:1px;">GREAT WALL &middot; 2 Players</strong>
+    <span id="turnBadge" class="turnbadge W">WHITE to move</span>
+    <span style="flex:1"></span>
+    <button id="btn-hidden" class="btn small" onclick="toggleHiddenFacing()">👁 Facing: Visible</button>
+    <a href="great-wall-rules-v1.html" target="_blank" class="btn small" style="text-decoration:none;">📜 Rules V1</a>
+    <button class="btn small" onclick="newGame()">Reset</button>
+  </div>
 
-    <!-- Stone Boxes -->
-    <div class="stone-boxes">
-        <div class="stone-box white-box active-turn" id="white-box">
-            <div class="box-label">White Player</div>
-            <div class="box-content" data-color="white">
-                <!-- Status indicator only -->
-            </div>
-        </div>
+  <div class="topbar">
+    <span style="font-weight:bold;">Action:</span>
+    <button id="act-place" class="btn" onclick="setMode('place')">Place</button>
+    <button id="act-move"  class="btn" onclick="setMode('move')">Move</button>
+    <button id="act-shoot" class="btn" onclick="setMode('shoot')">Shoot</button>
+    <button id="act-spin"  class="btn" onclick="setMode('spin')">Spin</button>
+    <span id="prompt" style="margin-left:8px;color:#6a5a44;font-style:italic;"></span>
+    <div id="touch-dirpicker">
+      <div class="touch-dirgrid">
+        <button class="touch-dirbtn" onclick="setDir(7)">↖</button>
+        <button class="touch-dirbtn" onclick="setDir(0)">↑</button>
+        <button class="touch-dirbtn" onclick="setDir(1)">↗</button>
+        <button class="touch-dirbtn" onclick="setDir(6)">←</button>
+        <div class="touch-dir-cur" id="touch-dir-cur">↑</div>
+        <button class="touch-dirbtn" onclick="setDir(2)">→</button>
+        <button class="touch-dirbtn" onclick="setDir(5)">↙</button>
+        <button class="touch-dirbtn" onclick="setDir(4)">↓</button>
+        <button class="touch-dirbtn" onclick="setDir(3)">↘</button>
+      </div>
+    </div>
+  </div>
 
-        <!-- Gladiator Strength Selection -->
-        <div class="strength-selector">
-            <div class="selector-label">Log in Strength</div>
-            <div class="strength-options">
-                <button class="strength-btn" data-strength="1" onclick="setStrength(1)">
-                    <span class="s-val">S:1</span>
-                    <span class="m-val">Cost: 1</span>
-                </button>
-                <button class="strength-btn" data-strength="2" onclick="setStrength(2)">
-                    <span class="s-val">S:2</span>
-                    <span class="m-val">Cost: 2</span>
-                </button>
-                <button class="strength-btn" data-strength="3" onclick="setStrength(3)">
-                    <span class="s-val">S:3</span>
-                    <span class="m-val">Cost: 3</span>
-                </button>
-                <button class="strength-btn tiger-btn" onclick="setStrength('tiger')">
-                    <span class="tiger-icon">🐅</span>
-                    <span class="m-val">Cost: 3</span>
-                </button>
-            </div>
-            <button class="auto-formation-btn" id="auto-formation" onclick="applyAutomaticFormation()">Automatic
-                Formation</button>
-            <div class="turn-controls">
-                <div class="moves-left">Moves Left: <span id="moves-count">3</span></div>
-                <button class="end-turn-btn" onclick="switchTurn()">End Turn</button>
-            </div>
-        </div>
-
-        <div class="stone-box black-box" id="black-box">
-            <div class="box-label">Black Player</div>
-            <div class="box-content" data-color="black">
-                <!-- Status indicator only -->
-            </div>
-        </div>
+  <div class="layout">
+    <div class="boardwrap">
+      <div id="board"></div>
     </div>
 
-    <!-- Game Board -->
-    <div class="board-wrapper">
-        <svg id="game-board" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
-            <!-- Board will be generated by JavaScript -->
-        </svg>
+    <div class="inforow">
+      <div class="panel forces-panel">
+        <div class="forces-row">
+          <div class="frc">⚪ <span><b id="cnt-w-board">1</b> on wall · <b id="cnt-w-res">15</b> reserve</span></div>
+          <div class="frc">⚫ <span><b id="cnt-b-board">1</b> on wall · <b id="cnt-b-res">15</b> reserve</span></div>
+        </div>
+        <details class="rules">
+          <summary>How to play</summary>
+          <b>Numpad 1-9</b> sets facing (matches compass layout). <b>Place</b>: hover a cell, click to drop. <b>Shoot</b>: arrow flies until it hits a vulnerable warrior (chain-fires), reflects off a head-on shield back at you, deflects off an angled shield, or flies off. <b>Spin</b>: kills all adjacent unshielded warriors, then pick new facing. Friendly fire is real.
+        </details>
+      </div>
+      <div class="panel log-panel">
+        <h3>BATTLE LOG</h3>
+        <div id="log"></div>
+      </div>
     </div>
+  </div>
+</section>
 
-    <!-- Game Status -->
-    <div class="status-panel">
-        <div class="turn-display" id="game-status">Game initialized</div>
+<!-- ===================== COLOSSEUM ===================== -->
+<section id="colosseum" class="screen">
+  <div class="topbar">
+    <button class="btn small" onclick="window.location='index.html'">&larr; Wonders</button>
+    <strong id="col-title" style="font-size:18px;letter-spacing:1px;">COLOSSEUM &middot; 2 Players</strong>
+    <span style="flex:1"></span>
+    <button id="col-btn-2p" class="btn small active" onclick="setColPlayerCount(2)">2P</button>
+    <button id="col-btn-3p" class="btn small" onclick="setColPlayerCount(3)">3P</button>
+    <button id="col-btn-4p" class="btn small" onclick="setColPlayerCount(4)">4P</button>
+    <button class="btn small" onclick="newColosseum()">Reset</button>
+  </div>
+  <div class="topbar">
+    <span id="col-turn-label" style="font-weight:bold;font-size:16px;">⚪ White's Turn</span>
+    <span id="col-counts" style="margin-left:16px;font-weight:bold;font-size:15px;"></span>
+    <span id="col-prompt" style="margin-left:12px;color:#6a5a44;font-style:italic;"></span>
+  </div>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:8px;">
+    <svg id="colboard" viewBox="-385 -385 770 770"
+      style="max-width:min(90vw,calc(100vh - 112px));max-height:min(90vw,calc(100vh - 112px));width:100%;height:100%;">
+    </svg>
+  </div>
+</section>
+
+<!-- direction picker -->
+<div id="dirpicker">
+  <div class="box">
+    <h3 id="dp-title">Choose facing</h3>
+    <div class="dirgrid">
+      <button class="dirbtn" onclick="chooseDir(7)">↖</button>
+      <button class="dirbtn" onclick="chooseDir(0)">↑</button>
+      <button class="dirbtn" onclick="chooseDir(1)">↗</button>
+      <button class="dirbtn" onclick="chooseDir(6)">←</button>
+      <button class="dirbtn center">·</button>
+      <button class="dirbtn" onclick="chooseDir(2)">→</button>
+      <button class="dirbtn" onclick="chooseDir(5)">↙</button>
+      <button class="dirbtn" onclick="chooseDir(4)">↓</button>
+      <button class="dirbtn" onclick="chooseDir(3)">↘</button>
     </div>
+    <div class="hint">The warrior will look this way.</div>
+  </div>
+</div>
 
-    <!-- Footer -->
-    <footer class="game-footer">
-        <p><a href="https://sevenwondersgames.com"
-                style="color: inherit; text-decoration: none;">SevenWondersGames.com</a></p>
-        <p>Game Design: Simon Allmer</p>
-    </footer>
+<script>
+/* ============================================================
+   SEVEN WONDERS — home status board
+   ============================================================ */
+// status helper: from 4 sub-states -> overall colour
+function overall(s){
+  const v=[s.p2.d,s.p2.p,s.p4.d,s.p4.p];
+  if(v.every(x=>x==='green')) return 'green';
+  if(v.every(x=>x==='red'))   return 'red';
+  return 'yellow';
+}
+// default all-red status
+const R={p2:{d:'red',p:'red'},p4:{d:'red',p:'red'}};
+function clone(){return JSON.parse(JSON.stringify(R));}
 
-    <script src="colosseum-game.js"></script>
+const GAMES = {
+  old:[
+    {name:'Pyramid',   status:{p2:{d:'green', p:'green' },p4:{d:'green', p:'yellow'}}},
+    {name:'Gardens',   status:{p2:{d:'green', p:'red'   },p4:{d:'red',   p:'red'   }}},
+    {name:'Temple',    status:{p2:{d:'green', p:'red'   },p4:{d:'red',   p:'red'   }}},
+    {name:'Statue',    status:{p2:{d:'green', p:'yellow'},p4:{d:'red',   p:'red'   }}},
+    {name:'Mausoleum', status:{p2:{d:'green', p:'red'   },p4:{d:'red',   p:'red'   }}},
+    {name:'Colossus',  status:{p2:{d:'green', p:'red'   },p4:{d:'red',   p:'red'   }}},
+    {name:'Pharos',    status:{p2:{d:'green', p:'yellow'},p4:{d:'red',   p:'red'   }}},
+  ],
+  new:[
+    {name:'Colosseum', status:{p2:{d:'yellow',p:'red'},p4:{d:'red',p:'red'}}, play:true, start:'startColosseum'},
+    {name:'Great Wall',status:{p2:{d:'yellow',p:'red'   },p4:{d:'red',   p:'red'   }}, play:true},
+    {name:'Tower',     status:clone()},
+    {name:'Citadel',   status:clone()},
+    {name:'Cathedral', status:clone()},
+    {name:'Palace',    status:clone()},
+    {name:'Skyscraper',status:{p2:{d:'green', p:'red'   },p4:{d:'green', p:'yellow'}}},
+  ]
+};
+
+function swatch(state){return `<div class="swatch sw-${state}"></div>`;}
+function frameHTML(g){
+  const o=overall(g.status);
+  const fn=g.start||'startGreatWall';
+  const click=g.play?`onclick="${fn}()"`:'';
+  const cls='frame status-'+o+(g.play?' clickable':'');
+  return `<div class="${cls}" ${click}>
+    <div class="name">${g.name}${g.play?'<div class="play-hint">▶ PLAY 2P</div>':''}</div>
+    <div class="attrs">
+      <div class="pgroup">
+        <div class="plabel">2 PLAYER</div>
+        <div class="media">
+          <div class="mcell"><div class="mlabel">Digital</div>${swatch(g.status.p2.d)}</div>
+          <div class="mcell"><div class="mlabel">Physical</div>${swatch(g.status.p2.p)}</div>
+        </div>
+      </div>
+      <div class="pgroup">
+        <div class="plabel">4 PLAYER</div>
+        <div class="media">
+          <div class="mcell"><div class="mlabel">Digital</div>${swatch(g.status.p4.d)}</div>
+          <div class="mcell"><div class="mlabel">Physical</div>${swatch(g.status.p4.p)}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+document.getElementById('col-old').innerHTML = GAMES.old.map(frameHTML).join('');
+document.getElementById('col-new').innerHTML = GAMES.new.map(frameHTML).join('');
+
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function goHome(){show('home');}
+function startGreatWall(){show('game');newGame();}
+
+/* ============================================================
+   GREAT WALL — game engine
+   ============================================================ */
+// Detect touch device (tablet / phone — no physical numpad available)
+const IS_TOUCH = navigator.maxTouchPoints > 0;
+
+// Landscape: 5 rows tall, 17 columns wide
+const COLS=17, ROWS=5;
+let CELL=56;
+function computeCell(){
+  // topbars ~52px each, inforow ~88px, gaps/padding
+  const byH = Math.floor((window.innerHeight - 260) / ROWS);
+  // leave 100px horizontal breathing room (layout padding + board border/padding + scrollbar)
+  const byW = Math.floor((window.innerWidth - 100) / COLS);
+  return Math.max(28, Math.min(byH, byW));
+}
+// Supply line / legendary fields — one on each end, centre row
+const LEG_LEFT  ={r:2,c:0};       // Black's supply line (White must reach here)
+const LEG_RIGHT ={r:2,c:COLS-1};  // White's supply line (Black must reach here)
+function isLegendary(r,c){return(r===LEG_LEFT.r&&c===LEG_LEFT.c)||(r===LEG_RIGHT.r&&c===LEG_RIGHT.c);}
+function supplyOf(color){return color==='W'?LEG_RIGHT:LEG_LEFT;}
+
+// directions, clockwise from North
+const DIRS=[
+  {n:'N', dr:-1,dc: 0},
+  {n:'NE',dr:-1,dc: 1},
+  {n:'E', dr: 0,dc: 1},
+  {n:'SE',dr: 1,dc: 1},
+  {n:'S', dr: 1,dc: 0},
+  {n:'SW',dr: 1,dc:-1},
+  {n:'W', dr: 0,dc:-1},
+  {n:'NW',dr:-1,dc:-1},
+];
+const opp = i => (i+4)%8;
+function back3(facing){const o=opp(facing);return new Set([(o+7)%8,o,(o+1)%8]);}
+
+let warriors=[]; // {id,color:'W'|'B',r,c,facing}
+let reserve={W:15,B:15};
+let turn='W';
+let mode='place';      // 'place' | 'move' | 'shoot' | 'spin'
+let nextId=1;
+let dirCallback=null;
+let busy=false;
+let previewId=null;    // warrior whose ranges are shown
+let currentDir=0;      // facing locked for next placement/move
+let hoveredCell=null;  // cell under cursor (ghost preview)
+let selectedWarrior=null;
+let _validPlaceCache=null;
+let cursor={r:Math.floor(ROWS/2), c:Math.floor(COLS/2)};
+let hiddenFacing=false; // digital-only toggle: hide enemy facing indicators
+
+/* ---------- connectivity helpers ---------- */
+function cheb(r1,c1,r2,c2){ return Math.max(Math.abs(r1-r2),Math.abs(c1-c2)); }
+
+// True if there exists a clear stepping-stone between (fr,fc) and (tr,tc)
+// (any shared neighbour not occupied by an enemy)
+function pathClear(fr,fc,tr,tc,color){
+  const d=cheb(fr,fc,tr,tc);
+  if(d===0) return false;
+  if(d===1) return true;   // adjacent — no intermediate needed
+  if(d!==2) return false;  // too far
+  for(let ir=fr-1;ir<=fr+1;ir++){
+    for(let ic=fc-1;ic<=fc+1;ic++){
+      if(ir===fr&&ic===fc) continue;
+      if(ir<0||ir>=ROWS||ic<0||ic>=COLS) continue;
+      if(cheb(ir,ic,tr,tc)!==1) continue; // must also touch target
+      const w=warriorAt(ir,ic);
+      if(!w||w.color===color) return true; // open path through this cell
+    }
+  }
+  return false; // all shared neighbours blocked by enemies
+}
+
+// Supply-chain BFS: returns set of "r,c" strings where `color` may legally place.
+// A placement is valid only if it's within 2 clear steps of a node that traces
+// back (through friendly stones ≤2 apart) to the supply line field.
+// Supply is cut if an ENEMY stone occupies the legendary supply field.
+function validPlacements(color){
+  if(_validPlaceCache) return _validPlaceCache;
+  if(reserve[color]<=0){_validPlaceCache=new Set();return _validPlaceCache;}
+
+  const sup=supplyOf(color);
+  const supStone=warriorAt(sup.r,sup.c);
+  const myStones=warriors.filter(w=>w.color===color);
+
+  // Nodes in the connected supply chain: start from supply field (if not enemy-blocked)
+  const chain=[];   // {r,c} of each node
+  const inChain=new Set();
+
+  function addNode(r,c){
+    const k=r+','+c;
+    if(inChain.has(k)) return;
+    inChain.add(k); chain.push({r,c});
+  }
+
+  // Root: legendary supply field (virtual anchor), unless enemy holds it
+  if(!supStone || supStone.color===color) addNode(sup.r,sup.c);
+
+  // BFS: each chain node expands to reachable friendly stones
+  for(let i=0;i<chain.length;i++){
+    const node=chain[i];
+    myStones.forEach(s=>{
+      if(inChain.has(s.r+','+s.c)) return;
+      const d=cheb(s.r,s.c,node.r,node.c);
+      if(d>=1&&d<=2&&pathClear(node.r,node.c,s.r,s.c,color)) addNode(s.r,s.c);
+    });
+  }
+
+  // Valid placements: empty cells within 2 clear steps of any chain node
+  const valid=new Set();
+  chain.forEach(node=>{
+    for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+      if(warriorAt(r,c)) continue;
+      const d=cheb(r,c,node.r,node.c);
+      if(d>=1&&d<=2&&pathClear(node.r,node.c,r,c,color)) valid.add(r+','+c);
+    }
+  });
+
+  _validPlaceCache=valid;
+  return valid;
+}
+
+// Cells a warrior can move to (up to 2 Chebyshev steps, path must be physically clear)
+function movePathClear(fr,fc,tr,tc){
+  // For distance-2 moves: at least one shared adjacent cell must be fully empty
+  if(cheb(fr,fc,tr,tc)===1) return true;
+  for(let ir=fr-1;ir<=fr+1;ir++){
+    for(let ic=fc-1;ic<=fc+1;ic++){
+      if(ir===fr&&ic===fc) continue;
+      if(ir<0||ir>=ROWS||ic<0||ic>=COLS) continue;
+      if(cheb(ir,ic,tr,tc)!==1) continue;
+      if(!warriorAt(ir,ic)) return true; // empty stepping-stone
+    }
+  }
+  return false;
+}
+
+function validMoves(w){
+  const moves=[];
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    if(warriorAt(r,c)) continue;
+    const d=cheb(w.r,w.c,r,c);
+    if(d>=1&&d<=2&&movePathClear(w.r,w.c,r,c)) moves.push({r,c});
+  }
+  return moves;
+}
+
+// numpad layout -> direction index
+const NUMPAD_DIR={ '8':0,'9':1,'6':2,'3':3,'2':4,'1':5,'4':6,'7':7 };
+const DIR_GLYPH=['↑','↗','→','↘','↓','↙','←','↖'];
+function enemyFacing(color){return color==='W'?6:2;} // white(right)->W, black(left)->E
+
+function newGame(){
+  warriors=[];
+  reserve={W:10,B:10};
+  turn='W'; mode='place'; previewId=null; busy=false; hoveredCell=null; selectedWarrior=null; _validPlaceCache=null;
+  cursor={r:Math.floor(ROWS/2), c:Math.floor(COLS/2)};
+  nextId=1;
+  currentDir=enemyFacing('W');
+  document.getElementById('log').innerHTML='';
+  log('Supply lines open. The wall awaits its defenders.','turn');
+  buildBoard();
+  setMode('place');
+}
+
+function boardOuterPx(){ return COLS*CELL + 12*2 + 6*2; } // cell area + padding + border
+
+function buildBoard(){
+  CELL=computeCell();
+  const b=document.getElementById('board');
+  b.style.width=(COLS*CELL)+'px';
+  b.style.height=(ROWS*CELL)+'px';
+  b.onmouseleave=clearHover;
+  // match inforow width to board outer width
+  const ir=document.querySelector('.inforow');
+  if(ir) ir.style.width=boardOuterPx()+'px';
+  let html='';
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const leg=isLegendary(r,c);
+      const cls='cell'+(leg?' legendary':'');
+      const inner=leg?'<div class="leg-star">✦</div>':'';
+      html+=`<div class="${cls}" id="cell-${r}-${c}"
+        style="left:${c*CELL}px;top:${r*CELL}px;width:${CELL}px;height:${CELL}px;"
+        onclick="cellClick(${r},${c})" onmouseenter="cellHover(${r},${c})">${inner}</div>`;
+    }
+  }
+  html+=`<div class="projectile" id="proj"></div>`;
+  html+=`<div class="stone ghost" id="ghost" style="display:none"></div>`;
+  b.innerHTML=html;
+}
+
+function warriorAt(r,c){return warriors.find(w=>w.r===r&&w.c===c);}
+
+function stoneSVG(color, facing, showFacing=true){
+  const fill  = color==='B' ? '#1d1d1d' : '#f4efe4';
+  const stroke = color==='B' ? '#000'   : '#9a8e74';
+  const rot = showFacing ? `rotate(${facing*45}deg)` : 'none';
+  if(!showFacing){
+    // plain circle — no pointer, no arc, no rotation hint
+    return `<svg viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="33" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
+      <circle cx="50" cy="50" r="6"  fill="${color==='B'?'#555':'#c8b88a'}" opacity=".6"/>
+    </svg>`;
+  }
+  const R=40, cx=50, cy=50;
+  const a1=22.5*Math.PI/180, a2=157.5*Math.PI/180;
+  const x1=(cx+R*Math.cos(a1)).toFixed(1), y1=(cy+R*Math.sin(a1)).toFixed(1);
+  const x2=(cx+R*Math.cos(a2)).toFixed(1), y2=(cy+R*Math.sin(a2)).toFixed(1);
+  return `<svg viewBox="0 0 100 100" style="transform:${rot}">
+    <circle cx="50" cy="50" r="33" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
+    <path d="M ${x1} ${y1} A ${R} ${R} 0 0 1 ${x2} ${y2}" fill="none" stroke="#b07a1e" stroke-width="9" stroke-linecap="round"/>
+    <polygon points="50,7 42,23 58,23" fill="#cc2b2b"/>
+  </svg>`;
+}
+
+function toggleHiddenFacing(){
+  hiddenFacing=!hiddenFacing;
+  const btn=document.getElementById('btn-hidden');
+  btn.textContent = hiddenFacing ? '👓 Facing: Hidden' : '👁 Facing: Visible';
+  btn.classList.toggle('active', hiddenFacing);
+  render();
+}
+
+function render(){
+  // clear cells
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const cell=document.getElementById(`cell-${r}-${c}`);
+    cell.classList.remove('selectable','valid-place','valid-move','hl-vuln','hl-shield','sel','cursor');
+    [...cell.querySelectorAll('.stone:not(.ghost)')].forEach(s=>s.remove());
+  }
+  // keyboard cursor
+  const curCell=document.getElementById(`cell-${cursor.r}-${cursor.c}`);
+  if(curCell) curCell.classList.add('cursor');
+  // place stones
+  warriors.forEach(w=>{
+    const cell=document.getElementById(`cell-${w.r}-${w.c}`);
+    const div=document.createElement('div');
+    div.className='stone';
+    const showFacing = !hiddenFacing || w.color===turn;
+    div.innerHTML=stoneSVG(w.color, w.facing, showFacing);
+    div.onclick=(e)=>{e.stopPropagation();stoneClick(w);};
+    cell.appendChild(div);
+  });
+
+  // interaction affordances
+  if(!busy){
+    if(mode==='place' && reserve[turn]>0){
+      validPlacements(turn).forEach(key=>{
+        const [r,c]=key.split(',').map(Number);
+        document.getElementById(`cell-${r}-${c}`).classList.add('valid-place');
+      });
+    }
+    if(mode==='move'){
+      if(selectedWarrior){
+        document.getElementById(`cell-${selectedWarrior.r}-${selectedWarrior.c}`).classList.add('sel');
+        validMoves(selectedWarrior).forEach(({r,c})=>{
+          document.getElementById(`cell-${r}-${c}`).classList.add('valid-move');
+        });
+      } else {
+        // highlight own warriors as clickable
+        warriors.filter(w=>w.color===turn).forEach(w=>{
+          document.getElementById(`cell-${w.r}-${w.c}`).classList.add('sel');
+        });
+      }
+    }
+  }
+
+  // preview ranges
+  if(previewId){
+    const w=warriors.find(x=>x.id===previewId);
+    if(w){
+      document.getElementById(`cell-${w.r}-${w.c}`).classList.add('sel');
+      const shield=back3(w.facing);
+      for(let d=0;d<8;d++){
+        const r=w.r+DIRS[d].dr, c=w.c+DIRS[d].dc;
+        if(r<0||r>=ROWS||c<0||c>=COLS)continue;
+        const side=opp(d); // side of that neighbour facing this warrior is irrelevant; here we mark this warrior's own arcs
+        const cell=document.getElementById(`cell-${r}-${c}`);
+        if(shield.has(d)) cell.classList.add('hl-shield');
+        else cell.classList.add('hl-vuln');
+      }
+    }
+  }
+
+  // counts
+  cnt('cnt-w-board',warriors.filter(w=>w.color==='W').length);
+  cnt('cnt-b-board',warriors.filter(w=>w.color==='B').length);
+  cnt('cnt-w-res',reserve.W);
+  cnt('cnt-b-res',reserve.B);
+
+  // turn badge
+  const tb=document.getElementById('turnBadge');
+  tb.className='turnbadge '+turn;
+  tb.textContent=(turn==='W'?'WHITE':'BLACK')+' to move';
+
+  // action buttons
+  ['place','move','shoot','spin'].forEach(m=>{
+    const btn=document.getElementById('act-'+m);
+    btn.classList.toggle('active',mode===m);
+  });
+  const hasValidPlace = reserve[turn]>0 && validPlacements(turn).size>0;
+  const hasOwnStones  = warriors.some(w=>w.color===turn);
+  document.getElementById('act-place').disabled = !hasValidPlace || busy;
+  document.getElementById('act-move').disabled  = !hasOwnStones  || busy;
+  document.getElementById('act-shoot').disabled = !hasOwnStones  || busy;
+  document.getElementById('act-spin').disabled  = !hasOwnStones  || busy;
+
+  updateGhost();
+}
+function cnt(id,v){document.getElementById(id).textContent=v;}
+
+function setMode(m){
+  if(busy)return;
+  mode=m; previewId=null; selectedWarrior=null;
+  if(m==='place') refreshPlacePrompt();
+  if(m==='move')  document.getElementById('prompt').textContent='Select a warrior, then click a blue cell up to 2 steps away.';
+  if(m==='shoot') document.getElementById('prompt').textContent='Click one of your warriors to fire its arrow.';
+  if(m==='spin')  document.getElementById('prompt').textContent='Click one of your warriors to spin its sword.';
+  // show touch facing picker only in place mode on touch devices
+  const tdp=document.getElementById('touch-dirpicker');
+  if(tdp) tdp.style.display=(IS_TOUCH && m==='place') ? 'flex' : 'none';
+  render();
+}
+
+function refreshPlacePrompt(){
+  document.getElementById('prompt').innerHTML= IS_TOUCH
+    ? `Placing — facing <b>${DIRS[currentDir].n} ${DIR_GLYPH[currentDir]}</b>`
+    : `Placing — facing <b>${DIRS[currentDir].n} ${DIR_GLYPH[currentDir]}</b> · numpad 1-9 sets direction, click a field to drop.`;
+  const tc=document.getElementById('touch-dir-cur');
+  if(tc) tc.textContent=DIR_GLYPH[currentDir];
+}
+
+// numpad / arrows set the locked-in facing (works while hovering)
+function setDir(d){
+  currentDir=d;
+  if(mode==='place') refreshPlacePrompt();
+  const tc=document.getElementById('touch-dir-cur');
+  if(tc) tc.textContent=DIR_GLYPH[d];
+  updateGhost();
+}
+
+function cellClick(r,c){
+  if(busy)return;
+  if(mode==='place' && reserve[turn]>0 && !warriorAt(r,c)){
+    if(!validPlacements(turn).has(r+','+c)){flash('Too far — must be within 2 clear steps of a friendly warrior.');return;}
+    warriors.push({id:nextId++,color:turn,r,c,facing:currentDir});
+    reserve[turn]--;
+    log(`${turn==='W'?'White':'Black'} places a warrior at (${r+1},${c+1}) facing ${DIRS[currentDir].n}.`);
+    endTurn();
+  }
+  if(mode==='move' && selectedWarrior && selectedWarrior.r===r && selectedWarrior.c===c){
+    // Space/click on own cell while selected = rotate in place
+    const sw=selectedWarrior; selectedWarrior=null;
+    openDirPicker('Rotate to new facing (0 steps)?',facing=>{
+      sw.facing=facing; log(`${nm(sw)} rotates to face ${DIRS[facing].n}.`); endTurn();
+    });
+    return;
+  }
+  if(mode==='move' && selectedWarrior && !warriorAt(r,c)){
+    const mv=validMoves(selectedWarrior);
+    if(!mv.some(m=>m.r===r&&m.c===c)){flash('Must move up to 2 steps through empty cells.');return;}
+    const w=selectedWarrior; selectedWarrior=null;
+    const pr=w.r, pc=w.c;
+    w.r=r; w.c=c;
+    // auto-suggest facing = direction moved; player can override via numpad then confirm
+    const autoDir=DIRS.findIndex(d=>d.dr===Math.sign(r-pr)&&d.dc===Math.sign(c-pc));
+    if(autoDir>=0) currentDir=autoDir;
+    openDirPicker('New facing after moving?',facing=>{
+      w.facing=facing;
+      log(`${nm(w)} moves from (${pr+1},${pc+1}) to (${r+1},${c+1}), now facing ${DIRS[facing].n}.`);
+      endTurn();
+    });
+  }
+}
+
+/* ---------- hover ghost (place mode) ---------- */
+function cellHover(r,c){ hoveredCell={r,c}; updateGhost(); }
+function clearHover(){ hoveredCell=null; updateGhost(); }
+function updateGhost(){
+  const g=document.getElementById('ghost');
+  if(!g)return;
+  const ok = mode==='place' && !busy && reserve[turn]>0 &&
+             hoveredCell && !warriorAt(hoveredCell.r,hoveredCell.c) &&
+             validPlacements(turn).has(hoveredCell.r+','+hoveredCell.c);
+  if(ok){
+    g.innerHTML=stoneSVG(turn,currentDir);
+    document.getElementById(`cell-${hoveredCell.r}-${hoveredCell.c}`).appendChild(g);
+    g.style.display='block';
+  } else {
+    g.style.display='none';
+  }
+}
+
+function stoneClick(w){
+  if(busy)return;
+  if(mode==='move'){
+    if(w.color!==turn){flash('That is not your warrior.');return;}
+    if(selectedWarrior && selectedWarrior.id===w.id){
+      // second click on same warrior = rotate in place (0-step move)
+      const sw=selectedWarrior; selectedWarrior=null;
+      openDirPicker('Rotate to new facing (0 steps)?',facing=>{
+        sw.facing=facing;
+        log(`${nm(sw)} rotates to face ${DIRS[facing].n}.`);
+        endTurn();
+      });
+      return;
+    }
+    selectedWarrior=w;
+    document.getElementById('prompt').textContent='Blue = move destination · Click same warrior again to rotate in place.';
+    render();
+  } else if(mode==='shoot'){
+    if(w.color!==turn){flash('That is not your warrior.');return;}
+    doShoot(w);
+  } else if(mode==='spin'){
+    if(w.color!==turn){flash('That is not your warrior.');return;}
+    doSpin(w);
+  } else {
+    // no mode / place mode → toggle preview
+    previewId = (previewId===w.id)?null:w.id;
+    render();
+  }
+}
+
+function flash(msg){document.getElementById('prompt').textContent=msg;}
+
+/* ---------- ARROW resolution ---------- */
+function deflect(v,f){
+  const cand=[(f+2)%8,(f+6)%8];
+  let best=cand[0],bd=-9;
+  for(const d of cand){
+    const dot=DIRS[d].dr*DIRS[v].dr + DIRS[d].dc*DIRS[v].dc;
+    if(dot>bd){bd=dot;best=d;}
+  }
+  return best;
+}
+
+function computeArrow(sr,sc,dir){
+  const removed=new Set();
+  const path=[{r:sr,c:sc}];
+  const kills=[]; const events=[];
+  let r=sr,c=sc,v=dir,steps=0;
+  const seen=new Set();
+  while(steps++<400){
+    const stateKey=r+','+c+','+v;
+    if(seen.has(stateKey)){events.push('The arrow ricochets in circles and falls, spent.');break;}
+    seen.add(stateKey);
+    r+=DIRS[v].dr; c+=DIRS[v].dc;
+    if(r<0||r>=ROWS||c<0||c>=COLS){path.push({r,c,out:true});events.push('The arrow flies off the wall — no effect.');break;}
+    path.push({r,c});
+    const w=warriorAt(r,c);
+    if(w && !removed.has(w.id)){
+      const s=opp(v);                 // side of w struck (toward incoming)
+      const o=opp(w.facing);
+      const guard=back3(w.facing);
+      if(s===o){
+        events.push(`🛡️ ${nm(w)} blocks it head-on — the arrow reflects straight back!`);
+        v=opp(v);
+      } else if(guard.has(s)){
+        events.push(`🛡️ ${nm(w)}'s shield deflects the arrow aside.`);
+        v=deflect(v,w.facing);
+      } else {
+        kills.push(w.id); removed.add(w.id);
+        events.push(`🏹 ${nm(w)} is struck down — and looses an arrow ${DIRS[w.facing].n} as it falls!`);
+        v=w.facing; // chain
+        seen.clear(); // board changed (a warrior fell) — past states are no longer a loop
+      }
+    }
+  }
+  return {path,kills,events};
+}
+
+function nm(w){return (w.color==='W'?'A White warrior':'A Black warrior');}
+
+async function doShoot(w){
+  busy=true; mode=null; previewId=null; render();
+  log(`${turn==='W'?'White':'Black'} warrior at (${w.r+1},${w.c+1}) shoots ${DIRS[w.facing].n}.`);
+  const res=computeArrow(w.r,w.c,w.facing);
+  await animatePath(res.path);
+  res.events.forEach(e=>log(e, e.includes('struck')||e.includes('reflect')?'kill':''));
+  if(res.kills.length){
+    res.kills.forEach(id=>killStone(id));
+    await sleep(450);
+    warriors=warriors.filter(x=>!res.kills.includes(x.id));
+    _validPlaceCache=null;
+  }
+  busy=false;
+  endTurn();
+}
+
+function computeSpin(att){
+  const kills=[];
+  for(let d=0;d<8;d++){
+    const r=att.r+DIRS[d].dr,c=att.c+DIRS[d].dc;
+    const w=warriorAt(r,c);
+    if(w && w.id!==att.id){
+      const s=opp(d);            // side of neighbour facing the attacker
+      if(!back3(w.facing).has(s)) kills.push(w.id);
+    }
+  }
+  return kills;
+}
+
+async function doSpin(att){
+  busy=true; previewId=null; render();
+  log(`${turn==='W'?'White':'Black'} warrior at (${att.r+1},${att.c+1}) spins its sword!`);
+  const kills=computeSpin(att);
+  if(kills.length){
+    kills.forEach(id=>{const v=warriors.find(x=>x.id===id);log(`⚔️ ${nm(v)} is cut down by the spin.`,'kill');killStone(id);});
+    await sleep(500);
+    warriors=warriors.filter(x=>!kills.includes(x.id));
+    _validPlaceCache=null;
+  } else {
+    log('The blade meets only air — no one was vulnerable.');
+  }
+  busy=false; render();
+  // reposition facing
+  openDirPicker('After the spin, choose a new facing.',(facing)=>{
+    att.facing=facing;
+    log(`The warrior now faces ${DIRS[facing].n}.`);
+    endTurn();
+  });
+}
+
+function killStone(id){
+  const w=warriors.find(x=>x.id===id);
+  if(!w)return;
+  const cell=document.getElementById(`cell-${w.r}-${w.c}`);
+  const st=cell.querySelector('.stone');
+  if(st) st.classList.add('dying');
+}
+
+/* ---------- animation ---------- */
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+async function animatePath(path){
+  const proj=document.getElementById('proj');
+  proj.style.display='block';
+  for(let i=0;i<path.length;i++){
+    const p=path[i];
+    proj.style.left=(p.c*CELL+CELL/2)+'px';
+    proj.style.top =(p.r*CELL+CELL/2)+'px';
+    await sleep(i===0?10:75);
+  }
+  await sleep(120);
+  proj.style.display='none';
+}
+
+/* ---------- turn flow ---------- */
+function endTurn(){
+  previewId=null; selectedWarrior=null; _validPlaceCache=null;
+  turn = (turn==='W')?'B':'W';
+  currentDir=enemyFacing(turn);
+  mode='place';
+  log(`— ${turn==='W'?'White':'Black'}'s turn —`,'turn');
+  setMode('place');
+}
+
+/* ---------- direction picker ---------- */
+function openDirPicker(title,cb){
+  dirCallback=cb;
+  document.getElementById('dp-title').textContent=title;
+  document.getElementById('dirpicker').style.display='flex';
+}
+function chooseDir(i){
+  document.getElementById('dirpicker').style.display='none';
+  const cb=dirCallback; dirCallback=null;
+  if(cb)cb(i);
+}
+function pickerOpen(){return document.getElementById('dirpicker').style.display==='flex';}
+
+// Rebuild board on resize so cell size stays optimal
+window.addEventListener('resize',()=>{if(document.getElementById('game').classList.contains('active'))buildBoard();render();});
+
+// Global keyboard handler
+document.addEventListener('keydown',(e)=>{
+  if(!document.getElementById('game').classList.contains('active')) return;
+
+  // --- direction picker is open: numpad/arrows confirm facing ---
+  if(pickerOpen()){
+    const num=NUMPAD_DIR[e.key];
+    if(num!==undefined){ e.preventDefault(); chooseDir(num); }
+    return;
+  }
+  if(busy) return;
+
+  // --- numpad sets facing (place & move modes) ---
+  const num=NUMPAD_DIR[e.key];
+  if(num!==undefined && (mode==='place'||mode==='move')){
+    e.preventDefault(); setDir(num); return;
+  }
+
+  // --- WASD / Arrow keys: move cursor ---
+  let dr=0,dc=0;
+  const k=e.key;
+  if(k==='ArrowUp'   ||k==='w'||k==='W') dr=-1;
+  if(k==='ArrowDown' ||k==='s'||k==='S') dr= 1;
+  if(k==='ArrowLeft' ||k==='a'||k==='A') dc=-1;
+  if(k==='ArrowRight'||k==='d'||k==='D') dc= 1;
+  if(dr||dc){
+    e.preventDefault();
+    cursor.r=Math.max(0,Math.min(ROWS-1,cursor.r+dr));
+    cursor.c=Math.max(0,Math.min(COLS-1,cursor.c+dc));
+    hoveredCell={r:cursor.r,c:cursor.c}; // ghost follows cursor
+    updateGhost();
+    render();
+    return;
+  }
+
+  // --- Spacebar: trigger action at cursor ---
+  if(k===' '){
+    e.preventDefault();
+    const w=warriorAt(cursor.r,cursor.c);
+    if(w) stoneClick(w);
+    else  cellClick(cursor.r,cursor.c);
+    return;
+  }
+});
+
+/* ============================================================
+   COLOSSEUM — sandbox prototype
+   Board: 57 cells
+     0        = centre
+     1–8      = ring 1, inner  (8  sectors × 45°)
+     9–24     = ring 2, middle (16 sectors × 22.5°)
+     25–56    = ring 3, outer  (32 sectors × 11.25°)
+   ============================================================ */
+const COL_R0=42;
+const COL_R1_IN=48,  COL_R1_OUT=108;
+const COL_R2_IN=114, COL_R2_OUT=178;
+const COL_R3_IN=184, COL_R3_OUT=268;
+const COL_MAX=8;
+const COL_R4_IN=274, COL_R4_OUT=358;
+
+const COL_COLORS={
+  W: {stone:'#f4efe4',stroke:'#9a8e74',territory:'#c8ddb8',highlight:'#90c880',name:'White'},
+  B: {stone:'#1d1d1d',stroke:'#555555',territory:'#8a8078',highlight:'#b0a898',name:'Black'},
+  Bl:{stone:'#2a5db0',stroke:'#1a3a80',territory:'#a8c4e0',highlight:'#68a0d0',name:'Blue'},
+  R: {stone:'#c02828',stroke:'#801010',territory:'#e0a8a8',highlight:'#d06060',name:'Red'},
+};
+const COL_SETUP={
+  2:[{color:'B',start:0},{color:'W',start:16}],
+  3:[{color:'B',start:0},{color:'Bl',start:8},{color:'W',start:16}],
+  4:[{color:'B',start:0},{color:'Bl',start:8},{color:'W',start:16},{color:'R',start:24}],
+};
+
+let colStones=[];
+let colSelected=null;
+let colTurn='W';
+let colNextId=1;
+let colTerritory={};
+let colPlayers=['B','W'];
+let colPlayerCount=2;
+
+function colRing(c){return c===0?0:c<=8?1:c<=24?2:c<=56?3:4;}
+function colSector(c){return c===0?0:c<=8?c-1:c<=24?c-9:c<=56?c-25:c-57;}
+function colId(ring,sec){return ring===0?0:ring===1?1+sec:ring===2?9+sec:ring===3?25+sec:57+sec;}
+function colAdj(cell){
+  const r=colRing(cell),s=colSector(cell);
+  const adj=new Set();
+  if(r===0){
+    for(let i=0;i<8;i++) adj.add(colId(1,i));
+  } else if(r===1){
+    adj.add(0);
+    adj.add(colId(1,(s+1)%8)); adj.add(colId(1,(s+7)%8));
+    adj.add(colId(2,s*2)); adj.add(colId(2,s*2+1));
+  } else if(r===2){
+    adj.add(colId(2,(s+1)%16)); adj.add(colId(2,(s+15)%16));
+    adj.add(colId(1,Math.floor(s/2)));
+    adj.add(colId(3,s*2)); adj.add(colId(3,s*2+1));
+  } else if(r===3){
+    adj.add(colId(3,(s+1)%32));
+    adj.add(colId(3,(s+31)%32));
+    adj.add(colId(2,Math.floor(s/2)));
+    adj.add(colId(4,s));
+  } else {
+    adj.add(colId(4,(s+1)%32));
+    adj.add(colId(4,(s+31)%32));
+    adj.add(colId(3,s));
+  }
+  return[...adj];
+}
+
+function colMoveOptions(stone){
+  const adj=colAdj(stone.cell);
+  // Territory teleport only applies to rings 1–3 (ring 4 is neutral)
+  const own=Object.entries(colTerritory)
+    .filter(([c,col])=>col===stone.color&&Number(c)!==stone.cell&&colRing(Number(c))!==4)
+    .map(([c])=>Number(c));
+  const all=[...new Set([...adj,...own])];
+  // Ring 4 is neutral but enemy stones block passage
+  return all.filter(c=>colRing(c)!==4||!colStones.some(s=>s.cell===c&&s.color!==stone.color));
+}
+
+function colCenter(cell){
+  if(cell===0) return{x:0,y:0};
+  const r=colRing(cell),s=colSector(cell);
+  const step=r===1?(Math.PI/4):r===2?(Math.PI/8):(Math.PI/16);
+  const rad=r===1?((COL_R1_IN+COL_R1_OUT)/2):r===2?((COL_R2_IN+COL_R2_OUT)/2):r===3?((COL_R3_IN+COL_R3_OUT)/2):((COL_R4_IN+COL_R4_OUT)/2);
+  return{x:rad*Math.cos(-Math.PI/2+(s+0.5)*step),y:rad*Math.sin(-Math.PI/2+(s+0.5)*step)};
+}
+
+function colArcPath(rIn,rOut,a1,a2){
+  const f=n=>n.toFixed(2);
+  const[x1,y1]=[rIn*Math.cos(a1),rIn*Math.sin(a1)];
+  const[x2,y2]=[rIn*Math.cos(a2),rIn*Math.sin(a2)];
+  const[x3,y3]=[rOut*Math.cos(a2),rOut*Math.sin(a2)];
+  const[x4,y4]=[rOut*Math.cos(a1),rOut*Math.sin(a1)];
+  return`M${f(x1)},${f(y1)} A${rIn},${rIn},0,0,1,${f(x2)},${f(y2)} L${f(x3)},${f(y3)} A${rOut},${rOut},0,0,0,${f(x4)},${f(y4)}Z`;
+}
+
+function buildColosseum(){
+  const svg=document.getElementById('colboard');
+  let h='';
+  h+=`<circle cx="0" cy="0" r="363" fill="#d4cbb4" stroke="#2a1e0e" stroke-width="5"/>`;
+  // centre
+  h+=`<circle class="col-cell" id="col-cell-0" cx="0" cy="0" r="${COL_R0}" onclick="colCellClick(0)"/>`;
+  // ring 1 — 8 × 45°
+  for(let i=0;i<8;i++){
+    const a1=-Math.PI/2+i*(Math.PI/4),a2=a1+(Math.PI/4);
+    h+=`<path class="col-cell" id="col-cell-${1+i}" d="${colArcPath(COL_R1_IN,COL_R1_OUT,a1,a2)}" stroke="#2a1e0e" stroke-width="1.5" onclick="colCellClick(${1+i})"/>`;
+  }
+  // ring 2 — 16 × 22.5°
+  for(let i=0;i<16;i++){
+    const a1=-Math.PI/2+i*(Math.PI/8),a2=a1+(Math.PI/8);
+    h+=`<path class="col-cell" id="col-cell-${9+i}" d="${colArcPath(COL_R2_IN,COL_R2_OUT,a1,a2)}" stroke="#2a1e0e" stroke-width="1.5" onclick="colCellClick(${9+i})"/>`;
+  }
+  // ring 3 — arena, 32 × 11.25°
+  for(let i=0;i<32;i++){
+    const a1=-Math.PI/2+i*(Math.PI/16),a2=a1+(Math.PI/16);
+    h+=`<path class="col-cell" id="col-cell-${25+i}" d="${colArcPath(COL_R3_IN,COL_R3_OUT,a1,a2)}" stroke="#2a1e0e" stroke-width="1.5" onclick="colCellClick(${25+i})"/>`;
+  }
+  // ring 4 — elevated safe zone, 32 × 11.25°
+  for(let i=0;i<32;i++){
+    const a1=-Math.PI/2+i*(Math.PI/16),a2=a1+(Math.PI/16);
+    h+=`<path class="col-cell col-safe" id="col-cell-${57+i}" d="${colArcPath(COL_R4_IN,COL_R4_OUT,a1,a2)}" stroke="#2a1e0e" stroke-width="2" onclick="colCellClick(${57+i})"/>`;
+  }
+  h+=`<g id="col-stones"></g>`;
+  svg.innerHTML=h;
+  renderColosseum();
+}
+
+function resolveConflicts(){
+  const byCell={};
+  colStones.forEach(s=>{ (byCell[s.cell]||(byCell[s.cell]=[])).push(s); });
+  Object.entries(byCell).forEach(([cell,stones])=>{
+    if(colRing(Number(cell))===4) return;
+    const colors=[...new Set(stones.map(s=>s.color))];
+    if(colors.length<=1) return;
+    const counts={};
+    stones.forEach(s=>counts[s.color]=(counts[s.color]||0)+1);
+    const maxCount=Math.max(...Object.values(counts));
+    // Remove only minorities — tied leaders all survive (standoff)
+    colStones=colStones.filter(s=>s.cell!==Number(cell)||counts[s.color]===maxCount);
+  });
+}
+
+function renderColosseum(){
+  const BULLET={W:'⚪',B:'⚫',Bl:'🔵',R:'🔴'};
+  // Compute valid destinations for selected stone
+  let selStone=null,validCells=[];
+  if(colSelected!==null){
+    selStone=colStones.find(x=>x.id===colSelected);
+    if(selStone) validCells=colMoveOptions(selStone);
+  }
+  // Cell fills: priority = selected > valid-move > territory > default
+  for(let i=0;i<89;i++){
+    const el=document.getElementById(`col-cell-${i}`);
+    if(!el) continue;
+    el.className='col-cell'+(i>=57?' col-safe':'');
+    if(selStone&&i===selStone.cell){
+      el.style.fill='#f0d060';
+    } else if(validCells.includes(i)){
+      el.style.fill=COL_COLORS[colTurn].highlight;
+    } else if(i!==0&&colRing(i)!==4&&colTerritory[i]){
+      el.style.fill=COL_COLORS[colTerritory[i]].territory;
+    } else {
+      el.style.fill='';
+    }
+  }
+  // Stones
+  const byCell={};
+  colStones.forEach(s=>{ (byCell[s.cell]||(byCell[s.cell]=[])).push(s); });
+  let sh='';
+  Object.entries(byCell).forEach(([cell,stones])=>{
+    const{x,y}=colCenter(Number(cell));
+    const n=stones.length,r=colRing(Number(cell)),sr=r>=3?10:13;
+    stones.forEach((s,idx)=>{
+      let ox=0,oy=0;
+      if(n>1){const a=(idx/n)*2*Math.PI,sp=Math.min(sr+2,n<=4?13:17);ox=Math.cos(a)*sp;oy=Math.sin(a)*sp;}
+      const cc=COL_COLORS[s.color];
+      const locked=isStandoff(s.cell);
+      const strokeClr=s.id===colSelected?'#f0c040':locked?'#d07020':cc.stroke;
+      const mine=s.color===colTurn&&!locked;
+      sh+=`<circle cx="${(x+ox).toFixed(1)}" cy="${(y+oy).toFixed(1)}" r="${sr}" fill="${cc.stone}" stroke="${strokeClr}" stroke-width="${s.id===colSelected?3:2}" style="cursor:${mine?'pointer':'default'}" onclick="colStoneClick(${s.id},event)"/>`;
+    });
+  });
+  document.getElementById('col-stones').innerHTML=sh;
+  // Labels
+  const tl=document.getElementById('col-turn-label');
+  if(tl) tl.textContent=`${BULLET[colTurn]||'●'} ${COL_COLORS[colTurn].name}'s Turn`;
+  document.getElementById('col-counts').textContent=
+    colPlayers.map(p=>`${BULLET[p]||'●'}${colStones.filter(s=>s.color===p).length}`).join('  ');
+  document.getElementById('col-prompt').textContent=selStone
+    ?'Click territory or adjacent cell · click stone to deselect'
+    :'Click your stone · outer ring = safe · equal forces = standoff';
+}
+
+function isStandoff(cell){
+  if(colRing(cell)===4) return false;
+  const on=colStones.filter(s=>s.cell===cell);
+  const colors=[...new Set(on.map(s=>s.color))];
+  if(colors.length<2) return false;
+  const counts={};
+  on.forEach(s=>counts[s.color]=(counts[s.color]||0)+1);
+  const vals=Object.values(counts);
+  return vals.every(v=>v===vals[0]);
+}
+
+function nextTurn(){
+  const alive=colPlayers.filter(p=>colStones.some(s=>s.color===p));
+  if(alive.length<=1){
+    renderColosseum();
+    setTimeout(()=>alert(alive[0]?COL_COLORS[alive[0]].name+' wins!':'Draw!'),50);
+    return;
+  }
+  let idx=(colPlayers.indexOf(colTurn)+1)%colPlayers.length,tries=0;
+  while(!colStones.some(s=>s.color===colPlayers[idx])&&tries<colPlayers.length){
+    idx=(idx+1)%colPlayers.length; tries++;
+  }
+  colTurn=colPlayers[idx];
+}
+
+function colCellClick(cell){
+  if(colSelected!==null){
+    const s=colStones.find(x=>x.id===colSelected);
+    if(s&&colMoveOptions(s).includes(cell)){
+      s.cell=cell;
+      if(cell!==0&&colRing(cell)!==4) colTerritory[cell]=s.color; // ring 4 and centre stay neutral
+      colSelected=null;
+      resolveConflicts();
+      nextTurn();
+    } else {
+      colSelected=null;
+    }
+    renderColosseum();
+  } else {
+    const mine=colStones.filter(s=>s.cell===cell&&s.color===colTurn);
+    if(mine.length===1&&!isStandoff(cell)){colSelected=mine[0].id;renderColosseum();}
+  }
+}
+
+function colStoneClick(id,event){
+  event.stopPropagation();
+  const s=colStones.find(x=>x.id===id);
+  if(!s) return;
+  if(s.color===colTurn){
+    if(isStandoff(s.cell)) return;
+    colSelected=(colSelected===id)?null:id;
+    renderColosseum();
+  } else {
+    if(colSelected!==null){
+      const sel=colStones.find(x=>x.id===colSelected);
+      if(sel&&colMoveOptions(sel).includes(s.cell)){colCellClick(s.cell);return;}
+    }
+    colSelected=null; renderColosseum();
+  }
+}
+
+function newColosseum(){
+  colStones=[]; colSelected=null; colTerritory={}; colNextId=1;
+  colPlayers=COL_SETUP[colPlayerCount].map(p=>p.color);
+  colTurn=colPlayers[0];
+  COL_SETUP[colPlayerCount].forEach(setup=>{
+    for(let i=0;i<8;i++){
+      const cell=colId(4,(setup.start+i)%32);
+      colStones.push({id:colNextId++,color:setup.color,cell});
+      // ring 4 is neutral — no territory claimed at start
+    }
+  });
+  colTurn='W'; // White always moves first
+  buildColosseum();
+}
+
+function setColPlayerCount(n){
+  colPlayerCount=n;
+  [2,3,4].forEach(k=>{
+    document.getElementById(`col-btn-${k}p`)?.classList.toggle('active',k===n);
+  });
+  const t=document.getElementById('col-title');
+  if(t) t.textContent=`COLOSSEUM · ${n} Players`;
+  newColosseum();
+}
+
+function startColosseum(){show('colosseum');newColosseum();}
+
+/* ---------- log ---------- */
+function log(msg,cls=''){
+  const el=document.getElementById('log');
+  const d=document.createElement('div');
+  d.className='ev'+(cls?' '+cls:'');
+  d.textContent=msg;
+  el.appendChild(d);
+  el.scrollTop=el.scrollHeight;
+}
+</script>
 </body>
-
 </html>

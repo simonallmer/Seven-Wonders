@@ -39,7 +39,7 @@
                 <div class="menu-face menu-back">
                     <nav class="game-menu">
                         <ul class="game-list">
-                            <li><a href="colosseum.html" class="game-link coming-soon" data-id="colosseum">Colosseum</a>
+                            <li><a href="#" class="game-link coming-soon" data-id="colosseum" onclick="openColosseum(event)">Colosseum</a>
                             </li>
                             <li><a href="great_wall.html" class="game-link" data-id="great_wall">Great Wall</a></li>
                             <li><a href="#" class="game-link coming-soon" data-id="tower">Tower</a></li>
@@ -72,6 +72,14 @@
     </div>
 
     <script src="script.js"></script>
+    <script>
+    function openColosseum(e){
+      e.preventDefault();
+      const pw=prompt('Enter password:');
+      if(pw==='2020') window.location='colosseum.html';
+      else if(pw!==null) alert('Incorrect password.');
+    }
+    </script>
 </body>
 
 </html>
