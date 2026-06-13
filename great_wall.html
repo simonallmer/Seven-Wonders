@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Great Wall - Seven Wonders</title>
     <meta name="description" content="Play Great Wall, an ancient strategy game from the Seven Wonders series">
     <link rel="stylesheet" href="great_wall-style.css">
@@ -141,6 +141,32 @@
                 toggleMenu();
             }
         });
+
+        // Pin the bottom UI to the VISIBLE viewport. On mobile Safari a `position:fixed;
+        // bottom` bar anchors to the layout viewport and hides behind the browser toolbar /
+        // below the fold — so the action buttons vanished on tablet/phone. We lift them by
+        // however much of the layout viewport is currently hidden below the visual viewport,
+        // plus the home-indicator safe area.
+        (function () {
+            const bar = document.querySelector('.action-bar');
+            const prompt = document.querySelector('.action-prompt');
+            function pin() {
+                let hiddenBelow = 0;
+                const vv = window.visualViewport;
+                if (vv) hiddenBelow = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+                if (bar) bar.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + 20) + 'px)';
+                if (prompt) prompt.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + 74) + 'px)';
+            }
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', pin);
+                window.visualViewport.addEventListener('scroll', pin);
+            }
+            window.addEventListener('resize', pin);
+            window.addEventListener('orientationchange', pin);
+            window.addEventListener('load', pin);
+            pin();
+            setTimeout(pin, 300); // after iOS settles its toolbars
+        })();
     </script>
 </body>
 
