@@ -53,7 +53,7 @@ const games = {
     great_wall: {
         name: 'Great Wall',
         description: 'The Great Wall of China',
-        status: 'playtest',
+        status: 'available',
         url: 'great_wall.html'
     },
     pagoda: {
