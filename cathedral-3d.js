@@ -119,16 +119,33 @@ function buildBoard() {
 }
 function buildStair(s) {
     const cx = wX(s.x), cz = wZ(s.y);
-    // back spine
-    const spine = new THREE.Mesh(new THREE.BoxGeometry(8, 3 * LIFT + 8, CELL - 10), matStair);
-    spine.position.set(cx + (s.side === 'L' ? -CELL * 0.32 : CELL * 0.32), 0, cz); spine.castShadow = true; groupDeco.add(spine);
+    const isNS = s.side === 'N' || s.side === 'S';
+    // spine offset direction (toward the outer edge, away from board)
+    let sx = 0, sz = 0;
+    if (s.side === 'L') { sx = -1; }
+    else if (s.side === 'R') { sx = 1; }
+    else if (s.side === 'N') { sz = -1; }
+    else { sz = 1; } // S
+    // spine — rotated 90° for N/S stairs so steps face the board
+    const spine = new THREE.Mesh(
+        new THREE.BoxGeometry(isNS ? CELL - 10 : 8, 3 * LIFT + 8, isNS ? 8 : CELL - 10),
+        matStair
+    );
+    spine.position.set(cx + sx * CELL * 0.32, 0, cz + sz * CELL * 0.32);
+    spine.castShadow = true; groupDeco.add(spine);
     // three landings: down / normal / up
     [-1, 0, 1].forEach(function (L) {
         const pad = new THREE.Mesh(new THREE.BoxGeometry(CELL - 12, 4, CELL - 12), matStair);
-        pad.position.set(cx, lvlY(L), cz); pad.castShadow = true; pad.receiveShadow = true;
+        pad.position.set(cx, lvlY(L), cz);
+        pad.castShadow = true; pad.receiveShadow = true;
         pad.userData = { stairSide: s.side }; groupDeco.add(pad);
+        // post at the outer corner of each pad
+        let px = 0, pz = 0;
+        if (s.side === 'L' || s.side === 'N') { px = -1; } else { px = 1; }
+        if (s.side === 'L' || s.side === 'R' || s.side === 'N') { pz = -1; } else { pz = 1; }
         const post = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, LIFT, 8), matStart);
-        post.position.set(cx + (s.side === 'L' ? -CELL * 0.28 : CELL * 0.28), lvlY(L) - LIFT / 2, cz - CELL * 0.3); groupDeco.add(post);
+        post.position.set(cx + px * CELL * 0.28, lvlY(L) - LIFT / 2, cz + pz * CELL * 0.3);
+        groupDeco.add(post);
     });
 }
 

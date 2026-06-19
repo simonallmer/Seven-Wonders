@@ -212,6 +212,24 @@ body::before {
     transform: none;
 }
 
+/* Locked Games (Password Required) */
+.game-link.locked {
+    color: rgba(180, 170, 155, 0.75);
+    cursor: pointer;
+    opacity: 1;
+}
+
+.game-link.locked:hover {
+    color: rgba(220, 210, 195, 0.9);
+    background: rgba(197, 160, 89, 0.08);
+    border-bottom-color: rgba(197, 160, 89, 0.4);
+    padding-left: 24px;
+}
+
+.game-link.locked:hover::before {
+    width: 20px;
+}
+
 .logo-container {
     margin: 40px 0 0;
     display: flex;

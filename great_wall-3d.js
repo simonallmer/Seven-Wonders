@@ -32,8 +32,8 @@ function cellTo3D(r, c) {
 }
 
 // Materials — golden-hour stone, two armies: jade limestone vs vermilion basalt
-const matBrick = new THREE.MeshStandardMaterial({ color: 0xb8a98c, roughness: 0.95, metalness: 0.02 });
-const matBrickDark = new THREE.MeshStandardMaterial({ color: 0x9c8d72, roughness: 0.95, metalness: 0.02 });
+const matBrick = new THREE.MeshStandardMaterial({ color: 0xcc3b22, roughness: 0.85, metalness: 0.03 });
+const matBrickDark = new THREE.MeshStandardMaterial({ color: 0x992d1a, roughness: 0.85, metalness: 0.03 });
 const matSlab = new THREE.MeshStandardMaterial({ color: 0xcfc2a4, roughness: 0.85, metalness: 0.05 });
 const matSlabDark = new THREE.MeshStandardMaterial({ color: 0xc2b393, roughness: 0.85, metalness: 0.05 });
 const matRock = new THREE.MeshStandardMaterial({ color: 0x6e6052, roughness: 1.0 });
@@ -54,14 +54,14 @@ const matBlackAccent = new THREE.MeshStandardMaterial({ color: 0xc23b22, roughne
 // depthTest stays ON so the wall/towers correctly occlude highlights behind them
 // (no seeing through the building). Rings float just above the slab and are annuli
 // around the cell, so they read clearly without depthTest disabled.
-const matHLPlace = new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.6, depthWrite: false });
-const matHLMove = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.6, depthWrite: false });
+const matHLPlace = new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.85, depthWrite: false });
+const matHLMove = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.7, depthWrite: false });
 const matHLSelect = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.75, depthWrite: false });
 const matHLChain = new THREE.MeshBasicMaterial({ color: 0xffc14d, transparent: true, opacity: 0.55, depthWrite: false });
 const matArcShield = new THREE.MeshBasicMaterial({ color: 0x2a6db0, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide });
 const matArcVuln = new THREE.MeshBasicMaterial({ color: 0xc0392b, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
 const matArrow = new THREE.MeshBasicMaterial({ color: 0xff5533 });
-const matFacingArrow = new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.5, depthTest: false, side: THREE.DoubleSide });
+const matFacingArrow = new THREE.MeshBasicMaterial({ color: 0xff8844, transparent: true, opacity: 0.85, depthTest: false, side: THREE.DoubleSide });
 // Transparent (not invisible) so it stays an easy raycast click target — visible:false meshes are skipped by the raycaster.
 const matFacingHit = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
 const matDebrisLight = new THREE.MeshStandardMaterial({ color: 0xd9d0b8, roughness: 0.9 });
@@ -94,7 +94,8 @@ function init3D() {
     controls.minDistance = 180;
     controls.maxDistance = 1400;
     controls.maxPolarAngle = Math.PI / 2 - 0.05;
-    controls.enablePan = false;
+    controls.enablePan = true;
+    controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
     controls.target.set(0, WALL_TOP, 0);
     controls.update();
     controls.addEventListener('change', () => { needsRender = true; });
@@ -253,9 +254,9 @@ function buildWall() {
         groupWall.add(band);
     }
 
-    // Walkway surface
+    // Walkway surface (offset up 0.5 to avoid z-fighting with wall body top)
     const walkway = new THREE.Mesh(new THREE.BoxGeometry(wallLen, 2, wallDepth), matBrickDark);
-    walkway.position.y = WALL_TOP - 1;
+    walkway.position.y = WALL_TOP + 0.5;
     walkway.receiveShadow = true;
     groupWall.add(walkway);
 
@@ -263,7 +264,7 @@ function buildWall() {
     const parapetZ = wallDepth / 2 - 6;
     for (let side = -1; side <= 1; side += 2) {
         const low = new THREE.Mesh(new THREE.BoxGeometry(wallLen, 7, 5), matBrick);
-        low.position.set(0, WALL_TOP + 3.5, side * parapetZ);
+        low.position.set(0, WALL_TOP + 3.6, side * parapetZ);
         low.castShadow = true;
         groupWall.add(low);
         const merlonCount = Math.floor(wallLen / 17);
@@ -910,7 +911,7 @@ function animate3D(time) {
     flags.forEach((fl, i) => { fl.rotation.x = wind + Math.sin(clockT * 3 + i) * 0.06; });
     // Facing arrows breathe softly while a direction is being chosen
     if (groupFacing.children.length) {
-        matFacingArrow.opacity = 0.4 + Math.sin(clockT * 4.5) * 0.18;
+        matFacingArrow.opacity = 0.7 + Math.sin(clockT * 4.5) * 0.25;
     }
     // Kestrels
     groupBirds.children.forEach(b => {
