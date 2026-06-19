@@ -6,15 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Palace — Seven Wonders</title>
     <meta name="description" content="Palace, after the Crystal Palace — 3D prototype for the Seven Wonders series">
-    <!-- Access gate -->
-    <script>
-        (function () {
-            try { if (sessionStorage.getItem('sw_dev') === '2020') return; } catch (e) { }
-            var pw = prompt('Palace prototype — access password:');
-            if (pw === '2020') { try { sessionStorage.setItem('sw_dev', '2020'); } catch (e) { } }
-            else { window.location.replace('index.html'); }
-        })();
-    </script>
     <link rel="stylesheet" href="palace-style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -51,11 +42,11 @@
             <div class="stone-counts-display">
                 <div class="count-item">
                     <div class="count-stone white"></div>
-                    <span class="res"><span id="w-pool">24</span> pool</span>
+                    <span class="res"><span id="w-pool">10</span> pool</span>
                 </div>
                 <div class="count-item">
                     <div class="count-stone black"></div>
-                    <span class="res"><span id="b-pool">24</span> pool</span>
+                    <span class="res"><span id="b-pool">10</span> pool</span>
                 </div>
             </div>
 
@@ -185,6 +176,7 @@
             setTimeout(pin, 300);
         })();
     </script>
+    <script src="global-keys.js"></script>
 </body>
 
 </html>

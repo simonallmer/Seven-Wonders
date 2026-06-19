@@ -68,28 +68,28 @@ const games = {
         status: 'playtest',
         url: 'pagoda.html'
     },
-    citadel: {
-        name: 'Citadel',
-        description: 'Machu Picchu',
-        status: 'playtest',
-        url: 'citadel.html'
-    },
     basilica: {
         name: 'Basilica',
         description: 'St. Peter\'s Basilica',
         status: 'playtest',
         url: 'basilica.html'
     },
+    library: {
+        name: 'Library',
+        description: 'The Library of Alexandria',
+        status: 'playtest',
+        url: 'library.html'
+    },
     cathedral: {
         name: 'Cathedral',
         description: 'The Gothic Cathedral',
-        status: 'available',
+        status: 'playtest',
         url: 'cathedral.html'
     },
     palace: {
         name: 'Palace',
         description: 'The Crystal Palace',
-        status: 'available',
+        status: 'playtest',
         url: 'palace.html'
     },
     skyscraper: {

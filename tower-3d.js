@@ -137,7 +137,21 @@ function init3D() {
     window.addEventListener('resize', onResize);
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
-    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    
+    let __pointerDownPos_towerdjs = { x: 0, y: 0 };
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+        __pointerDownPos_towerdjs.x = e.clientX;
+        __pointerDownPos_towerdjs.y = e.clientY;
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+        const dx = e.clientX - __pointerDownPos_towerdjs.x;
+        const dy = e.clientY - __pointerDownPos_towerdjs.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 5) {
+            onPointerDown(e);
+        }
+    });
+
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerleave', clearHover);
     renderer.setAnimationLoop(animate);

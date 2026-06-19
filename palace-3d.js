@@ -26,7 +26,7 @@ let hoverKey = null;
 // ---- layout ----
 const CELL = 30;
 const STEP = 26;
-const W = 15, D = 5;
+const W = 7, D = 5;
 function worldX(x) { return (x - (W - 1) / 2) * CELL; }
 function worldZ(y) { return (y - (D - 1) / 2) * CELL; }
 function levelTop(l) { return l * STEP; }
@@ -50,7 +50,7 @@ function ringQuat(face) { return new THREE.Quaternion().setFromUnitVectors(ZAX, 
 function ringQuatN(n) { return new THREE.Quaternion().setFromUnitVectors(ZAX, n); }
 function fieldCenter(f) {
     const cx = worldX(f.x), cz = worldZ(f.y);
-    if (f.face === 'top') return new THREE.Vector3(cx, levelTop(window.palLevel(f.x, f.y)) + 1.0, cz);
+    if (f.face === 'top') return new THREE.Vector3(cx, f.k * STEP + 0.2, cz);
     const n = fieldNormal(f.face), vy = (f.k + 0.5) * STEP;
     return new THREE.Vector3(cx + n.x * (CELL / 2), vy, cz + n.z * (CELL / 2));
 }
@@ -104,7 +104,7 @@ function init3D() {
     scene.fog = new THREE.FogExp2(0xf3cf91, 0.0006);
 
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 12000);
-    camera.position.set(120, 360, 380);
+    camera.position.set(60, 240, 340);
 
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -115,7 +115,7 @@ function init3D() {
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = 0.05;
-    controls.minDistance = 220; controls.maxDistance = 1200;
+    controls.minDistance = 120; controls.maxDistance = 900;
     controls.maxPolarAngle = Math.PI / 2 - 0.05;
     controls.target.set(0, 36, 0); controls.update();
     controls.addEventListener('change', function () { needsRender = true; });
@@ -139,12 +139,24 @@ function init3D() {
     window.addEventListener('resize', onResize);
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
-    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    
+    let __pointerDownPos_palacedjs = { x: 0, y: 0 };
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+        __pointerDownPos_palacedjs.x = e.clientX;
+        __pointerDownPos_palacedjs.y = e.clientY;
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+        const dx = e.clientX - __pointerDownPos_palacedjs.x;
+        const dy = e.clientY - __pointerDownPos_palacedjs.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 5) {
+            onPointerDown(e);
+        }
+    });
+
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerleave', clearHover);
     renderer.setAnimationLoop(animate);
-
-    if (window.refreshPal) window.refreshPal();
 }
 function onResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -161,6 +173,39 @@ function buildEnvironment() {
     const plinth = new THREE.Mesh(new THREE.BoxGeometry(W * CELL + 60, 8, D * CELL + 60),
         new THREE.MeshStandardMaterial({ color: 0xcabf9f, roughness: 0.9 }));
     plinth.position.y = -4; plinth.receiveShadow = true; groupEnv.add(plinth);
+
+    // Decorative stone piles just beyond the east edge — surplus stones from the removed half
+    // The plinth top is at y=0; pile centres start safely above it
+    const pileX = worldX(W - 1) + CELL * 1.4;
+    [-CELL, 0, CELL].forEach(function (dz) {
+        addStonePile(pileX, dz, 3);
+    });
+    addStonePile(pileX + CELL * 0.7, -CELL * 0.5, 2);
+    addStonePile(pileX + CELL * 0.7,  CELL * 0.5, 2);
+}
+
+function addStonePile(px, pz, count) {
+    const plinthTop = 0;
+    const stoneColors = [0xc8bfae, 0xb0a898, 0xd4cbbf, 0xa09588];
+    const offsets = [
+        [0, 0], [8, -6], [-7, 5], [5, 8], [-4, -8],
+        [10, 3], [-9, -3], [3, 10], [-2, 7], [7, -9]
+    ];
+    for (let i = 0; i < count; i++) {
+        const r = 4.5 + (i % 3) * 1.5;
+        const row = Math.floor(i / 3);
+        const [ox, oz] = offsets[i % offsets.length];
+        const geo = new THREE.SphereGeometry(r, 14, 10);
+        const mat = new THREE.MeshStandardMaterial({
+            color: stoneColors[i % stoneColors.length],
+            roughness: 0.85, metalness: 0.05
+        });
+        const stone = new THREE.Mesh(geo, mat);
+        stone.position.set(px + ox, plinthTop + r + row * (r * 1.6), pz + oz);
+        stone.castShadow = true;
+        stone.receiveShadow = true;
+        groupEnv.add(stone);
+    }
 }
 
 // one glass cube per voxel so they can break individually
@@ -195,7 +240,7 @@ function buildStructure() {
             if (window.palIsPortal(x, y)) buildPortal(x, y, cx, cz, levelTop(L));
         }
     }
-    // goal bands: the end a player must REACH (Black scores at x=14, White at x=0)
+    // goal bands: the end a player must REACH (Black scores at x=6, White at x=0)
     for (let y = 0; y < D; y++) {
         addGoal(0, y, matGoalW);          // White wins by reaching x=0
         addGoal(W - 1, y, matGoalB);      // Black wins by reaching x=14
@@ -210,7 +255,6 @@ function addGoal(x, y, mat) {
 function buildPortal(x, y, cx, cz, h) {
     let nx = 0, nz = 0;
     if (y === 2 && x === 0) nx = -1; else if (y === 2 && x === W - 1) nx = 1;
-    else if (x === 7 && y === 0) nz = -1; else if (x === 7 && y === D - 1) nz = 1;
     const arch = new THREE.Mesh(new THREE.TorusGeometry(CELL * 0.3, 1.6, 8, 18, Math.PI), matGold);
     arch.position.set(cx + nx * (CELL / 2 - 0.5), h * 0.55, cz + nz * (CELL / 2 - 0.5));
     if (nx) arch.rotation.y = Math.PI / 2;

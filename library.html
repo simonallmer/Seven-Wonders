@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library - Seven Wonders</title>
+    <meta name="description" content="Play Library, an ancient strategy game from the Seven Wonders series inspired by the House of Wisdom">
+    <link rel="stylesheet" href="library-style.css">
+</head>
+
+<body class="view-3d">
+    <!-- Overlay for side menu -->
+    <div id="overlay" class="overlay"></div>
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <a href="index.html" class="top-bar-btn top-bar-link">← Menu</a>
+        <button id="menu-toggle" class="top-bar-btn menu-toggle-btn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+
+    <!-- Side Menu -->
+    <div id="side-menu" class="side-menu">
+        <div class="menu-content">
+            <h1 class="game-title" style="text-align: center; font-size: 2.2rem; margin-bottom: 5px; font-family: 'Ancient Tulip', 'Cinzel', serif; letter-spacing: 5px;">LIBRARY</h1>
+            <p class="game-subtitle" style="text-align: center; margin-top: 0; opacity: 0.7; color: #d4cfc4; font-family: 'Cinzel', serif;">House of Wisdom</p>
+            
+            <div class="menu-divider" style="height: 1px; background: rgba(100, 90, 80, 0.2); margin: 20px 0;"></div>
+
+            <div class="players-dropdown" style="margin-bottom: 10px;">
+                <button id="players-btn" class="menu-btn">2 Players</button>
+                <div class="players-menu" id="players-menu" style="display: none;">
+                    <button id="btn-p2" class="active menu-btn-sub" data-players="2">2 Players</button>
+                    <button id="btn-p3" class="menu-btn-sub" data-players="3">3 Players</button>
+                    <button id="btn-p4" class="menu-btn-sub" data-players="4">4 Players</button>
+                </div>
+            </div>
+
+            <div class="opp-dropdown" style="margin-bottom: 10px;">
+                <button id="opponent-btn" class="menu-btn">Opponent: Human</button>
+                <div class="opp-menu" id="opponent-menu" style="display: none;">
+                    <button id="btn-opp-human" class="active menu-btn-sub" data-opp="human">Human</button>
+                    <button disabled style="opacity: 0.6; cursor: not-allowed;" class="menu-btn-sub">Computer: Easy</button>
+                </div>
+            </div>
+
+            <button id="rules-btn" class="menu-btn">Rules</button>
+            <button id="reset-button" class="menu-btn">New Game</button>
+            <button id="close-menu-btn" class="menu-btn">Close</button>
+        </div>
+    </div>
+
+    <div id="game-layout">
+        <div id="view-container">
+            <div id="canvas3d"></div>
+        </div>
+
+        <button id="cancel-button" class="hidden">Cancel Move</button>
+
+        <div id="status-panel-top" style="position: absolute; top: 80px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; color: #4a4a4a; font-family: 'Cinzel', serif; font-size: 0.9rem; white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; font-weight: bold; text-shadow: 0 1px 2px rgba(255,255,255,0.8); z-index: 10;">
+            <div id="player-color" style="width: 16px; height: 16px; border: 1px solid #a39e93; border-radius: 50%; background-color: #fff; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2), 0 0 5px rgba(255,255,255,0.5);"></div>
+            <span id="status-text">Player 1 to move</span>
+        </div>
+
+        <!-- Custom action selection for Library -->
+        <div id="action-panel" style="position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 10;">
+            <button id="btn-action-lay" class="action-btn-custom active">Lay Plate / Wall</button>
+            <button id="btn-action-move" class="action-btn-custom">Move Figure</button>
+            <button id="btn-action-push" class="action-btn-custom">Push Wall</button>
+            <button id="btn-action-topple" class="action-btn-custom">Topple Wall</button>
+        </div>
+    </div>
+
+
+
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="message-overlay hidden">
+        <div class="message-content">
+            <h2 id="modal-title" class="message-title"></h2>
+            <p id="modal-text" class="message-text"></p>
+            <div class="modal-actions">
+                <button id="modal-new-game" class="modal-btn">New Game</button>
+                <button id="modal-menu" class="modal-btn" onclick="window.location.href='index.html'">Back to Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div id="rules-modal" class="rules-modal hidden">
+        <div class="rules-overlay" id="rules-overlay"></div>
+        <div class="rules-content">
+            <h2>Library Rules</h2>
+            <div class="rules-body" style="text-align: left; font-size: 0.9em; max-height: 60vh; overflow-y: auto; padding-right: 15px;">
+                <p><strong>GOAL</strong><br>
+                Reach any of the 7 fields on your opposite side of the board before your opponents do.</p>
+
+                <p><strong>GAME SETUP</strong><br>
+                The 7x7 board starts empty except for exactly one starting field plate placed in the middle of each player's side. Players start in their study rooms off-board and must deploy onto their starting plate to begin.</p>
+
+                <p><strong>YOUR ACTIONS (Choose 1 per turn)</strong></p>
+                <ul style="padding-left: 20px; margin-bottom: 15px;">
+                    <li><strong>Lay Plate / Wall:</strong> Click any empty cell block to lay a walkable Plate, OR click any empty grid-gap line to place a Wall. Note: No starting line boundaries can be walled to avoid trapping players.</li>
+                    <li><strong>Move Figure:</strong> Move your stone 1 cell orthogonally. You can only move onto placed Field Plates, and you cannot cross any standing walls.</li>
+                    <li><strong>Push Wall:</strong> Slide a standing wall by 1 space. If other walls are connected to it in the push direction, they slide along too (propagation), provided there is an empty gap at the end to accommodate the shift.</li>
+                    <li><strong>Topple Wall (Domino Smash):</strong> Select a wall and a fall direction. The wall collapses flat onto the adjacent fields. Any fallen wall block automatically becomes a walkable plate! Any player figure on those fields is crushed and returned to their study room. Parallel adjacent walls continue the chain reaction!</li>
+                </ul>
+            </div>
+            <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="game-footer" style="margin-top: 30px; font-family: 'Cinzel', serif; font-size: 0.7rem; color: #a39e93; letter-spacing: 2px; text-align: center;">
+        <p>Design: Simon Allmer</p>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <script src="library-game.js"></script>
+    <script src="library-3d.js"></script>
+    <script>
+        // Side menu logic
+        const menuToggle = document.getElementById('menu-toggle');
+        const sideMenu = document.getElementById('side-menu');
+        const overlay = document.getElementById('overlay');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+
+        function toggleMenu() {
+            sideMenu.classList.toggle('open');
+            overlay.classList.toggle('active');
+            // Close flyouts when closing menu
+            if (!sideMenu.classList.contains('open')) {
+                document.getElementById('players-menu').classList.remove('show-flyout');
+                document.getElementById('opponent-menu').classList.remove('show-flyout');
+            }
+        }
+
+        menuToggle.addEventListener('click', toggleMenu);
+        overlay.addEventListener('click', toggleMenu);
+        closeMenuBtn.addEventListener('click', toggleMenu);
+
+        // Flyout logic
+        document.getElementById('players-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('players-menu').classList.toggle('show-flyout');
+            document.getElementById('opponent-menu').classList.remove('show-flyout');
+        });
+        document.getElementById('opponent-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('opponent-menu').classList.toggle('show-flyout');
+            document.getElementById('players-menu').classList.remove('show-flyout');
+        });
+        // Close flyouts on outside click
+        document.addEventListener('click', () => {
+            document.getElementById('players-menu').classList.remove('show-flyout');
+            document.getElementById('opponent-menu').classList.remove('show-flyout');
+        });
+
+        // Global Keydown (Space for menu, Esc for main menu)
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                window.location.href = 'index.html';
+            } else if (e.code === 'Space') {
+                // Prevent scrolling
+                if (e.target === document.body || e.target === document.documentElement) {
+                    e.preventDefault();
+                }
+                toggleMenu();
+            }
+        });
+
+        // Rules modal logic
+        document.getElementById('rules-btn').addEventListener('click', function () {
+            document.getElementById('rules-modal').classList.remove('hidden');
+        });
+        document.getElementById('rules-close-btn').addEventListener('click', function () {
+            document.getElementById('rules-modal').classList.add('hidden');
+        });
+        document.getElementById('rules-overlay').addEventListener('click', function () {
+            document.getElementById('rules-modal').classList.add('hidden');
+        });
+    </script>
+    <script src="global-keys.js"></script>
+</body>
+
+</html>

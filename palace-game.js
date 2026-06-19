@@ -21,22 +21,18 @@
 //   You can never END a turn enclosed inside the building — only pass through.
 // ============================================
 
-const PAL_W = 15;          // length (x), the nave
+const PAL_W = 7;           // length (x) — shortened pyramid
 const PAL_D = 5;           // depth  (y)
-const PAL_TRANSEPT = 7;    // centre column
 const PAL_ROW_LEVEL = [1, 2, 3, 2, 1];
-const PAL_TRANSEPT_LEVEL = 5;   // tall central wall — blocks every lane
-const PAL_MAXK = 5;
-const PAL_POOL_START = 24;
+const PAL_MAXK = 3;
+const PAL_POOL_START = 10;
 
 function palLevel(x, y) {
-    if (x === PAL_TRANSEPT) return PAL_TRANSEPT_LEVEL;
     return PAL_ROW_LEVEL[y];
 }
 function palIsRidge(x, y) { return palLevel(x, y) >= 3; }
 function palIsPortal(x, y) {
-    return (y === 2 && (x === 0 || x === PAL_W - 1)) ||
-           (x === PAL_TRANSEPT && (y === 0 || y === PAL_D - 1));
+    return (y === 2 && (x === 0 || x === PAL_W - 1));
 }
 function palInBounds(x, y) { return x >= 0 && x < PAL_W && y >= 0 && y < PAL_D; }
 function palLevelSafe(x, y) { return palInBounds(x, y) ? palLevel(x, y) : 0; }
@@ -139,12 +135,15 @@ function palClear() {
     refreshPal();
 }
 
-// seed the race start position (Black west, White east; two L1 lanes + the ridge)
+// seed: 5 white on east (x=6), 5 black on west (x=0), one per row, on the lowest glass level
 function palSeedRace() {
     palBoard = {};
-    [['B', 0, 0], ['B', 0, 4], ['B', 0, 2], ['W', 14, 0], ['W', 14, 4], ['W', 14, 2]].forEach(function (e) {
-        palBoard[palFieldId('top', e[1], e[2], palLevel(e[1], e[2]) - 1)] = { color: e[0] };
-    });
+    for (let y = 0; y < PAL_D; y++) {
+        // Black stones at x=0 (west end) on lowest level
+        palBoard[palFieldId('top', 0, y, 0)] = { color: 'B' };
+        // White stones at x=PAL_W-1 (east end) on lowest level
+        palBoard[palFieldId('top', PAL_W - 1, y, 0)] = { color: 'W' };
+    }
 }
 
 // ---- voxel / engine ----
@@ -161,7 +160,7 @@ function palSettleField(id, color) {
     let tx, ty, ks;
     if (f.face === 'top') { tx = f.x; ty = f.y; ks = palLevel(f.x, f.y); }
     else { const s = PAL_SIDES.find(function (q) { return q.face === f.face; }); tx = f.x + s.dx; ty = f.y + s.dz; ks = f.k; if (!palInBounds(tx, ty)) { tx = f.x; ty = f.y; ks = palLevel(f.x, f.y); } }
-    let kk = ks; while (kk > 0 && !palSolidAt(tx, ty, kk - 1)) kk--;
+    let kk = 0;
     return { color: color, x: tx, y: ty, k: kk };
 }
 function palStartPlay() {

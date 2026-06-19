@@ -138,7 +138,21 @@ function init3D() {
 
         // Add click listener to canvas (single registration only — avoid duplicate fire)
         const canvas = renderer.domElement;
-        canvas.addEventListener('pointerdown', onMouseDown);
+        
+    let __pointerDownPos_statuedjs = { x: 0, y: 0 };
+    canvas.addEventListener('pointerdown', (e) => {
+        __pointerDownPos_statuedjs.x = e.clientX;
+        __pointerDownPos_statuedjs.y = e.clientY;
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+        const dx = e.clientX - __pointerDownPos_statuedjs.x;
+        const dy = e.clientY - __pointerDownPos_statuedjs.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 5) {
+            onMouseDown(e);
+        }
+    });
+
         canvas.addEventListener('pointerup', onCanvasClick);
         canvas.addEventListener('pointermove', onCanvasMouseMove);
 

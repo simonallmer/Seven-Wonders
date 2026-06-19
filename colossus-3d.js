@@ -114,7 +114,21 @@ function init3D() {
     window.addEventListener('resize', onWindowResize);
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
-    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    
+    let __pointerDownPos_colossusdjs = { x: 0, y: 0 };
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+        __pointerDownPos_colossusdjs.x = e.clientX;
+        __pointerDownPos_colossusdjs.y = e.clientY;
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+        const dx = e.clientX - __pointerDownPos_colossusdjs.x;
+        const dy = e.clientY - __pointerDownPos_colossusdjs.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 5) {
+            onPointerDown(e);
+        }
+    });
+
 
     // Warm Light from Torch
     const torchLight = new THREE.PointLight(0xffaa44, 1.5, 1000);

@@ -111,7 +111,21 @@ function init3D() {
     // Raycaster for interaction
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
-    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    
+    let __pointerDownPos_mausoleumdjs = { x: 0, y: 0 };
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+        __pointerDownPos_mausoleumdjs.x = e.clientX;
+        __pointerDownPos_mausoleumdjs.y = e.clientY;
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+        const dx = e.clientX - __pointerDownPos_mausoleumdjs.x;
+        const dy = e.clientY - __pointerDownPos_mausoleumdjs.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 5) {
+            onPointerDown(e);
+        }
+    });
+
 
     // Animation loop
     renderer.setAnimationLoop(animate3D);

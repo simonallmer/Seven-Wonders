@@ -100,7 +100,21 @@ function init3D() {
 
     // Event Listeners
     window.addEventListener('resize', onWindowResize);
-    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    
+    let __pointerDownPos_gardensdjs = { x: 0, y: 0 };
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+        __pointerDownPos_gardensdjs.x = e.clientX;
+        __pointerDownPos_gardensdjs.y = e.clientY;
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+        const dx = e.clientX - __pointerDownPos_gardensdjs.x;
+        const dy = e.clientY - __pointerDownPos_gardensdjs.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 5) {
+            onPointerDown(e);
+        }
+    });
+
     renderer.domElement.addEventListener('pointerup', onPointerUp);
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.style.touchAction = 'none';

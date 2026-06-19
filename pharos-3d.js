@@ -102,7 +102,21 @@ function init3D() {
     window.addEventListener('resize', onWindowResize);
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
-    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    
+    let __pointerDownPos_pharosdjs = { x: 0, y: 0 };
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+        __pointerDownPos_pharosdjs.x = e.clientX;
+        __pointerDownPos_pharosdjs.y = e.clientY;
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+        const dx = e.clientX - __pointerDownPos_pharosdjs.x;
+        const dy = e.clientY - __pointerDownPos_pharosdjs.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 5) {
+            onPointerDown(e);
+        }
+    });
+
     renderer.domElement.addEventListener('pointermove', onPointerMove);
 
     renderer.setAnimationLoop(animate3D);

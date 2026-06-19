@@ -90,7 +90,21 @@ function init3D() {
     // Raycaster for interaction (use window to capture clicks correctly)
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
-    window.addEventListener('pointerdown', onPointerDown);
+    
+    let __pointerDownPos_templedjs = { x: 0, y: 0 };
+    window.addEventListener('pointerdown', (e) => {
+        __pointerDownPos_templedjs.x = e.clientX;
+        __pointerDownPos_templedjs.y = e.clientY;
+    });
+
+    window.addEventListener('pointerup', (e) => {
+        const dx = e.clientX - __pointerDownPos_templedjs.x;
+        const dy = e.clientY - __pointerDownPos_templedjs.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 5) {
+            onPointerDown(e);
+        }
+    });
+
 
     // Animation loop
     renderer.setAnimationLoop(animate3D);

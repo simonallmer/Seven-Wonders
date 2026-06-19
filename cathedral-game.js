@@ -3,7 +3,8 @@
 // ============================================
 // Chessboard 7x7. Two pilgrims start at opposite mid-edges (top/bottom).
 // Terrain: every field except the two starts can be RAISED (+1) / LOWERED (-1),
-// but only your OWN colour, and never the field a pilgrim stands on.
+// but only your OWN colour. The pilgrim rides the terrain — when you reshape
+// the cell beneath them, their level changes by the same amount.
 //
 // LEVELS: a pilgrim stands on a plane -1, 0 or +1. On the board you may step to
 // an adjacent cell whose terrain is <= your level (never climb above your level).
@@ -75,7 +76,7 @@ function cathMoveTargets(color) {
 function cathLiftTargets(dir) {
     const out = [];
     for (let x = 0; x < CATH_W; x++) for (let y = 0; y < CATH_H; y++) {
-        if (!cLiftable(x, y) || cColor(x, y) !== cathTurn || cPilAt(x, y)) continue;
+        if (!cLiftable(x, y) || cColor(x, y) !== cathTurn) continue;
         const h = cHeight(x, y);
         if (dir > 0 && h < 1) out.push({ x: x, y: y, h: h });
         if (dir < 0 && h > -1) out.push({ x: x, y: y, h: h });
@@ -101,10 +102,15 @@ function cathTapLift(x, y) {
     if (cathWinner || cathMode === 'move') return;
     if (!cLiftable(x, y)) { flashCath('That field is fixed'); return; }
     if (cColor(x, y) !== cathTurn) { flashCath((cathTurn === 'W' ? 'White' : 'Black') + ' may only lift ' + (cathTurn === 'W' ? 'white' : 'black') + ' fields'); return; }
-    if (cPilAt(x, y)) { flashCath('You cannot reshape a field a pilgrim stands on'); return; }
     const k = cKey(x, y), h = cathHmap[k] || 0;
     if (cathMode === 'raise') { if (h >= 1) { flashCath('Already at the top'); return; } cathHmap[k] = h + 1; }
     else { if (h <= -1) { flashCath('Already at the bottom'); return; } cathHmap[k] = h - 1; }
+    // Pilgrim rides the terrain
+    const who = cPilAt(x, y);
+    if (who) {
+        const p = cathPil[who];
+        p.level = Math.max(-1, Math.min(1, p.level + (cathMode === 'raise' ? 1 : -1)));
+    }
     if (window.cathAnimLift) window.cathAnimLift(x, y, cathHmap[k]);
     cathAfter();
 }

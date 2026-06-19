@@ -135,7 +135,21 @@ function init3D() {
     window.addEventListener('resize', onWindowResize);
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
-    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    
+    let __pointerDownPos_greatwalldjs = { x: 0, y: 0 };
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+        __pointerDownPos_greatwalldjs.x = e.clientX;
+        __pointerDownPos_greatwalldjs.y = e.clientY;
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+        const dx = e.clientX - __pointerDownPos_greatwalldjs.x;
+        const dy = e.clientY - __pointerDownPos_greatwalldjs.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 5) {
+            onPointerDown(e);
+        }
+    });
+
 
     renderer.setAnimationLoop(animate3D);
 }
