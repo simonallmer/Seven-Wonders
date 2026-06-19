@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Tower - Seven Wonders</title>
+    <meta name="description" content="Play Tower, an ancient strategy game from the Seven Wonders series inspired by the Porcelain Tower of Nanjing">
+    <link rel="stylesheet" href="tower-style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+</head>
+
+<body class="view-3d">
+    <div id="game-container">
+        <div id="canvas3d" class="canvas-container"></div>
+    </div>
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <a href="index.html" class="top-bar-btn top-bar-link">← Menu</a>
+        <button id="menu-toggle" class="top-bar-btn menu-toggle-btn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+
+    <!-- Side Menu -->
+    <div id="side-menu" class="side-menu">
+        <div class="menu-content">
+            <h1 class="game-title">TOWER</h1>
+
+            <div class="player-info">
+                <div class="current-player-display">
+                    <div id="player-indicator" class="player-indicator"></div>
+                    <span id="player-name">White's Turn</span>
+                </div>
+            </div>
+
+            <div class="stone-counts-display">
+                <div class="count-item">
+                    <div class="count-stone white"></div>
+                    <span id="w-board-hud">0</span>
+                    <span class="res">+<span id="w-res-hud">12</span> pool</span>
+                </div>
+                <div class="count-item">
+                    <div class="count-stone black"></div>
+                    <span id="b-board-hud">0</span>
+                    <span class="res">+<span id="b-res-hud">12</span> pool</span>
+                </div>
+            </div>
+
+            <div class="menu-divider"></div>
+
+            <button id="opponent-btn" class="menu-btn">Opponent: Human</button>
+            <button id="rules-btn" class="menu-btn">Rules</button>
+            <button id="reset-button" class="menu-btn">Reset Game</button>
+            <button id="close-menu-btn" class="menu-btn">Close Menu</button>
+
+            <div class="menu-footer">
+                <p>Design: Simon Allmer</p>
+                <p>After the Porcelain Tower of Nanjing</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Bar -->
+    <div class="action-bar">
+        <button id="act-place" class="action-chip">Place</button>
+        <button id="act-move" class="action-chip">Move</button>
+        <button id="act-levelup" class="action-chip">Level Up</button>
+    </div>
+    <div id="action-prompt" class="action-prompt"></div>
+
+    <!-- Game Message -->
+    <div id="game-message" class="game-message hidden"></div>
+
+    <!-- Game Over Overlay -->
+    <div id="message-box" class="message-overlay" onclick="this.classList.remove('visible')">
+        <div class="message-content" onclick="event.stopPropagation()">
+            <h2 id="message-title" class="message-title"></h2>
+            <p id="message-text" class="message-text"></p>
+            <div class="modal-buttons">
+                <button onclick="location.reload()" class="modal-btn">Play Again</button>
+                <a href="index.html" class="modal-btn secondary">Menu</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div id="rules-modal" class="rules-modal" style="display:none;">
+        <div class="rules-overlay" id="rules-overlay" onclick="document.getElementById('rules-modal').style.display='none'"></div>
+        <div class="rules-content">
+            <h2>Tower Rules</h2>
+            <div class="rules-body">
+                <p><strong>GOAL</strong><br>Control all 8 tiles on any single ring, OR two full columns top-to-bottom of the tower.</p>
+                <p><strong>TILES</strong><br>Each tile is a triangular prism: its top shows your color (ownership), one face shows its active number (1–3). You start with 12 in your pool.</p>
+                <p><strong>PLACE</strong><br>Raise a tile from your pool onto any empty slot — your color up, number 1 outward.</p>
+                <p><strong>MOVE</strong><br>Pick one of your tiles, then tap an adjacent empty slot (around a ring or up/down a column) to slide it there. It keeps its number and color.</p>
+                <p><strong>ATTACK</strong><br>No separate button — after picking your tile, tap an adjacent <em>enemy</em> chain instead of an empty slot. If your chain's numbers sum higher than theirs, you capture the whole enemy chain (flipped to your color, reset to 1). Green = you win, red = too strong.</p>
+                <p><strong>LEVEL UP</strong><br>Rotate one of your tiles to the next number (1→2→3→1). Cycling 3→1 rings the bell: immediately move any one tile (yours or the enemy's) to an adjacent empty slot.</p>
+            </div>
+            <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
+        </div>
+    </div>
+
+    <script>window.is3DView = true;</script>
+    <script src="tower-game.js"></script>
+    <script src="tower-3d.js"></script>
+    <script>
+        const menuToggle = document.getElementById('menu-toggle');
+        const sideMenu = document.getElementById('side-menu');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+        const rulesBtn = document.getElementById('rules-btn');
+        const rulesModal = document.getElementById('rules-modal');
+        const rulesCloseBtn = document.getElementById('rules-close-btn');
+
+        function toggleMenu() {
+            menuToggle.classList.toggle('active');
+            sideMenu.classList.toggle('open');
+        }
+        menuToggle.addEventListener('click', toggleMenu);
+        closeMenuBtn.addEventListener('click', toggleMenu);
+        rulesBtn.addEventListener('click', () => {
+            rulesModal.style.display = 'flex';
+            if (sideMenu.classList.contains('open')) toggleMenu();
+        });
+        rulesCloseBtn.addEventListener('click', () => rulesModal.style.display = 'none');
+
+        // Pin the bottom UI above mobile Safari's toolbar / home indicator (see Great Wall fix).
+        (function () {
+            const bar = document.querySelector('.action-bar');
+            const prompt = document.querySelector('.action-prompt');
+            function pin() {
+                let hiddenBelow = 0;
+                const vv = window.visualViewport;
+                if (vv) hiddenBelow = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+                if (bar) bar.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + 20) + 'px)';
+                if (prompt) prompt.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + 74) + 'px)';
+            }
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', pin);
+                window.visualViewport.addEventListener('scroll', pin);
+            }
+            window.addEventListener('resize', pin);
+            window.addEventListener('orientationchange', pin);
+            window.addEventListener('load', pin);
+            pin();
+            setTimeout(pin, 300);
+        })();
+    </script>
+</body>
+
+</html>

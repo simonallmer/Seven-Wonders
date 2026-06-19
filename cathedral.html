@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Cathedral — Seven Wonders</title>
+    <meta name="description" content="Cathedral, after the great Gothic cathedral — a build-your-labyrinth prototype for the Seven Wonders series">
+    <script>
+        (function () {
+            try { if (sessionStorage.getItem('sw_dev') === '2020') return; } catch (e) { }
+            var pw = prompt('Cathedral prototype — access password:');
+            if (pw === '2020') { try { sessionStorage.setItem('sw_dev', '2020'); } catch (e) { } }
+            else { window.location.replace('index.html'); }
+        })();
+    </script>
+    <link rel="stylesheet" href="cathedral-style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+</head>
+
+<body class="view-3d">
+    <div id="game-container">
+        <div id="canvas3d" class="canvas-container"></div>
+    </div>
+
+    <div class="top-bar">
+        <a href="index.html" class="top-bar-btn top-bar-link">← Menu</a>
+        <button id="menu-toggle" class="top-bar-btn menu-toggle-btn"><span></span><span></span><span></span></button>
+    </div>
+
+    <div id="side-menu" class="side-menu">
+        <div class="menu-content">
+            <h1 class="game-title">CATHEDRAL</h1>
+            <div class="player-info">
+                <div class="current-player-display">
+                    <div id="player-indicator" class="player-indicator white"></div>
+                    <span id="player-name">White — seeking the rose</span>
+                </div>
+            </div>
+            <div class="menu-divider"></div>
+            <button id="rules-btn" class="menu-btn">About</button>
+            <button id="reset-btn" class="menu-btn">Reset</button>
+            <button id="close-menu-btn" class="menu-btn">Close Menu</button>
+            <div class="menu-footer">
+                <p>Design: Simon Allmer</p>
+                <p>After the great cathedral · the Chartres labyrinth</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-bar">
+        <button id="chip-raise" class="action-chip">⬆ Raise</button>
+        <button id="chip-lower" class="action-chip">⬇ Lower</button>
+        <button id="chip-reset" class="action-chip">Reset</button>
+    </div>
+    <div id="action-prompt" class="action-prompt"></div>
+
+    <div id="game-message" class="game-message hidden"></div>
+
+    <div id="message-box" class="message-overlay" onclick="this.classList.remove('visible')">
+        <div class="message-content" onclick="event.stopPropagation()">
+            <h2 id="message-title" class="message-title"></h2>
+            <p id="message-text" class="message-text"></p>
+            <div class="modal-buttons">
+                <button onclick="location.reload()" class="modal-btn">Play Again</button>
+                <a href="index.html" class="modal-btn secondary">Menu</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="rules-modal" class="rules-modal" style="display:none;">
+        <div class="rules-overlay" id="rules-overlay" onclick="document.getElementById('rules-modal').style.display='none'"></div>
+        <div class="rules-content">
+            <h2>Cathedral — “The Pilgrimage”</h2>
+            <div class="rules-body">
+                <p><strong>PROTOTYPE</strong><br>Core sandbox. Mirror-equal, perfect information. <em>Win condition still being designed.</em></p>
+                <p><strong>LEVELS &amp; STAIRS</strong><br>You stand on a level (−1, 0, +1). The two <strong>side stairs</strong> (attached at the middle of the left/right edges) are the only place to change level: step on, then pick <strong>Down / Normal / Up</strong> to come back onto the board at that level — your reset/elevator.</p>
+                <p><strong>THE TERRAIN</strong><br>The board is a chessboard. It starts flat. Every field (except the two starts and the rose) can be <strong>Raised</strong> (+1) or <strong>Lowered</strong> (−1) — but <strong>White may only lift white fields, Black only black</strong>. Your fields are the diagonals, so you build alone, but you cross your opponent's walls by raising your own to match.</p>
+                <p><strong>MOVE</strong><br>Step to an adjacent field at the <em>same height or lower</em> — you can never climb up. A raised field is a wall; a lowered field is a pit you fall into and must work your way out of.</p>
+                <p><strong>YOUR TURN — one action</strong><br><strong>Move</strong> one step, <em>or</em> <strong>Raise</strong> / <strong>Lower</strong> one of your own-colour fields (↑/↓ keys). You may <em>never</em> reshape the field you stand on — so you can't simply rise out of a trap.</p>
+                <p><strong>THE CATCH</strong><br>Your colour is your toolkit: raise it into walls, sink it into pits, to maze and trap your opponent on the squares they must cross — while you race the same gauntlet they build for you.</p>
+            </div>
+            <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
+        </div>
+    </div>
+
+    <script>window.is3DView = true;</script>
+    <script src="cathedral-game.js"></script>
+    <script src="cathedral-3d.js"></script>
+    <script>
+        const menuToggle = document.getElementById('menu-toggle');
+        const sideMenu = document.getElementById('side-menu');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+        const rulesBtn = document.getElementById('rules-btn');
+        const rulesModal = document.getElementById('rules-modal');
+        const rulesCloseBtn = document.getElementById('rules-close-btn');
+        function toggleMenu() { menuToggle.classList.toggle('active'); sideMenu.classList.toggle('open'); }
+        menuToggle.addEventListener('click', toggleMenu);
+        closeMenuBtn.addEventListener('click', toggleMenu);
+        rulesBtn.addEventListener('click', () => { rulesModal.style.display = 'flex'; if (sideMenu.classList.contains('open')) toggleMenu(); });
+        rulesCloseBtn.addEventListener('click', () => rulesModal.style.display = 'none');
+
+        const setMode = (m) => () => window.cathSetMode(window.getCathState().mode === m ? 'move' : m);
+        document.getElementById('chip-raise').addEventListener('click', setMode('raise'));
+        document.getElementById('chip-lower').addEventListener('click', setMode('lower'));
+        document.getElementById('chip-reset').addEventListener('click', () => window.cathReset());
+        document.getElementById('reset-btn').addEventListener('click', () => { window.cathReset(); if (sideMenu.classList.contains('open')) toggleMenu(); });
+
+        document.addEventListener('keydown', (e) => {
+            const tag = (e.target && e.target.tagName) || '';
+            if (/^(INPUT|TEXTAREA)$/.test(tag)) return;
+            if (e.key === 'ArrowUp') { e.preventDefault(); window.cathSetMode(window.getCathState().mode === 'raise' ? 'move' : 'raise'); }
+            else if (e.key === 'ArrowDown') { e.preventDefault(); window.cathSetMode(window.getCathState().mode === 'lower' ? 'move' : 'lower'); }
+            else if (e.key === 'Escape') window.cathSetMode('move');
+            else if (e.key.toLowerCase() === 'r') window.cathReset();
+        });
+
+        (function () {
+            const bar = document.querySelector('.action-bar');
+            const prompt = document.querySelector('.action-prompt');
+            function pin() {
+                let hidden = 0; const vv = window.visualViewport;
+                if (vv) hidden = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+                if (bar) bar.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hidden + 20) + 'px)';
+                if (prompt) prompt.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hidden + 74) + 'px)';
+            }
+            if (window.visualViewport) { window.visualViewport.addEventListener('resize', pin); window.visualViewport.addEventListener('scroll', pin); }
+            window.addEventListener('resize', pin); window.addEventListener('orientationchange', pin); window.addEventListener('load', pin);
+            pin(); setTimeout(pin, 300);
+        })();
+    </script>
+</body>
+
+</html>

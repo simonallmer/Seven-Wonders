@@ -175,6 +175,22 @@ body::before {
     transform: translateY(1px);
 }
 
+/* Prototype tag — subtle "not the finished game" marker on the right of a menu entry */
+.proto-tag {
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Cinzel', serif;
+    font-size: 0.55rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(197, 160, 89, 0.5);
+    font-weight: 500;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
 /* Coming Soon Games */
 .game-link.coming-soon {
     color: rgba(128, 128, 128, 0.6);

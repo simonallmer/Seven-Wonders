@@ -3,61 +3,188 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Palace - Seven Wonders</title>
-    <meta name="description" content="Play Palace, the Forbidden City from the Seven Wonders series">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Palace — Seven Wonders</title>
+    <meta name="description" content="Palace, after the Crystal Palace — 3D prototype for the Seven Wonders series">
+    <!-- Access gate -->
+    <script>
+        (function () {
+            try { if (sessionStorage.getItem('sw_dev') === '2020') return; } catch (e) { }
+            var pw = prompt('Palace prototype — access password:');
+            if (pw === '2020') { try { sessionStorage.setItem('sw_dev', '2020'); } catch (e) { } }
+            else { window.location.replace('index.html'); }
+        })();
+    </script>
     <link rel="stylesheet" href="palace-style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
 </head>
 
-<body>
-    <a href="index.html?menu=new" class="back-link">← Back to Seven Wonders</a>
+<body class="view-3d">
+    <div id="game-container">
+        <div id="canvas3d" class="canvas-container"></div>
+    </div>
 
-    <header class="game-header">
-        <h1 class="game-title">PALACE</h1>
-        <p class="game-subtitle">The Forbidden City</p>
-    </header>
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <a href="index.html" class="top-bar-btn top-bar-link">← Menu</a>
+        <button id="menu-toggle" class="top-bar-btn menu-toggle-btn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
 
-    <div class="status-panel">
-        <div class="turn-display">
-            <div class="current-player-indicator" id="current-player-color"></div>
-            <span id="game-status">White to move. Select a stone to move.</span>
-        </div>
-        <div class="stone-counts">
-            <span>White: <span id="white-count">7</span></span>
-            <span>Black: <span id="black-count">7</span></span>
-            <span>Top: <span id="top-count">0/7</span></span>
+    <!-- Side Menu -->
+    <div id="side-menu" class="side-menu">
+        <div class="menu-content">
+            <h1 class="game-title">PALACE</h1>
+
+            <div class="player-info">
+                <div class="current-player-display">
+                    <div id="player-indicator" class="player-indicator white"></div>
+                    <span id="player-name">Placing White</span>
+                </div>
+            </div>
+
+            <div class="stone-counts-display">
+                <div class="count-item">
+                    <div class="count-stone white"></div>
+                    <span class="res"><span id="w-pool">24</span> pool</span>
+                </div>
+                <div class="count-item">
+                    <div class="count-stone black"></div>
+                    <span class="res"><span id="b-pool">24</span> pool</span>
+                </div>
+            </div>
+
+            <div class="menu-divider"></div>
+
+            <button id="clear-btn" class="menu-btn">Clear Board</button>
+            <button id="rules-btn" class="menu-btn">About</button>
+            <button id="close-menu-btn" class="menu-btn">Close Menu</button>
+
+            <div class="menu-footer">
+                <p>Design: Simon Allmer</p>
+                <p>After the Crystal Palace, Hyde Park 1851</p>
+            </div>
         </div>
     </div>
 
-    <div class="citadell-container">
-        <div id="citadell-board" class="citadell-board">
-            <!-- All levels will be rendered here, stacked on top of each other -->
+    <!-- Action Bar: stone pool -->
+    <div class="action-bar">
+        <span id="setup-chips">
+            <button id="chip-white" class="action-chip active" data-color="W">White</button>
+            <button id="chip-black" class="action-chip" data-color="B">Black</button>
+            <button id="chip-mode" class="action-chip">Walls: Off</button>
+            <button id="chip-clear" class="action-chip">Clear</button>
+        </span>
+        <span id="play-chips" style="display:none">
+            <button id="chip-shatter" class="action-chip">💥 Shatter</button>
+        </span>
+        <button id="chip-phase" class="action-chip">▶ Play</button>
+    </div>
+    <div id="action-prompt" class="action-prompt"></div>
+
+    <!-- Game Message -->
+    <div id="game-message" class="game-message hidden"></div>
+
+    <!-- Win Overlay -->
+    <div id="message-box" class="message-overlay" onclick="this.classList.remove('visible')">
+        <div class="message-content" onclick="event.stopPropagation()">
+            <h2 id="message-title" class="message-title"></h2>
+            <p id="message-text" class="message-text"></p>
+            <div class="modal-buttons">
+                <button onclick="location.reload()" class="modal-btn">Race Again</button>
+                <a href="index.html" class="modal-btn secondary">Menu</a>
+            </div>
         </div>
     </div>
 
-    <div class="action-buttons">
-        <button id="cancel-button" class="action-btn cancel-btn hidden">Cancel Move</button>
-        <button id="reset-button" class="action-btn reset-btn">New Game</button>
-    </div>
-
-    <div id="message-box" class="hidden"></div>
-
-    <!-- Game Over Modal -->
-    <div id="game-over-modal" class="hidden">
-        <div class="message-overlay"></div>
-        <div class="message-content">
-            <h2 id="modal-title">Game Over</h2>
-            <p id="modal-text"></p>
+    <!-- About Modal -->
+    <div id="rules-modal" class="rules-modal" style="display:none;">
+        <div class="rules-overlay" id="rules-overlay" onclick="document.getElementById('rules-modal').style.display='none'"></div>
+        <div class="rules-content">
+            <h2>Palace — “The Span”</h2>
+            <div class="rules-body">
+                <p><strong>PROTOTYPE</strong><br>This is a shape-and-pool sandbox, not the finished game. Set stones to feel out the board; movement comes next.</p>
+                <p><strong>THE BOARD</strong><br>An elongated stepped pyramid, 15 long × 5 deep. The cross-section rises L1 → L2 → L3 → L2 → L1. A transept crosses at the centre, lifting that line to the top — so the highest level forms an elongated <em>+</em> (the long nave ridge crossed by the short transept).</p>
+                <p><strong>RUN</strong><br>Slide along one level in a straight line, as far as you like, until a wall, a stone or the edge stops you.</p>
+                <p><strong>JUMP</strong><br>Hop to an adjacent field exactly one level higher or lower. Never two levels — so a two-high step is an impassable wall. That is how you build <em>traps</em>.</p>
+                <p><strong>SHATTER</strong><br>Destroy a whole glass block. You must be next to the block you break, or you may shatter the block beneath your own feet — in which case you drop straight down to the ground and stand upright. Next turn you can run through the opening.</p>
+                <p><strong>NO RESTING INSIDE</strong><br>You can only ever stand on an open surface, never enclosed within the building — pass through, don't dwell.</p>
+            </div>
+            <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
         </div>
     </div>
 
-    <footer class="game-footer">
-        <p><a href="https://sevenwondersgames.com"
-                style="color: inherit; text-decoration: none;">SevenWondersGames.com</a></p>
-        <p>Game Design: Simon Allmer</p>
-    </footer>
+    <script>window.is3DView = true;</script>
+    <script src="palace-game.js"></script>
+    <script src="palace-3d.js"></script>
+    <script>
+        const menuToggle = document.getElementById('menu-toggle');
+        const sideMenu = document.getElementById('side-menu');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+        const rulesBtn = document.getElementById('rules-btn');
+        const rulesModal = document.getElementById('rules-modal');
+        const rulesCloseBtn = document.getElementById('rules-close-btn');
 
-    <script src="citadell-game.js"></script>
+        function toggleMenu() {
+            menuToggle.classList.toggle('active');
+            sideMenu.classList.toggle('open');
+        }
+        menuToggle.addEventListener('click', toggleMenu);
+        closeMenuBtn.addEventListener('click', toggleMenu);
+        rulesBtn.addEventListener('click', () => {
+            rulesModal.style.display = 'flex';
+            if (sideMenu.classList.contains('open')) toggleMenu();
+        });
+        rulesCloseBtn.addEventListener('click', () => rulesModal.style.display = 'none');
+
+        // pool controls
+        document.getElementById('chip-white').addEventListener('click', () => window.palSetColor('W'));
+        document.getElementById('chip-black').addEventListener('click', () => window.palSetColor('B'));
+        document.getElementById('chip-mode').addEventListener('click', () => window.palToggleMode());
+        document.getElementById('chip-clear').addEventListener('click', () => window.palClear());
+        document.getElementById('chip-phase').addEventListener('click', () => window.palTogglePhase());
+        document.getElementById('chip-shatter').addEventListener('click', () => window.palToggleShatterMode());
+        document.getElementById('clear-btn').addEventListener('click', () => { window.palClear(); if (sideMenu.classList.contains('open')) toggleMenu(); });
+
+        // keyboard: S = swap colour, R = reset, F = walls mode, ENTER = Play/Setup
+        document.addEventListener('keydown', (e) => {
+            const tag = (e.target && e.target.tagName) || '';
+            if (/^(INPUT|TEXTAREA)$/.test(tag)) return;
+            const k = e.key.toLowerCase();
+            if (k === 's') { window.palToggleColor(); }
+            else if (k === 'r') { window.palClear(); }
+            else if (k === 'f') { window.palToggleMode(); }
+            else if (k === 'x') { window.palToggleShatterMode(); }
+            else if (e.key === 'Enter') { window.palTogglePhase(); }
+        });
+
+        // Pin the bottom UI above mobile Safari's toolbar / home indicator.
+        (function () {
+            const bar = document.querySelector('.action-bar');
+            const prompt = document.querySelector('.action-prompt');
+            function pin() {
+                let hiddenBelow = 0;
+                const vv = window.visualViewport;
+                if (vv) hiddenBelow = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+                if (bar) bar.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + 20) + 'px)';
+                if (prompt) prompt.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + 74) + 'px)';
+            }
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', pin);
+                window.visualViewport.addEventListener('scroll', pin);
+            }
+            window.addEventListener('resize', pin);
+            window.addEventListener('orientationchange', pin);
+            window.addEventListener('load', pin);
+            pin();
+            setTimeout(pin, 300);
+        })();
+    </script>
 </body>
 
 </html>

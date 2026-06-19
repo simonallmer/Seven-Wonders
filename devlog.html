@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer Log — Seven Wonders</title>
+    <script>
+        (function () {
+            try { if (sessionStorage.getItem('sw_dev') === '2020') return; } catch (e) { }
+            var pw = prompt('Developer Log — access password:');
+            if (pw === '2020') { try { sessionStorage.setItem('sw_dev', '2020'); } catch (e) { } }
+            else { window.location.replace('index.html'); }
+        })();
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;700&family=Crimson+Text:wght@400;600&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --gold: #C5A059; --stone: #f5f1e8; }
+        body { background: #0c0c0c; background-image: radial-gradient(ellipse at 50% -10%, #1a1612, #0c0c0c 70%); color: var(--stone); font-family: 'Crimson Text', serif; min-height: 100vh; padding: 24px 16px 80px; }
+        .back-link { position: fixed; top: 18px; left: 18px; z-index: 10; color: var(--gold); text-decoration: none; font-family: 'Cinzel', serif; font-size: .9rem; border: 1px solid rgba(197, 160, 89, .4); padding: 8px 16px; border-radius: 6px; background: rgba(0, 0, 0, .4); }
+        .back-link:hover { background: rgba(197, 160, 89, .15); }
+        .wrap { max-width: 820px; margin: 0 auto; }
+        h1 { font-family: 'Cinzel', serif; font-size: 2.2rem; letter-spacing: .12em; color: var(--gold); text-align: center; margin-top: 6px; }
+        .sub { text-align: center; font-style: italic; opacity: .7; letter-spacing: .1em; margin-bottom: 6px; }
+        .stamp { text-align: center; font-family: 'Cinzel', serif; font-size: .66rem; letter-spacing: .2em; color: var(--gold); border: 1px solid rgba(197, 160, 89, .4); display: inline-block; padding: 4px 12px; border-radius: 4px; }
+        .center { text-align: center; margin-bottom: 30px; }
+        section { background: linear-gradient(160deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, .015)); border: 1px solid rgba(197, 160, 89, .28); border-radius: 12px; padding: 22px 26px; margin-bottom: 22px; }
+        h2 { font-family: 'Cinzel', serif; color: var(--gold); font-size: 1.35rem; letter-spacing: .08em; margin-bottom: 2px; }
+        .wonder { font-style: italic; opacity: .7; margin-bottom: 14px; font-size: .95rem; }
+        .status { float: right; font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: .14em; padding: 4px 10px; border-radius: 4px; }
+        .st-locked { background: rgba(95, 160, 95, .2); border: 1px solid #5fa05f; color: #b6e6b6; }
+        .st-reserved { background: rgba(197, 160, 89, .18); border: 1px solid var(--gold); color: #e9d6a8; }
+        .st-open { background: rgba(160, 120, 200, .18); border: 1px solid #a078c8; color: #d8c4ec; }
+        h3 { font-family: 'Cinzel', serif; color: #e9d6a8; font-size: .98rem; letter-spacing: .04em; margin: 14px 0 5px; }
+        p, li { font-size: 1.02rem; line-height: 1.62; opacity: .92; }
+        ul { margin: 4px 0 6px 20px; }
+        li { margin-bottom: 5px; }
+        .meta { font-size: .9rem; opacity: .7; }
+        b.k { color: var(--gold); }
+        .arch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 22px; margin-top: 8px; }
+        .arch div { font-size: .96rem; }
+        .yes { color: #9ec99e; } .no { color: #e1a3a3; }
+        .footer { text-align: center; font-size: .82rem; opacity: .5; font-style: italic; margin-top: 24px; }
+        hr { border: none; border-top: 1px solid rgba(197, 160, 89, .18); margin: 14px 0; }
+    </style>
+</head>
+
+<body>
+    <a href="index.html" class="back-link">← Menu</a>
+    <div class="wrap">
+        <h1>DEVELOPER LOG</h1>
+        <p class="sub">Seven Wonders · Allmer Games — Concept Vault</p>
+        <div class="center"><span class="stamp">CONFIDENTIAL · INTERNAL</span></div>
+
+        <section>
+            <h2>House rules of the series</h2>
+            <p>Every Seven Wonders game is <b class="k">simple, abstract, deep</b>, and must earn its place by the <b class="k">Only Original</b> principle — it draws on a timeless game-family but contributes a new symbol that only <i>its</i> wonder could license.</p>
+            <ul>
+                <li><b>Never asymmetric.</b> Both sides always play by the same rules with mirror-equal forces. (Rules out the pursuit / Tafl / Fox-&amp;-Geese family entirely.)</li>
+                <li><b>The soul is the design logic.</b> Theme dresses the mechanic; it never replaces it. A material (glass, stone, die) only belongs if it <i>changes a rule</i>.</li>
+            </ul>
+            <h3>The panopticum — families already mined</h3>
+            <div class="arch">
+                <div class="yes">✓ Territory / surround — Mausoleum, Colossus, Colosseum</div>
+                <div class="yes">✓ Move &amp; jump — Temple, Great Wall</div>
+                <div class="yes">✓ Stacking — Gardens</div>
+                <div class="yes">✓ Slide &amp; push — Mausoleum, Colossus</div>
+                <div class="yes">✓ Value pieces (dice/number) — Statue, Tower</div>
+                <div class="yes">✓ Line / set completion — Skyscraper, Tower</div>
+                <div class="yes">✓ Light / projection (our invention) — Pharos, Skyscraper</div>
+                <div class="no">✗ Asymmetry — forbidden by house rule</div>
+            </div>
+            <h3>Untapped — the open frontier</h3>
+            <div class="arch">
+                <div class="yes">○ Connection (Hex / TwixT) → <b class="k">claimed by PALACE</b></div>
+                <div class="yes">○ Sowing / growth (mancala) → <b class="k">reserved for CITADEL</b></div>
+                <div class="yes">○ Tile / path laying → candidate for CATHEDRAL</div>
+            </div>
+            <p class="meta" style="margin-top:8px">Note: Gardens' <i>Trail</i> already grazes sowing (dropping one stone per field from a moving stack) — so Citadel must take the <i>full</i> "plant &amp; grow over time" version to stay original.</p>
+        </section>
+
+        <section>
+            <span class="status st-locked">LOCKED</span>
+            <h2>Palace — “The Span”</h2>
+            <p class="wonder">after the Crystal Palace (1851) · felt location: a hall of glass and light · the modern wing</p>
+            <p><b>Family:</b> Connection — the series' first. <b>Why this wonder:</b> the Crystal Palace is the only wonder that is fundamentally a <i>modular kit that spans a distance</i> (Paxton's prefab glass panes + the axial nave &amp; transept). No other wonder licenses connection without borrowing.</p>
+            <h3>Core</h3>
+            <ul>
+                <li>The board is the plan: a long <b>nave</b> crossed at the centre by the <b>transept</b> arch. Cells are glass <b>bays</b>.</li>
+                <li>Each turn, lay one glass pane. <b>Black</b> spans the nave end-to-end (west↔east); <b>White</b> spans across the transept (north↔south). First unbroken chain wins.</li>
+                <li><b>The new symbol — fragility:</b> glass left <b>unsupported</b> by neighbours <b>shatters</b> and is removed. You don't just connect; you connect something that <i>holds</i>. (Repurposes Mausoleum's Collapse from <i>capture</i> into <i>structural tension</i>.)</li>
+                <li>The <b>transept</b> is the shared keystone both spans must cross.</li>
+            </ul>
+            <p class="meta">Open: board proportions (elongation vs. balance), exact support/shatter rule, whether the transept is a single keystone cell or a band. See the live field (Palace, password-gated).</p>
+        </section>
+
+        <section>
+            <span class="status st-reserved">RESERVED</span>
+            <h2>Citadel — “Growth”</h2>
+            <p class="wonder">after Machu Picchu · felt location: the terraced mountain</p>
+            <p><b>Family:</b> Sowing / growth (mancala lineage) — the full version Gardens only hinted at.</p>
+            <h3>Seed idea (Simon's): plant something, and something grows</h3>
+            <ul>
+                <li>You don't place finished pieces — you <b>plant seeds</b>, and on later turns they <b>grow on their own</b> (spread to adjacent terraces / rise a level / yield a new stone). Time is a player.</li>
+                <li>Machu Picchu's <b>agricultural terraces</b> are the board — stepped levels where growth flows downhill or climbs, and where what you sow shapes what you can later reap.</li>
+                <li>Possible Only-Original twist: growth is <b>deterministic and visible</b> (like Frontier turning luck into certainty) — you can read the future of the field and must plan around the harvest, not gamble on it.</li>
+            </ul>
+            <p class="meta">Open: what exactly "grows" (count, height, spread), and the win condition (most harvest? control of terraces?). Keep distinct from Gardens (opaque stacking) and from sowing-as-mere-distribution.</p>
+        </section>
+
+        <section>
+            <span class="status st-open">OPEN</span>
+            <h2>Cathedral — brainstorm</h2>
+            <p class="wonder">after the great Gothic cathedral · felt location: TBD (keep abstract — do NOT drift into Detective Noname's Victorian London)</p>
+            <p>Remaining untapped family best suited here: <b>tile / path-laying</b> (you build the structure as you play). Two candidate directions:</p>
+            <ul>
+                <li><b>Vault-raising (tile-laying):</b> players lay <b>rib/arch tiles</b> to raise the vaulted ceiling bay by bay; a vault only stands if its arches <b>meet and balance</b> (thrust must be answered by counter-thrust) — the Gothic engineering principle as the rule. Score completed vaults.</li>
+                <li><b>Symmetry / the mirror:</b> the cathedral is bilaterally symmetric (nave) and radially symmetric (rose window). A game where a move must be <b>answered in mirror</b>, or where you score by completing symmetric figures, would be a genuinely new abstract primitive. Untested — high originality, needs prototyping.</li>
+            </ul>
+            <p class="meta">Avoid: stained-glass <i>light</i> as the core — that collides with Pharos / Skyscraper. Light may appear only as dressing.</p>
+        </section>
+
+        <p class="footer">Magic is Real — the human element here is the design logic itself. Guard it.</p>
+    </div>
+</body>
+
+</html>

@@ -47,7 +47,7 @@ const games = {
     colosseum: {
         name: 'Colosseum',
         description: 'The Flavian Amphitheatre',
-        status: 'playtest',
+        status: 'available',
         url: 'colosseum.html'
     },
     great_wall: {
@@ -55,6 +55,12 @@ const games = {
         description: 'The Great Wall of China',
         status: 'available',
         url: 'great_wall.html'
+    },
+    tower: {
+        name: 'Tower',
+        description: 'The Porcelain Tower of Nanjing',
+        status: 'available',
+        url: 'tower.html'
     },
     pagoda: {
         name: 'Pagoda',
@@ -74,10 +80,16 @@ const games = {
         status: 'playtest',
         url: 'basilica.html'
     },
+    cathedral: {
+        name: 'Cathedral',
+        description: 'The Gothic Cathedral',
+        status: 'available',
+        url: 'cathedral.html'
+    },
     palace: {
         name: 'Palace',
-        description: 'The Forbidden City',
-        status: 'playtest',
+        description: 'The Crystal Palace',
+        status: 'available',
         url: 'palace.html'
     },
     skyscraper: {
