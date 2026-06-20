@@ -98,20 +98,18 @@ function init3D() {
 
     scene.add(new THREE.HemisphereLight(0xfff4e6, 0x7a6e42, 1.05));
     const dir = new THREE.DirectionalLight(0xffe6bc, 1.45);
-    dir.position.set(150, 560, 130); dir.castShadow = true; // high overhead so light reaches into the bowl
+    dir.position.set(150, 560, 130); dir.castShadow = true;
     dir.shadow.camera.top = 320; dir.shadow.camera.bottom = -320;
     dir.shadow.camera.left = -320; dir.shadow.camera.right = 320;
     dir.shadow.camera.near = 0.5; dir.shadow.camera.far = 2200;
     dir.shadow.mapSize.set(2048, 2048);
-    dir.shadow.normalBias = 1.5;   // kills self-shadow "net" acne on the big flat tiers
+    dir.shadow.normalBias = 1.5;
     dir.shadow.bias = -0.0004;
     scene.add(dir);
 
     scene.add(groupEnv, groupArena, groupPads, groupStones, groupHi, groupHover, groupFX, groupBirds);
 
     buildEnvironment();
-    buildAmphitheater();
-    buildPads();
 
     addEventListener('resize', onResize);
     raycaster = new THREE.Raycaster(); mouse = new THREE.Vector2();
@@ -149,7 +147,6 @@ function buildEnvironment() {
         m.position.set(Math.cos(a) * dist, -2 + h / 2, Math.sin(a) * dist);
         groupEnv.add(m);
     }
-    // cypresses ringing the arena
     for (let i = 0; i < 40; i++) {
         const a = Math.random() * Math.PI * 2, dist = 270 + Math.random() * 500;
         const t = new THREE.Group();
@@ -178,32 +175,27 @@ function ringMesh(rIn, rOut, mat, y) {
     return m;
 }
 function buildAmphitheater() {
-    // ONE solid stepped bowl + outer wall, revolved from a cross-section profile —
-    // gives real thickness and fully-connected tiers (no paper-thin floating rings).
     const P = [
-        [0.5, H[0]], [RIN[1], H[0]],          // arena floor
-        [RIN[1], H[1]], [ROUT[1], H[1]],      // riser 1 + ledge 1
-        [RIN[2], H[2]], [ROUT[2], H[2]],      // riser 2 + ledge 2
-        [RIN[3], H[3]], [ROUT[3], H[3]],      // riser 3 + ledge 3
-        [RIN[4], H[4]], [ROUT[4], H[4]],      // riser 4 + ledge 4 (elevated)
-        [ROUT[4] + 2, H[4]],                  // step out to wall foot
-        [ROUT[4] + 2, WALL_TOP],              // inner wall up
-        [WALL_R, WALL_TOP],                   // top rim across
-        [WALL_R, 0]                           // exterior face down to ground
+        [0.5, H[0]], [RIN[1], H[0]],
+        [RIN[1], H[1]], [ROUT[1], H[1]],
+        [RIN[2], H[2]], [ROUT[2], H[2]],
+        [RIN[3], H[3]], [ROUT[3], H[3]],
+        [RIN[4], H[4]], [ROUT[4], H[4]],
+        [ROUT[4] + 2, H[4]],
+        [ROUT[4] + 2, WALL_TOP],
+        [WALL_R, WALL_TOP],
+        [WALL_R, 0]
     ].map(p => new THREE.Vector2(p[0], p[1]));
     const bowl = new THREE.Mesh(new THREE.LatheGeometry(P, 96), matBowl);
     bowl.castShadow = true; bowl.receiveShadow = true;
     groupArena.add(bowl);
 
-    // arena sand floor (color overlay)
     const floor = new THREE.Mesh(new THREE.CircleGeometry(RIN[1] - 1, 48), matSand);
     floor.rotation.x = -Math.PI / 2; floor.position.y = H[0] + 0.15; floor.receiveShadow = true;
     groupArena.add(floor);
 
-    // field grooves — radial dividers between sectors on every seating ring
     buildGrooves();
 
-    // cornices (arcade levels) + top rim trim
     [24, 48, 70].forEach(y => {
         const cor = new THREE.Mesh(new THREE.CylinderGeometry(WALL_R + 3, WALL_R + 3, 3.5, 96, 1, true), matCornice);
         cor.position.y = y; groupArena.add(cor);
@@ -211,7 +203,6 @@ function buildAmphitheater() {
     const rim = new THREE.Mesh(new THREE.CylinderGeometry(WALL_R + 3, WALL_R + 3, 4, 96, 1, true), matCornice);
     rim.position.y = WALL_TOP; groupArena.add(rim);
 
-    // arcade piers (vertical divisions of the exterior)
     const bays = 40;
     for (let i = 0; i < bays; i++) {
         const a = (i / bays) * Math.PI * 2;
@@ -223,26 +214,23 @@ function buildAmphitheater() {
     }
 }
 
-// Radial grooves so each cell is visually distinct (the steps already divide the rings).
 function buildGrooves() {
     for (let r = 1; r <= 4; r++) {
         const count = COUNTS[r], step = Math.PI * 2 / count;
         const len = ROUT[r] - RIN[r] + 2, midR = (RIN[r] + ROUT[r]) / 2;
         for (let i = 0; i < count; i++) {
-            const a = -Math.PI / 2 + i * step;          // sector boundary
+            const a = -Math.PI / 2 + i * step;
             const dirX = Math.cos(a), dirZ = -Math.sin(a);
             const groove = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.2, len), matGroove);
             groove.position.set(midR * dirX, H[r] + 0.5, midR * dirZ);
             groove.rotation.y = Math.atan2(dirX, dirZ);
             groupArena.add(groove);
         }
-        // a thin lip line along the ledge's outer edge for extra readability
         const lip = new THREE.Mesh(new THREE.CylinderGeometry(ROUT[r] - 0.5, ROUT[r] - 0.5, 1.4, 96, 1, true), matGroove);
         lip.position.y = H[r] + 0.4; groupArena.add(lip);
     }
 }
 
-// clickable + colorable cell pads
 function buildPads() {
     padMeshes.clear();
     while (groupPads.children.length) groupPads.remove(groupPads.children[0]);
@@ -265,7 +253,7 @@ function buildPads() {
 }
 
 // ============================================
-// STONES (series dome + gold bevel)
+// STONES
 // ============================================
 function createStone(colorHex, dark) {
     const g = new THREE.Group();
@@ -374,9 +362,13 @@ function colVictory(color) { needsRender = true; }
 
 function colRebuild() {
     stoneMeshes.forEach(m => groupStones.remove(m)); stoneMeshes.clear();
+    while (groupArena.children.length) groupArena.remove(groupArena.children[0]);
+    while (groupPads.children.length) groupPads.remove(groupPads.children[0]);
     while (groupHi.children.length) groupHi.remove(groupHi.children[0]);
     while (groupFX.children.length) groupFX.remove(groupFX.children[0]);
     clearHover();
+    buildAmphitheater();
+    buildPads();
     colSync3D(); colUpdateViews();
 }
 

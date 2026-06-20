@@ -2,7 +2,7 @@
 // Game Design: Simon Allmer
 // Concentric-ring arena. Armies start on the elevated safe outer ring and
 // descend to fight in the arena: majority takes a cell, ties stand off (lock),
-// claimed cells become territory you can redeploy to. Last army standing wins.
+// claimed cells become territory you can redeploy to. Last commander standing wins.
 
 // ============================================
 // BOARD MODEL — 5 rings, 89 cells
@@ -17,28 +17,6 @@ var COL_COUNTS = [1, 8, 16, 32, 32];
 function colRing(c) { return c === 0 ? 0 : c <= 8 ? 1 : c <= 24 ? 2 : c <= 56 ? 3 : 4; }
 function colSector(c) { return c === 0 ? 0 : c <= 8 ? c - 1 : c <= 24 ? c - 9 : c <= 56 ? c - 25 : c - 57; }
 function colId(ring, sec) { return ring === 0 ? 0 : ring === 1 ? 1 + sec : ring === 2 ? 9 + sec : ring === 3 ? 25 + sec : 57 + sec; }
-
-function colAdj(cell) {
-    var r = colRing(cell), s = colSector(cell), adj = new Set();
-    if (r === 0) { for (var i = 0; i < 8; i++) adj.add(colId(1, i)); }
-    else if (r === 1) {
-        adj.add(0);
-        adj.add(colId(1, (s + 1) % 8)); adj.add(colId(1, (s + 7) % 8));
-        adj.add(colId(2, s * 2)); adj.add(colId(2, s * 2 + 1));
-    } else if (r === 2) {
-        adj.add(colId(2, (s + 1) % 16)); adj.add(colId(2, (s + 15) % 16));
-        adj.add(colId(1, Math.floor(s / 2)));
-        adj.add(colId(3, s * 2)); adj.add(colId(3, s * 2 + 1));
-    } else if (r === 3) {
-        adj.add(colId(3, (s + 1) % 32)); adj.add(colId(3, (s + 31) % 32));
-        adj.add(colId(2, Math.floor(s / 2)));
-        adj.add(colId(4, s));
-    } else {
-        adj.add(colId(4, (s + 1) % 32)); adj.add(colId(4, (s + 31) % 32));
-        adj.add(colId(3, s));
-    }
-    return [...adj];
-}
 
 // ============================================
 // COLORS / SETUP
@@ -119,35 +97,56 @@ function isStandoff(cell) {
 }
 
 function colMoveOptions(stone) {
-    var r = colRing(stone.cell), s = colSector(stone.cell);
+    var r = colRing(stone.cell), s = colSector(stone.cell), color = stone.color;
     var dests = new Set();
 
-    // base adjacency: rings 0–3 freely; a ring-4 neighbour only if empty (the ring is safe — no landing on others)
-    colAdj(stone.cell).forEach(function (c) {
-        if (colRing(c) === 4) { if (!colStones.some(function (x) { return x.cell === c; })) dests.add(c); }
-        else dests.add(c);
-    });
+    // — run INWARD (multi-step, toward centre)
+    if (r > 0) {
+        var cr = r, cs = s;
+        while (cr > 0) {
+            var nextCell;
+            if (cr === 4)      { nextCell = colId(3, cs); cr = 3; }
+            else if (cr === 3) { var ps = Math.floor(cs / 2); nextCell = colId(2, ps); cr = 2; cs = ps; }
+            else if (cr === 2) { var ps = Math.floor(cs / 2); nextCell = colId(1, ps); cr = 1; cs = ps; }
+            else               { nextCell = 0; cr = 0; }
+            var occ = stonesAt(nextCell);
+            var hasEnemy = occ.some(function (x) { return x.color !== color; });
+            if (occ.length === 0) { dests.add(nextCell); }
+            else if (hasEnemy)    { dests.add(nextCell); break; }
+        }
+    }
 
-    // territory redeploy — your claimed cells on rings 1–3
-    Object.entries(colTerritory).forEach(function (e) {
-        var c = Number(e[0]);
-        if (e[1] === stone.color && c !== stone.cell && colRing(c) !== 4) dests.add(c);
-    });
-
-    // The outer ring is neutral ground held by everyone: a stone already on it may slide ANY
-    // distance around the ring, passing empty cells and its OWN stones, blocked only by a stone
-    // of a DIFFERENT colour in the way. It lands on an empty cell.
-    if (r === 4) {
+    // — run CIRCLE (same ring)
+    if (COL_COUNTS[r] > 1) {
         [1, -1].forEach(function (dir) {
-            for (var k = 1; k < 32; k++) {
-                var c = colId(4, (s + dir * k + 32) % 32);
-                var occ = colStones.filter(function (x) { return x.cell === c; });
-                if (occ.some(function (x) { return x.color !== stone.color; })) break; // enemy in the way blocks
-                if (occ.length === 0) dests.add(c);                                    // empty cell = valid landing
-                // own stone: pass through, keep sliding
+            for (var k = 1; k < COL_COUNTS[r]; k++) {
+                var nc = colId(r, (s + dir * k + COL_COUNTS[r]) % COL_COUNTS[r]);
+                var occ = stonesAt(nc);
+                var hasEnemy = occ.some(function (x) { return x.color !== color; });
+                if (occ.length === 0) { dests.add(nc); }
+                else if (hasEnemy)    { if (r !== 4) dests.add(nc); break; }
             }
         });
     }
+
+    // — jump OUTWARD (single step, away from centre)
+    if (r === 0) {
+        for (var i = 0; i < 8; i++) dests.add(colId(1, i));
+    } else if (r === 1) {
+        dests.add(colId(2, s * 2)); dests.add(colId(2, s * 2 + 1));
+    } else if (r === 2) {
+        dests.add(colId(3, s * 2)); dests.add(colId(3, s * 2 + 1));
+    } else if (r === 3) {
+        var c = colId(4, s);
+        if (!colStones.some(function (x) { return x.cell === c; })) dests.add(c);
+    }
+
+    // — territory redeploy (rings 1–3)
+    Object.entries(colTerritory).forEach(function (e) {
+        var c = Number(e[0]);
+        if (e[1] === color && c !== stone.cell && colRing(c) !== 4) dests.add(c);
+    });
+
     return [...dests];
 }
 
@@ -180,7 +179,6 @@ function colTap(cell) {
     if (colSelected !== null) {
         var s = colStones.find(function (x) { return x.id === colSelected; });
         if (s && colMoveOptions(s).indexOf(cell) !== -1) { doMove(s, cell); return; }
-        // re-select own stone on another cell
         var mine = stonesAt(cell).filter(function (x) { return x.color === colTurn; });
         if (mine.length && !isStandoff(cell) && mine[0].id !== colSelected) { colSelected = mine[0].id; refresh(); return; }
         colSelected = null; refresh();
@@ -200,8 +198,6 @@ function doMove(s, cell) {
         if (cell !== 0 && colRing(cell) !== 4) colTerritory[cell] = s.color;
         colSelected = null;
         var removed = resolveConflicts();
-
-        // Eliminate commanders reduced below 4 stones
         var elimMsgs = [];
         colPlayers.forEach(function (p) {
             var cnt = colStones.filter(function (x) { return x.color === p; }).length;
@@ -211,7 +207,6 @@ function doMove(s, cell) {
                 colStones = colStones.filter(function (x) { return x.color !== p; });
             }
         });
-
         var finish = function () {
             colBusy = false;
             if (elimMsgs.length) showMessage(elimMsgs.join(', ') + ' eliminated from the arena!');
@@ -307,7 +302,6 @@ function newColosseum() {
     colBusy = false; colGameOver = false;
     if (messageBox) messageBox.classList.remove('visible');
     colPlayers = COL_SETUP[colPlayerCount].map(function (p) { return p.color; });
-    // Set AI defaults
     colPlayers.forEach(function (p) {
         if (p === 'W') colIsComputer[p] = false;
         else colIsComputer[p] = colPlayerCount > 2 || !!colIsComputer[p];
@@ -343,7 +337,6 @@ window.setColPlayerCount = setColPlayerCount;
 if (resetButton) resetButton.addEventListener('click', function () { newColosseum(); showMessage('The arena is reset.'); });
 
 document.addEventListener('DOMContentLoaded', function () {
-    // default 2 players
     var b2 = document.getElementById('col-btn-2p'); if (b2) b2.classList.add('active');
     newColosseum();
 });
