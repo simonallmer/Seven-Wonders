@@ -173,7 +173,6 @@ class LibraryGame {
         if (this.selectedAction === 'LAY') {
             if (type === 'h') {
                 if (this.hWalls[r][c]) return this.log("A wall already exists here.");
-                if (r === 0 || r === BOARD_SIZE - 2) return this.log("Cannot place walls on starting outer lines.");
                 
                 this.hWalls[r][c] = true;
                 this.log(`${cp.name} laid a horizontal wall.`);
@@ -181,7 +180,6 @@ class LibraryGame {
                 this.endTurn();
             } else {
                 if (this.vWalls[r][c]) return this.log("A wall already exists here.");
-                if ((c === 0 || c === BOARD_SIZE - 2) && this.numPlayers > 2) return this.log("Cannot place walls on side outer lines in 3/4 player mode.");
                 
                 this.vWalls[r][c] = true;
                 this.log(`${cp.name} laid a vertical wall.`);
