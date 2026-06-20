@@ -554,7 +554,6 @@ game.on('onInit', (data) => {
             if (data.fields[r][c]) createPlate(r, c);
         }
     }
-    setUIAction('LAY');
 });
     statusText.innerText = `${data.player.name} to move`;
     playerColorBox.style.backgroundColor = '#' + data.player.colorHex.toString(16).padStart(6, '0');
