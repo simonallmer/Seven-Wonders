@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Version History — Seven Wonders</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;700&family=Crimson+Text:wght@400;600&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --gold: #C5A059; --stone: #f5f1e8; }
+        body { background: #0c0c0c; background-image: radial-gradient(ellipse at 50% -10%, #1a1612, #0c0c0c 70%); color: var(--stone); font-family: 'Crimson Text', serif; min-height: 100vh; padding: 24px 16px 80px; }
+        .back-link { position: fixed; top: 18px; left: 18px; z-index: 10; color: var(--gold); text-decoration: none; font-family: 'Cinzel', serif; font-size: .9rem; border: 1px solid rgba(197, 160, 89, .4); padding: 8px 16px; border-radius: 6px; background: rgba(0, 0, 0, .4); }
+        .back-link:hover { background: rgba(197, 160, 89, .15); }
+        .wrap { max-width: 750px; margin: 0 auto; }
+        h1 { font-family: 'Cinzel', serif; font-size: 2.2rem; letter-spacing: .12em; color: var(--gold); text-align: center; margin-top: 6px; }
+        .sub { text-align: center; font-style: italic; opacity: .7; letter-spacing: .1em; margin-bottom: 30px; }
+        section { background: linear-gradient(160deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, .015)); border: 1px solid rgba(197, 160, 89, .28); border-radius: 12px; padding: 22px 26px; margin-bottom: 22px; }
+        h2 { font-family: 'Cinzel', serif; color: var(--gold); font-size: 1.35rem; letter-spacing: .08em; margin-bottom: 14px; }
+        .changelog { list-style: none; margin-top: 8px; }
+        .changelog li { padding: 6px 0; font-size: 1.02rem; line-height: 1.6; opacity: .92; }
+        .changelog li::before { content: "— "; color: var(--gold); opacity: .6; }
+        .changelog li a { color: var(--gold); text-decoration: none; }
+        .changelog li a:hover { text-decoration: underline; }
+    </style>
+</head>
+
+<body>
+    <a href="index.html" class="back-link">← Menu</a>
+
+    <div class="wrap">
+        <h1>Version 0.0.1</h1>
+        <p class="sub">20 June 2026</p>
+
+        <section>
+            <h2>What's New</h2>
+            <ul class="changelog">
+                <li><a href="colosseum.html">Colosseum</a> has been released.</li>
+            </ul>
+        </section>
+    </div>
+
+
+</body>
+
+</html>

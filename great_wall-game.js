@@ -97,7 +97,7 @@ function showMessage(text, duration) {
     window.msgTimeout = setTimeout(function () { gameMessage.classList.add('hidden'); }, duration);
 }
 
-function setPrompt(text) { if (actionPrompt) actionPrompt.textContent = text || ''; }
+function setPrompt(text) { if (actionPrompt) actionPrompt.textContent = ''; }
 
 // ============================================
 // RULE HELPERS

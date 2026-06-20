@@ -143,19 +143,14 @@
         });
 
         // Pin the bottom UI to the VISIBLE viewport. On mobile Safari a `position:fixed;
-        // bottom` bar anchors to the layout viewport and hides behind the browser toolbar /
-        // below the fold — so the action buttons vanished on tablet/phone. We lift them by
-        // however much of the layout viewport is currently hidden below the visual viewport,
-        // plus the home-indicator safe area.
+        // bottom` bar anchors to the layout viewport — CSS `env(safe-area-inset-bottom)` handles it now.
         (function () {
             const bar = document.querySelector('.action-bar');
-            const prompt = document.querySelector('.action-prompt');
             function pin() {
-                let hiddenBelow = 0;
                 const vv = window.visualViewport;
-                if (vv) hiddenBelow = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
-                if (bar) bar.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + 20) + 'px)';
-                if (prompt) prompt.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + 74) + 'px)';
+                if (!vv) return;
+                var hiddenBelow = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+                if (bar) bar.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + 12) + 'px)';
             }
             if (window.visualViewport) {
                 window.visualViewport.addEventListener('resize', pin);
@@ -165,7 +160,7 @@
             window.addEventListener('orientationchange', pin);
             window.addEventListener('load', pin);
             pin();
-            setTimeout(pin, 300); // after iOS settles its toolbars
+            setTimeout(pin, 300);
         })();
     </script>
     <script src="global-keys.js"></script>
