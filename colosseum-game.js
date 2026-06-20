@@ -45,7 +45,7 @@ function colAdj(cell) {
 // ============================================
 var COL_COLORS = {
     W: { name: 'White', stone: 0xf4efe4, terr: 0xc8ddb8, hi: 0x90c880 },
-    B: { name: 'Black', stone: 0x1d1d1d, terr: 0x8a8078, hi: 0xb0a898 },
+    B: { name: 'Black', stone: 0x1d1d1d, terr: 0x4a4a4a, hi: 0x666666 },
     Bl: { name: 'Blue', stone: 0x2a5db0, terr: 0xa8c4e0, hi: 0x68a0d0 },
     R: { name: 'Red', stone: 0xc02828, terr: 0xe0a8a8, hi: 0xd06060 }
 };
@@ -67,6 +67,7 @@ var colPlayers = ['B', 'W'];
 var colPlayerCount = 2;
 var colBusy = false;
 var colGameOver = false;
+var colIsComputer = {};    // color -> bool
 
 window.getColState = function () {
     var sel = colSelected !== null ? colStones.find(function (s) { return s.id === colSelected; }) : null;
@@ -199,9 +200,22 @@ function doMove(s, cell) {
         if (cell !== 0 && colRing(cell) !== 4) colTerritory[cell] = s.color;
         colSelected = null;
         var removed = resolveConflicts();
+
+        // Eliminate commanders reduced below 4 stones
+        var elimMsgs = [];
+        colPlayers.forEach(function (p) {
+            var cnt = colStones.filter(function (x) { return x.color === p; }).length;
+            if (cnt < 4 && cnt > 0) {
+                elimMsgs.push(COL_COLORS[p].name);
+                colStones.filter(function (x) { return x.color === p; }).forEach(function (x) { removed.push(x); });
+                colStones = colStones.filter(function (x) { return x.color !== p; });
+            }
+        });
+
         var finish = function () {
             colBusy = false;
-            if (removed.length) showMessage(removed.length + ' outnumbered stone' + (removed.length > 1 ? 's' : '') + ' cleared from the sand.');
+            if (elimMsgs.length) showMessage(elimMsgs.join(', ') + ' eliminated from the arena!');
+            else if (removed.length) showMessage(removed.length + ' outnumbered stone' + (removed.length > 1 ? 's' : '') + ' cleared from the sand.');
             nextTurn();
         };
         if (removed.length && window.colAnimRemove) window.colAnimRemove(removed, finish); else finish();
@@ -216,13 +230,14 @@ function nextTurn() {
     while (!colStones.some(function (s) { return s.color === colPlayers[idx]; }) && tries < colPlayers.length) { idx = (idx + 1) % colPlayers.length; tries++; }
     colTurn = colPlayers[idx];
     refresh();
+    if (!colGameOver && colIsComputer[colTurn]) setTimeout(colAI, 800);
 }
 
 function endGame(winner) {
     colGameOver = true;
     refresh();
     var title = winner ? COL_COLORS[winner].name + ' Wins!' : 'Draw';
-    var text = winner ? COL_COLORS[winner].name + ' is the last army standing in the arena.' : 'No armies remain.';
+    var text = winner ? COL_COLORS[winner].name + ' is the last commander standing in the arena!' : 'No commanders remain.';
     if (messageTitle) messageTitle.textContent = title;
     if (messageText) messageText.textContent = text;
     if (messageBox) messageBox.classList.add('visible');
@@ -251,6 +266,40 @@ function refresh() {
 }
 
 // ============================================
+// AI
+// ============================================
+function colAI() {
+    if (colGameOver || colBusy) return;
+    var myStones = colStones.filter(function (s) { return s.color === colTurn; });
+    if (!myStones.length) return;
+    var bestMove = null, bestScore = -Infinity;
+    myStones.forEach(function (s) {
+        colMoveOptions(s).forEach(function (c) {
+            var score = Math.random();
+            var at = stonesAt(c);
+            var myCount = at.filter(function (x) { return x.color === s.color; }).length + 1;
+            var opps = {};
+            at.forEach(function (x) { if (x.color !== s.color) opps[x.color] = (opps[x.color] || 0) + 1; });
+            Object.keys(opps).forEach(function (oc) { if (myCount > opps[oc]) score += 100; });
+            if (colRing(c) >= 1 && colRing(c) <= 3 && colTerritory[c] !== s.color) score += 10;
+            if (colRing(c) === 4) score += 5;
+            if (score > bestScore) { bestScore = score; bestMove = { stone: s, cell: c }; }
+        });
+    });
+    if (bestMove) doMove(bestMove.stone, bestMove.cell);
+}
+
+function toggleColOpponent() {
+    var opp = colPlayers.find(function (x) { return x !== 'W'; });
+    if (!opp) return;
+    colIsComputer[opp] = !colIsComputer[opp];
+    var ob = document.getElementById('col-opponent-btn');
+    if (ob) ob.textContent = 'Opponent: ' + (colIsComputer[opp] ? 'Computer' : 'Human');
+    showMessage(colIsComputer[opp] ? 'Computer opponent' : 'Human opponent');
+}
+window.toggleColOpponent = toggleColOpponent;
+
+// ============================================
 // SETUP
 // ============================================
 function newColosseum() {
@@ -258,6 +307,16 @@ function newColosseum() {
     colBusy = false; colGameOver = false;
     if (messageBox) messageBox.classList.remove('visible');
     colPlayers = COL_SETUP[colPlayerCount].map(function (p) { return p.color; });
+    // Set AI defaults
+    colPlayers.forEach(function (p) {
+        if (p === 'W') colIsComputer[p] = false;
+        else colIsComputer[p] = colPlayerCount > 2 || !!colIsComputer[p];
+    });
+    var ob = document.getElementById('col-opponent-btn');
+    if (ob) {
+        if (colPlayerCount > 2) ob.style.display = 'none';
+        else { ob.style.display = ''; ob.textContent = 'Opponent: ' + (colIsComputer[colPlayers.find(function (x) { return x !== 'W'; })] ? 'Computer' : 'Human'); }
+    }
     COL_SETUP[colPlayerCount].forEach(function (setup) {
         for (var i = 0; i < 8; i++) {
             var cell = colId(4, (setup.start + i) % 32);

@@ -18,7 +18,7 @@
     </div>
 
     <div class="top-bar">
-        <a href="index.html" class="top-bar-btn top-bar-link">← Menu</a>
+        <a href="index.html?menu=new" class="top-bar-btn top-bar-link">← Menu</a>
         <button id="menu-toggle" class="top-bar-btn menu-toggle-btn"><span></span><span></span><span></span></button>
     </div>
 
@@ -46,6 +46,7 @@
                 </div>
             </div>
 
+            <button id="col-opponent-btn" class="menu-btn" onclick="toggleColOpponent()">Opponent: Human</button>
             <button id="rules-btn" class="menu-btn">Rules</button>
             <button id="reset-button" class="menu-btn">Reset Game</button>
             <button id="close-menu-btn" class="menu-btn">Close Menu</button>
@@ -66,7 +67,7 @@
             <p id="message-text" class="message-text"></p>
             <div class="modal-buttons">
                 <button onclick="newColosseum()" class="modal-btn" id="play-again-btn">Play Again</button>
-                <a href="index.html" class="modal-btn secondary">Menu</a>
+                <a href="index.html?menu=new" class="modal-btn secondary">Menu</a>
             </div>
         </div>
     </div>
@@ -76,11 +77,12 @@
         <div class="rules-content">
             <h2>Colosseum Rules</h2>
             <div class="rules-body">
-                <p><strong>GOAL</strong><br>Be the last army standing in the arena. Each side begins with 8 stones on the elevated outer ring.</p>
+                <p><strong>GOAL</strong><br>Reduce each opponent below 4 stones to be the last commander standing. Each army begins with 8 stones on the elevated outer ring.</p>
                 <p><strong>DESCEND</strong><br>On your turn, tap one of your stones, then a highlighted cell — an adjacent ring/sector, inward or outward — to move it one step. The outer ring is safe; the arena below is where blood is spilt.</p>
-                <p><strong>MAJORITY</strong><br>When stones of different colors share a cell, whoever has the most survives — the outnumbered are cleared away. The outer ring never resolves combat.</p>
+                <p><strong>MAJORITY</strong><br>When stones of different colors share a cell inside the arena, whoever has the most survives — the outnumbered are cleared away. The outer ring never resolves combat.</p>
                 <p><strong>STANDOFF</strong><br>Equal forces on a cell lock in a standoff: those stones cannot move until the balance is broken.</p>
                 <p><strong>TERRITORY</strong><br>A cell you move into (rings inside the arena) becomes your territory — you may redeploy any of your stones straight to it from anywhere.</p>
+                <p><strong>DEFEAT</strong><br>A commander reduced below 4 stones is eliminated from the arena — all their remaining stones are routed.</p>
             </div>
             <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
         </div>

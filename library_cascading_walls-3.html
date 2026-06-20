@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dominoverse: Cascading Walls</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Custom Board Styles using alternating grid template for 7 fields and 6 gaps */
+    .board-grid {
+      display: grid;
+      /* 7 fields (1fr) and 6 gaps (12px) in between */
+      grid-template-columns: 1fr 12px 1fr 12px 1fr 12px 1fr 12px 1fr 12px 1fr 12px 1fr;
+      grid-template-rows: 1fr 12px 1fr 12px 1fr 12px 1fr 12px 1fr 12px 1fr 12px 1fr;
+      position: relative;
+    }
+    
+    /* Horizontal Walls sit in the row gaps */
+    .h-wall-trigger {
+      height: 100%;
+      width: 100%;
+      z-index: 20;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border-radius: 4px;
+    }
+    
+    /* Vertical Walls sit in the column gaps */
+    .v-wall-trigger {
+      height: 100%;
+      width: 100%;
+      z-index: 20;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border-radius: 4px;
+    }
+
+    /* Active wall blocks */
+    .wall-active {
+      background-color: #64748b; /* slate-500 */
+      box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+    }
+
+    /* Pulse effect for valid targets */
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(0.96); }
+    }
+    .valid-target {
+      animation: pulse-subtle 2s infinite ease-in-out;
+      box-shadow: 0 0 10px #10b981;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-teal-500 selection:text-slate-900">
+
+  <!-- Header -->
+  <header class="bg-slate-800 border-b border-slate-700 py-4 px-6 shadow-md">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="bg-teal-500 text-slate-950 p-2 rounded-lg font-black text-xl tracking-wider shadow-md shadow-teal-500/20">
+          DV
+        </div>
+        <div>
+          <h1 class="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">
+            DOMINOVERSE
+          </h1>
+          <p class="text-xs text-slate-400 font-medium">Cascading Walls & Dynamic Mazes</p>
+        </div>
+      </div>
+
+      <!-- Action / Game Status Message Bar -->
+      <div id="game-status" class="bg-slate-850 px-4 py-2 rounded-lg border border-slate-700 text-sm text-slate-300 max-w-md text-center">
+        Welcome! Choose the number of players to begin.
+      </div>
+
+      <!-- Quick Controls -->
+      <div class="flex items-center gap-2">
+        <button onclick="openRules()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-xs font-semibold transition flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-info"></i> Rules
+        </button>
+        <button onclick="resetGame()" class="bg-rose-600 hover:bg-rose-500 px-3 py-1.5 rounded text-xs font-bold text-white transition flex items-center gap-1.5 shadow-lg shadow-rose-600/10">
+          <i class="fa-solid fa-arrow-rotate-left"></i> Restart
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Setup Screen Overlay / Init Selector -->
+  <div id="setup-screen" class="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center p-4 transition-all duration-300">
+    <div class="bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-2xl max-w-md w-full text-center">
+      <h2 class="text-3xl font-black mb-2 text-teal-400">Setup New Game</h2>
+      <p class="text-slate-400 text-sm mb-6">Select the number of players to prepare the 7x7 board.</p>
+      
+      <div class="grid grid-cols-3 gap-4 mb-8">
+        <button onclick="initGame(2)" class="bg-slate-700 hover:bg-teal-600 hover:text-slate-950 p-4 rounded-xl font-bold transition duration-200 group">
+          <div class="text-2xl mb-1 group-hover:scale-110 transition">2</div>
+          <div class="text-xs opacity-80">Players</div>
+        </button>
+        <button onclick="initGame(3)" class="bg-slate-700 hover:bg-teal-600 hover:text-slate-950 p-4 rounded-xl font-bold transition duration-200 group">
+          <div class="text-2xl mb-1 group-hover:scale-110 transition">3</div>
+          <div class="text-xs opacity-80">Players</div>
+        </button>
+        <button onclick="initGame(4)" class="bg-slate-700 hover:bg-teal-600 hover:text-slate-950 p-4 rounded-xl font-bold transition duration-200 group">
+          <div class="text-2xl mb-1 group-hover:scale-110 transition">4</div>
+          <div class="text-xs opacity-80">Players</div>
+        </button>
+      </div>
+
+      <div class="text-left bg-slate-900/50 p-4 rounded-lg border border-slate-700/50 text-xs text-slate-400 space-y-2">
+        <p class="font-semibold text-slate-300">Game Overview (7x7 Board):</p>
+        <p>• Lay down field plates to create a walkable path, or place walls to block opponents.</p>
+        <p>• Only ONE starting plate is placed in the exact middle of each player's starting line.</p>
+        <p>• Slide/push walls when multiple are connected, shifting the maze dynamically.</p>
+        <p>• Topple a wall onto adjacent spaces. If there's no plate there, the fallen wall instantly becomes a new plate! Crushes any player's stone in its way.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rules Modal -->
+  <div id="rules-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 p-6 rounded-xl shadow-2xl max-w-lg w-full">
+      <div class="flex items-center justify-between mb-4 border-b border-slate-700 pb-2">
+        <h3 class="text-xl font-bold text-teal-400 flex items-center gap-2">
+          <i class="fa-solid fa-circle-info"></i> How to Play Dominoverse
+        </h3>
+        <button onclick="closeRules()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="text-sm space-y-3 text-slate-300 max-h-[70vh] overflow-y-auto pr-2">
+        <p><strong class="text-teal-400">Goal:</strong> Reach any of the 7 fields on your opposite side of the board before your opponents do.</p>
+        
+        <p><strong class="text-teal-400">Game Setup:</strong> The 7x7 board starts empty except for exactly one starting field plate placed in the middle of each player's side. Players start off-board and must deploy onto their starting plate to begin.</p>
+        
+        <h4 class="font-bold text-slate-200 mt-4 border-l-2 border-teal-500 pl-2">Your Actions (Choose 1 per turn):</h4>
+        <ul class="list-disc pl-5 space-y-2">
+          <li><strong>Lay Plate / Wall:</strong> Click any empty cell block to lay a walkable Plate, OR click any empty grid-gap line to place a Wall. <em>Note: No starting line boundaries can be walled to avoid trapping players.</em></li>
+          <li><strong>Move Figure:</strong> Move your stone 1 cell orthogonally. You can only move onto placed Field Plates, and you cannot cross any standing walls.</li>
+          <li><strong>Push Wall:</strong> Slide a standing wall by 1 space. If other walls are connected to it in the push direction, they slide along too (propagation), provided there is an empty gap at the end to accommodate the shift.</li>
+          <li><strong>Topple Wall (Domino Smash):</strong> Select a wall and a fall direction. The wall collapses flat onto the adjacent fields. Any fallen wall block automatically becomes a walkable plate (even if the space was completely empty before!). Any player stone on those fields is crushed and returned to their reserve off-board. Parallel adjacent walls continue the chain reaction!</li>
+        </ul>
+      </div>
+      <div class="mt-6 text-right">
+        <button onclick="closeRules()" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm transition">
+          Got it!
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Game Layout -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    
+    <!-- Left Column: Active Game Status, Reserves, Control Pad -->
+    <div class="lg:col-span-4 space-y-6">
+      
+      <!-- Current Turn Card -->
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg relative overflow-hidden">
+        <div id="turn-accent" class="absolute left-0 top-0 bottom-0 w-2 bg-teal-500"></div>
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <span class="text-xs uppercase font-extrabold text-slate-400 tracking-wider">Current Turn</span>
+            <h2 id="current-player-name" class="text-2xl font-black text-teal-400 mt-0.5">Player 1</h2>
+          </div>
+          <!-- Player Stone Indicator -->
+          <div id="player-token-indicator" class="w-10 h-10 rounded-full flex items-center justify-center border-4 shadow-md bg-teal-500 text-slate-950 border-teal-300 font-bold">
+            P1
+          </div>
+        </div>
+
+        <div class="space-y-2 text-xs text-slate-300 border-t border-slate-700/50 pt-3">
+          <div class="flex justify-between">
+            <span>Opposite Goal:</span>
+            <span id="player-goal-desc" class="font-semibold text-teal-400">Top Row</span>
+          </div>
+          <div class="flex justify-between">
+            <span>Reserve Status:</span>
+            <span id="player-reserve-desc" class="font-semibold">Off Board (Ready)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Panel -->
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg">
+        <h3 class="text-xs uppercase font-extrabold text-slate-400 tracking-wider mb-3">Choose Action</h3>
+        
+        <div class="grid grid-cols-1 gap-2.5">
+          <!-- LAY PLATE / WALL (CONSOLIDATED) -->
+          <button id="btn-action-lay" onclick="setAction('LAY')" class="action-btn flex items-center justify-between p-3 rounded-lg border bg-slate-700/50 border-slate-600 hover:bg-slate-700 transition duration-150 text-left">
+            <div class="flex items-center gap-3">
+              <span class="bg-emerald-500/15 text-emerald-400 p-2 rounded-lg text-sm w-9 h-9 flex items-center justify-center">
+                <i class="fa-solid fa-square-plus"></i>
+              </span>
+              <div>
+                <span class="font-bold block text-sm">Lay Plate / Wall</span>
+                <span class="text-xxs text-slate-400 block mt-0.5">Place tile on cell OR wall in gap</span>
+              </div>
+            </div>
+            <span class="text-xs text-slate-500"><i class="fa-solid fa-chevron-right"></i></span>
+          </button>
+
+          <!-- MOVE FIGURE -->
+          <button id="btn-action-move-figure" onclick="setAction('MOVE_FIGURE')" class="action-btn flex items-center justify-between p-3 rounded-lg border bg-slate-700/50 border-slate-600 hover:bg-slate-700 transition duration-150 text-left">
+            <div class="flex items-center gap-3">
+              <span class="bg-blue-500/15 text-blue-400 p-2 rounded-lg text-sm w-9 h-9 flex items-center justify-center">
+                <i class="fa-solid fa-chess-pawn"></i>
+              </span>
+              <div>
+                <span class="font-bold block text-sm">Move Figure</span>
+                <span class="text-xxs text-slate-400 block mt-0.5">Spawn or walk orthogonally</span>
+              </div>
+            </div>
+            <span class="text-xs text-slate-500"><i class="fa-solid fa-chevron-right"></i></span>
+          </button>
+
+          <!-- PUSH WALL -->
+          <button id="btn-action-push-wall" onclick="setAction('PUSH_WALL')" class="action-btn flex items-center justify-between p-3 rounded-lg border bg-slate-700/50 border-slate-600 hover:bg-slate-700 transition duration-150 text-left">
+            <div class="flex items-center gap-3">
+              <span class="bg-purple-500/15 text-purple-400 p-2 rounded-lg text-sm w-9 h-9 flex items-center justify-center">
+                <i class="fa-solid fa-arrows-left-right"></i>
+              </span>
+              <div>
+                <span class="font-bold block text-sm">Push Wall</span>
+                <span class="text-xxs text-slate-400 block mt-0.5">Slide connected walls together</span>
+              </div>
+            </div>
+            <span class="text-xs text-slate-500"><i class="fa-solid fa-chevron-right"></i></span>
+          </button>
+
+          <!-- TOPPLE WALL -->
+          <button id="btn-action-topple-wall" onclick="setAction('TOPPLE_WALL')" class="action-btn flex items-center justify-between p-3 rounded-lg border bg-slate-700/50 border-slate-600 hover:bg-slate-700 transition duration-150 text-left">
+            <div class="flex items-center gap-3">
+              <span class="bg-rose-500/15 text-rose-400 p-2 rounded-lg text-sm w-9 h-9 flex items-center justify-center">
+                <i class="fa-solid fa-angles-down"></i>
+              </span>
+              <div>
+                <span class="font-bold block text-sm">Topple Wall</span>
+                <span class="text-xxs text-slate-400 block mt-0.5">Domino cascade & crush stones</span>
+              </div>
+            </div>
+            <span class="text-xs text-slate-500"><i class="fa-solid fa-chevron-right"></i></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Player Standings / Reserves status -->
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg">
+        <h3 class="text-xs uppercase font-extrabold text-slate-400 tracking-wider mb-3">Player Roster</h3>
+        <div id="player-list" class="space-y-3">
+          <!-- Populated Dynamically -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: Interactive Board -->
+    <div class="lg:col-span-8 flex flex-col items-center">
+      
+      <!-- Directional Indicator Helpers around the Board -->
+      <div class="w-full max-w-[550px] bg-slate-800 border border-slate-700 rounded-2xl p-4 md:p-6 shadow-2xl flex flex-col items-center">
+        
+        <!-- TOP ZONE GOAL -->
+        <div class="w-full text-center text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest flex items-center justify-center gap-2">
+          <i class="fa-solid fa-caret-down animate-bounce text-emerald-400"></i>
+          <span id="top-goal-label">Top Goal Line</span>
+          <i class="fa-solid fa-caret-down animate-bounce text-emerald-400"></i>
+        </div>
+
+        <div class="relative w-full aspect-square max-w-[460px] bg-slate-950 p-3 rounded-xl border-4 border-slate-800 shadow-inner">
+          
+          <!-- Interactive Board Container (Integrated CSS alternating layout for 7x7) -->
+          <div id="game-board" class="board-grid h-full w-full">
+            <!-- Fields and wall triggers generated dynamically by JavaScript -->
+          </div>
+
+        </div>
+
+        <!-- BOTTOM ZONE GOAL -->
+        <div class="w-full text-center text-xs font-bold text-slate-400 mt-4 uppercase tracking-widest flex items-center justify-center gap-2">
+          <i class="fa-solid fa-caret-up animate-bounce text-cyan-400"></i>
+          <span id="bottom-goal-label">Bottom Goal Line</span>
+          <i class="fa-solid fa-caret-up animate-bounce text-cyan-400"></i>
+        </div>
+
+      </div>
+
+      <!-- Live Log/Action feedback -->
+      <div class="w-full max-w-[550px] mt-4 bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 text-xs text-slate-400 flex items-start gap-2">
+        <span class="text-teal-400"><i class="fa-solid fa-clock-rotate-left"></i></span>
+        <div id="game-log" class="line-clamp-2">
+          Game initialized. Setup your pieces to start navigating the shifting arena.
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Interactive Help Footer / Info -->
+  <footer class="bg-slate-950 text-slate-500 py-4 text-center text-xs border-t border-slate-800">
+    <p>© 2026 Dominoverse Board Game. Designed with advanced push & topple vector mathematics.</p>
+  </footer>
+
+  <script>
+    // Game State variables
+    const BOARD_SIZE = 7; // Configured to 7x7 fields
+    let numPlayers = 2;
+    let currentPlayer = 0;
+    let selectedAction = 'LAY'; // Current active action: LAY, MOVE_FIGURE, PUSH_WALL, TOPPLE_WALL
+    let winner = null;
+    
+    // Players setup
+    let players = [];
+    // Board Data Structures
+    const fields = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(false));
+    
+    // Walls Data Structures
+    const hWalls = Array(BOARD_SIZE - 1).fill(null).map(() => Array(BOARD_SIZE).fill(false));
+    const vWalls = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE - 1).fill(false));
+
+    // Selection helper for complex sub-actions
+    let selectedWallForAction = null; // {type: 'h'|'v', r, c}
+
+    // Colors
+    const playerColors = [
+      { 
+        id: 0, 
+        name: 'Player 1', 
+        bg: 'bg-cyan-500', 
+        border: 'border-cyan-300', 
+        text: 'text-cyan-400',
+        ring: 'ring-cyan-500',
+        light: '#06b6d4',
+        startRow: BOARD_SIZE - 1, 
+        goalRow: 0 
+      },
+      { 
+        id: 1, 
+        name: 'Player 2', 
+        bg: 'bg-rose-500', 
+        border: 'border-rose-300', 
+        text: 'text-rose-400',
+        ring: 'ring-rose-500',
+        light: '#f43f5e',
+        startRow: 0, 
+        goalRow: BOARD_SIZE - 1 
+      },
+      { 
+        id: 2, 
+        name: 'Player 3', 
+        bg: 'bg-amber-500', 
+        border: 'border-amber-300', 
+        text: 'text-amber-400',
+        ring: 'ring-amber-500',
+        light: '#f59e0b',
+        startRow: BOARD_SIZE - 1, 
+        goalRow: 0
+      },
+      { 
+        id: 3, 
+        name: 'Player 4', 
+        bg: 'bg-purple-500', 
+        border: 'border-purple-300', 
+        text: 'text-purple-400',
+        ring: 'ring-purple-500',
+        light: '#a855f7',
+        startRow: 0, 
+        goalRow: BOARD_SIZE - 1
+      }
+    ];
+
+    // Initialize Game
+    function initGame(pCount) {
+      numPlayers = pCount;
+      winner = null;
+      currentPlayer = 0;
+      selectedAction = 'LAY';
+      selectedWallForAction = null;
+      
+      // Reset boards
+      for(let r=0; r<BOARD_SIZE; r++) {
+        for(let c=0; c<BOARD_SIZE; c++) {
+          fields[r][c] = false;
+        }
+      }
+      for(let r=0; r<BOARD_SIZE - 1; r++) {
+        for(let c=0; c<BOARD_SIZE; c++) {
+          hWalls[r][c] = false;
+        }
+      }
+      for(let r=0; r<BOARD_SIZE; r++) {
+        for(let c=0; c<BOARD_SIZE - 1; c++) {
+          vWalls[r][c] = false;
+        }
+      }
+
+      // Initialize players
+      players = [];
+      for(let i=0; i<numPlayers; i++) {
+        let startRow, startCol, goalRow, goalCol, directionDesc;
+        
+        if (numPlayers === 2) {
+          if (i === 0) {
+            startRow = BOARD_SIZE - 1; startCol = null; goalRow = 0; goalCol = null; directionDesc = `Reach Top Row (Row 1)`;
+          } else {
+            startRow = 0; startCol = null; goalRow = BOARD_SIZE - 1; goalCol = null; directionDesc = `Reach Bottom Row (Row ${BOARD_SIZE})`;
+          }
+        } else {
+          if (i === 0) {
+            startRow = BOARD_SIZE - 1; startCol = null; goalRow = 0; goalCol = null; directionDesc = `Reach Top Row (Row 1)`;
+          } else if (i === 1) {
+            startRow = 0; startCol = null; goalRow = BOARD_SIZE - 1; goalCol = null; directionDesc = `Reach Bottom Row (Row ${BOARD_SIZE})`;
+          } else if (i === 2) {
+            startRow = null; startCol = 0; goalRow = null; goalCol = BOARD_SIZE - 1; directionDesc = `Reach Right Column (Col ${BOARD_SIZE})`;
+          } else {
+            startRow = null; startCol = BOARD_SIZE - 1; goalRow = null; goalCol = 0; directionDesc = "Reach Left Column (Col 1)";
+          }
+        }
+
+        players.push({
+          id: i,
+          name: `Player ${i+1}`,
+          color: playerColors[i],
+          row: null, 
+          col: null,
+          startRow,
+          startCol,
+          goalRow,
+          goalCol,
+          directionDesc
+        });
+      }
+
+      // Starting plate defaults - Exactly ONE placed in the middle of each player's starting line
+      const mid = Math.floor(BOARD_SIZE / 2); // 3 for size 7
+      for (let i = 0; i < numPlayers; i++) {
+        const p = players[i];
+        if (p.startRow !== null && p.startRow !== undefined) {
+          fields[p.startRow][mid] = true;
+        } else if (p.startCol !== null && p.startCol !== undefined) {
+          fields[mid][p.startCol] = true;
+        }
+      }
+
+      document.getElementById('setup-screen').classList.add('hidden');
+      
+      if (numPlayers === 2) {
+        document.getElementById('top-goal-label').textContent = "P2 Start / P1 Goal Row";
+        document.getElementById('bottom-goal-label').textContent = "P1 Start / P2 Goal Row";
+      } else {
+        document.getElementById('top-goal-label').textContent = "Top & Left Starts";
+        document.getElementById('bottom-goal-label').textContent = "Bottom & Right Starts";
+      }
+
+      updateUI();
+      logEvent(`A new ${numPlayers}-player game on 7x7 board has begun. Ready to lay down plates or walls.`);
+    }
+
+    // Toggle Action Mode
+    function setAction(action) {
+      if (winner) return;
+      selectedAction = action;
+      selectedWallForAction = null; 
+      
+      document.querySelectorAll('.action-btn').forEach(btn => {
+        btn.classList.remove('ring-2', 'ring-teal-400', 'bg-slate-700');
+        btn.classList.add('bg-slate-700/50');
+      });
+      
+      const activeBtn = document.getElementById(`btn-action-${action.toLowerCase().replace('_', '-')}`);
+      if (activeBtn) {
+        activeBtn.classList.add('ring-2', 'ring-teal-400', 'bg-slate-700');
+        activeBtn.classList.remove('bg-slate-700/50');
+      }
+
+      let desc = "";
+      switch(action) {
+        case 'LAY': desc = "Click an empty cell to lay a walkable Plate, OR click any gap channel to place a Wall."; break;
+        case 'MOVE_FIGURE': desc = "Click an adjacent field tile to move, or deploy your stone onto your middle starting plate."; break;
+        case 'PUSH_WALL': desc = "Click an existing wall, then choose a direction to push/slide it."; break;
+        case 'TOPPLE_WALL': desc = "Click an existing wall, then select which direction to tip it over."; break;
+      }
+      document.getElementById('game-status').innerText = desc;
+      renderBoard();
+    }
+
+    // Main UI Update
+    function updateUI() {
+      if (players.length === 0) return;
+      const cp = players[currentPlayer];
+      
+      document.getElementById('current-player-name').innerText = cp.name;
+      document.getElementById('current-player-name').className = `text-2xl font-black ${cp.color.text} mt-0.5`;
+      document.getElementById('turn-accent').style.backgroundColor = cp.color.light;
+      
+      const indicator = document.getElementById('player-token-indicator');
+      indicator.className = `w-12 h-12 rounded-full flex items-center justify-center border-4 shadow-md ${cp.color.bg} text-slate-950 ${cp.color.border} font-bold text-lg`;
+      indicator.innerText = `P${cp.id + 1}`;
+      
+      document.getElementById('player-goal-desc').innerText = cp.directionDesc;
+      document.getElementById('player-goal-desc').className = `font-semibold ${cp.color.text}`;
+
+      const isOffBoard = cp.row === null;
+      document.getElementById('player-reserve-desc').innerText = isOffBoard ? "Off-Board Reserve (Needs Plate to enter)" : `On Field [Row ${cp.row + 1}, Col ${cp.col + 1}]`;
+      document.getElementById('player-reserve-desc').className = isOffBoard ? "font-semibold text-amber-400" : "font-semibold text-emerald-400";
+
+      const rosterDiv = document.getElementById('player-list');
+      rosterDiv.innerHTML = '';
+      players.forEach(p => {
+        const isCurrent = p.id === currentPlayer;
+        const statusText = p.row === null ? "Off-board" : `Cell [${p.row+1},${p.col+1}]`;
+        const item = document.createElement('div');
+        item.className = `flex items-center justify-between p-2 rounded-lg border ${isCurrent ? 'bg-slate-700/80 border-slate-500' : 'bg-slate-900/40 border-transparent'} transition`;
+        item.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full ${p.color.bg} block"></span>
+            <span class="font-bold text-sm ${isCurrent ? 'text-white' : 'text-slate-400'}">${p.name}</span>
+          </div>
+          <span class="text-xs ${p.row === null ? 'text-amber-500/90' : 'text-emerald-500/90'}">${statusText}</span>
+        `;
+        rosterDiv.appendChild(item);
+      });
+
+      setAction(selectedAction);
+    }
+
+    // Render Board Grid (7x7 setup)
+    function renderBoard() {
+      const board = document.getElementById('game-board');
+      board.innerHTML = '';
+
+      // 1. Generate Field Cells
+      for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          const cell = document.createElement('div');
+          cell.id = `cell-${r}-${c}`;
+          cell.style.gridRow = `${2 * r + 1}`;
+          cell.style.gridColumn = `${2 * c + 1}`;
+          cell.className = "relative rounded flex items-center justify-center transition-all duration-200";
+          
+          const hasPlate = fields[r][c];
+          if (hasPlate) {
+            cell.className += " bg-slate-700 border border-slate-600 shadow-md text-slate-500 text-xxs font-mono";
+            cell.innerHTML = `<span class="opacity-15 absolute inset-1 border border-dashed border-slate-100 rounded"></span>`;
+          } else {
+            cell.className += " bg-slate-950/80 border border-slate-800/60 cursor-pointer";
+          }
+
+          const occupant = players.find(p => p.row === r && p.col === c);
+          if (occupant) {
+            const token = document.createElement('div');
+            token.className = `w-9 h-9 rounded-full ${occupant.color.bg} ${occupant.color.border} border-2 flex items-center justify-center font-extrabold text-slate-950 text-sm shadow-lg transform scale-110 z-10 animate-pulse`;
+            token.innerText = `P${occupant.id + 1}`;
+            cell.appendChild(token);
+          }
+
+          cell.addEventListener('click', () => handleCellClick(r, c));
+
+          // Interaction Highlight Cues
+          if (!winner) {
+            const cp = players[currentPlayer];
+            if (selectedAction === 'LAY' && !hasPlate) {
+              cell.classList.add('hover:ring-2', 'hover:ring-emerald-400', 'hover:bg-emerald-500/10');
+            } else if (selectedAction === 'MOVE_FIGURE') {
+              if (isValidMoveTarget(cp, r, c)) {
+                cell.classList.add('valid-target', 'cursor-pointer');
+              }
+            }
+          }
+
+          board.appendChild(cell);
+        }
+      }
+
+      // 2. Generate Horizontal Wall Channels (Gaps in between row grids)
+      for (let r = 0; r < BOARD_SIZE - 1; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          const hWall = document.createElement('div');
+          hWall.style.gridRow = `${2 * r + 2}`;
+          hWall.style.gridColumn = `${2 * c + 1}`;
+          hWall.className = "h-wall-trigger";
+
+          const isActive = hWalls[r][c];
+          if (isActive) {
+            hWall.classList.add('wall-active');
+          } else if (selectedAction === 'LAY') {
+            hWall.classList.add('hover:bg-amber-400/30');
+          }
+
+          if (selectedWallForAction && selectedWallForAction.type === 'h' && selectedWallForAction.r === r && selectedWallForAction.c === c) {
+            hWall.classList.add('ring-2', 'ring-teal-400', 'bg-teal-500/50');
+          }
+
+          if ((selectedAction === 'PUSH_WALL' || selectedAction === 'TOPPLE_WALL') && isActive) {
+            hWall.classList.add('hover:ring-2', 'hover:ring-teal-400', 'cursor-pointer');
+          }
+
+          hWall.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleWallClick('h', r, c);
+          });
+          board.appendChild(hWall);
+        }
+      }
+
+      // 3. Generate Vertical Wall Channels
+      for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE - 1; c++) {
+          const vWall = document.createElement('div');
+          vWall.style.gridRow = `${2 * r + 1}`;
+          vWall.style.gridColumn = `${2 * c + 2}`;
+          vWall.className = "v-wall-trigger";
+
+          const isActive = vWalls[r][c];
+          if (isActive) {
+            vWall.classList.add('wall-active');
+          } else if (selectedAction === 'LAY') {
+            vWall.classList.add('hover:bg-amber-400/30');
+          }
+
+          if (selectedWallForAction && selectedWallForAction.type === 'v' && selectedWallForAction.r === r && selectedWallForAction.c === c) {
+            vWall.classList.add('ring-2', 'ring-teal-400', 'bg-teal-500/50');
+          }
+
+          if ((selectedAction === 'PUSH_WALL' || selectedAction === 'TOPPLE_WALL') && isActive) {
+            vWall.classList.add('hover:ring-2', 'hover:ring-teal-400', 'cursor-pointer');
+          }
+
+          vWall.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleWallClick('v', r, c);
+          });
+          board.appendChild(vWall);
+        }
+      }
+
+      // 4. Fill passive corners to solidify board graphics
+      for (let r = 0; r < BOARD_SIZE - 1; r++) {
+        for (let c = 0; c < BOARD_SIZE - 1; c++) {
+          const corner = document.createElement('div');
+          corner.style.gridRow = `${2 * r + 2}`;
+          corner.style.gridColumn = `${2 * c + 2}`;
+          corner.className = "bg-slate-950/40 rounded-sm";
+          board.appendChild(corner);
+        }
+      }
+
+      // Render Direction overlays if wall sub-action is in progress
+      if (selectedWallForAction) {
+        renderDirectionOverlay();
+      }
+    }
+
+    // Check if cell is valid move target
+    function isValidMoveTarget(player, r, c) {
+      if (!fields[r][c]) return false;
+
+      const occupant = players.find(p => p.row === r && p.col === c);
+      if (occupant) return false;
+
+      if (player.row === null) {
+        if (player.startRow !== null) {
+          return r === player.startRow;
+        } else if (player.startCol !== null) {
+          return c === player.startCol;
+        }
+        return false;
+      }
+
+      const rDiff = Math.abs(player.row - r);
+      const cDiff = Math.abs(player.col - c);
+      
+      if ((rDiff === 1 && cDiff === 0) || (rDiff === 0 && cDiff === 1)) {
+        if (player.row === r) {
+          const minCol = Math.min(player.col, c);
+          return !vWalls[r][minCol];
+        } else {
+          const minRow = Math.min(player.row, r);
+          return !hWalls[minRow][c];
+        }
+      }
+
+      return false;
+    }
+
+    // Click triggers
+    function handleCellClick(r, c) {
+      if (winner) return;
+      const cp = players[currentPlayer];
+
+      if (selectedAction === 'LAY') {
+        if (fields[r][c]) {
+          showToast("A plate is already placed here.");
+          return;
+        }
+        fields[r][c] = true;
+        logEvent(`${cp.name} laid a walkable plate at [Row ${r+1}, Col ${c+1}].`);
+        endTurn();
+      } 
+      else if (selectedAction === 'MOVE_FIGURE') {
+        if (isValidMoveTarget(cp, r, c)) {
+          const oldPos = cp.row === null ? "Reserve" : `[Row ${cp.row+1}, Col ${cp.col+1}]`;
+          cp.row = r;
+          cp.col = c;
+          logEvent(`${cp.name} moved figure from ${oldPos} to [Row ${r+1}, Col ${c+1}].`);
+          
+          checkWinCondition(cp);
+          if (!winner) {
+            endTurn();
+          }
+        } else {
+          showToast("Invalid destination. Choose a connected adjacent Plate.");
+        }
+      }
+    }
+
+    function handleWallClick(type, r, c) {
+      if (winner) return;
+      const cp = players[currentPlayer];
+
+      if (selectedAction === 'LAY') {
+        // Restrictions: Prevent walling off the immediate starting zones to avoid player lock-outs
+        if (type === 'h') {
+          if (hWalls[r][c]) {
+            showToast("A wall already exists here.");
+            return;
+          }
+          if (r === 0 || r === BOARD_SIZE - 2) {
+            showToast("Cannot place walls on starting outer lines to prevent trapping players.");
+            return;
+          }
+          hWalls[r][c] = true;
+          logEvent(`${cp.name} laid a horizontal wall between Rows ${r+1}/${r+2} at Col ${c+1}.`);
+          endTurn();
+        } else {
+          if (vWalls[r][c]) {
+            showToast("A wall already exists here.");
+            return;
+          }
+          if ((c === 0 || c === BOARD_SIZE - 2) && numPlayers > 2) {
+            showToast("Cannot place walls on side outer lines in multi-player setup.");
+            return;
+          }
+          vWalls[r][c] = true;
+          logEvent(`${cp.name} laid a vertical wall between Cols ${c+1}/${c+2} at Row ${r+1}.`);
+          endTurn();
+        }
+      } 
+      else if (selectedAction === 'PUSH_WALL' || selectedAction === 'TOPPLE_WALL') {
+        const hasWall = (type === 'h' ? hWalls[r][c] : vWalls[r][c]);
+        if (!hasWall) {
+          showToast("Select an active standing wall.");
+          return;
+        }
+        selectedWallForAction = { type, r, c };
+        renderBoard();
+      }
+    }
+
+    // Direction selection using perfect CSS grid alignment
+    function renderDirectionOverlay() {
+      const sw = selectedWallForAction;
+      if (!sw) return;
+
+      const overlay = document.createElement('div');
+      overlay.className = "absolute z-50 bg-slate-800 border border-teal-500 rounded-lg p-2.5 shadow-2xl flex gap-2 items-center text-xs justify-center";
+      
+      // Align exactly in the grid location of the target wall!
+      overlay.style.gridRow = sw.type === 'h' ? `${2 * sw.r + 2}` : `${2 * sw.r + 1}`;
+      overlay.style.gridColumn = sw.type === 'h' ? `${2 * sw.c + 1}` : `${2 * sw.c + 2}`;
+      overlay.style.justifySelf = 'center';
+      overlay.style.alignSelf = 'center';
+
+      if (sw.type === 'h') {
+        if (selectedAction === 'PUSH_WALL') {
+          overlay.innerHTML = `
+            <span class="font-extrabold text-teal-400 mr-1 whitespace-nowrap">Push:</span>
+            <button onclick="executeWallPush('left')" class="bg-teal-500 hover:bg-teal-400 text-slate-900 font-bold px-2 py-1 rounded flex items-center gap-1">
+              <i class="fa-solid fa-arrow-left"></i> Left
+            </button>
+            <button onclick="executeWallPush('right')" class="bg-teal-500 hover:bg-teal-400 text-slate-900 font-bold px-2 py-1 rounded flex items-center gap-1">
+              Right <i class="fa-solid fa-arrow-right"></i>
+            </button>
+            <button onclick="cancelWallAction()" class="bg-slate-700 hover:bg-slate-600 px-1.5 py-1 rounded text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+          `;
+        } else {
+          overlay.innerHTML = `
+            <span class="font-extrabold text-rose-400 mr-1 whitespace-nowrap">Topple:</span>
+            <button onclick="executeWallTopple('up')" class="bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold px-2 py-1 rounded flex items-center gap-1">
+              <i class="fa-solid fa-arrow-up"></i> Up
+            </button>
+            <button onclick="executeWallTopple('down')" class="bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold px-2 py-1 rounded flex items-center gap-1">
+              Down <i class="fa-solid fa-arrow-down"></i>
+            </button>
+            <button onclick="cancelWallAction()" class="bg-slate-700 hover:bg-slate-600 px-1.5 py-1 rounded text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+          `;
+        }
+      } else {
+        if (selectedAction === 'PUSH_WALL') {
+          overlay.innerHTML = `
+            <span class="font-extrabold text-teal-400 mr-1 whitespace-nowrap">Push:</span>
+            <button onclick="executeWallPush('up')" class="bg-teal-500 hover:bg-teal-400 text-slate-900 font-bold px-2 py-1 rounded flex items-center gap-1">
+              <i class="fa-solid fa-arrow-up"></i> Up
+            </button>
+            <button onclick="executeWallPush('down')" class="bg-teal-500 hover:bg-teal-400 text-slate-900 font-bold px-2 py-1 rounded flex items-center gap-1">
+              Down <i class="fa-solid fa-arrow-down"></i>
+            </button>
+            <button onclick="cancelWallAction()" class="bg-slate-700 hover:bg-slate-600 px-1.5 py-1 rounded text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+          `;
+        } else {
+          overlay.innerHTML = `
+            <span class="font-extrabold text-rose-400 mr-1 whitespace-nowrap">Topple:</span>
+            <button onclick="executeWallTopple('left')" class="bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold px-2 py-1 rounded flex items-center gap-1">
+              <i class="fa-solid fa-arrow-left"></i> Left
+            </button>
+            <button onclick="executeWallTopple('right')" class="bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold px-2 py-1 rounded flex items-center gap-1">
+              Right <i class="fa-solid fa-arrow-right"></i>
+            </button>
+            <button onclick="cancelWallAction()" class="bg-slate-700 hover:bg-slate-600 px-1.5 py-1 rounded text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+          `;
+        }
+      }
+
+      document.getElementById('game-board').appendChild(overlay);
+    }
+
+    function cancelWallAction() {
+      selectedWallForAction = null;
+      renderBoard();
+    }
+
+    // Slide/Push logic
+    function executeWallPush(direction) {
+      if (!selectedWallForAction) return;
+      const { type, r, c } = selectedWallForAction;
+      const cp = players[currentPlayer];
+
+      if (type === 'h') {
+        if (direction === 'left') {
+          let startCol = c;
+          while (startCol > 0 && hWalls[r][startCol - 1]) {
+            startCol--;
+          }
+          if (startCol - 1 < 0) {
+            showToast("Cannot slide further. Edge of the grid reached.");
+            return;
+          }
+          for (let col = startCol - 1; col < c; col++) {
+            hWalls[r][col] = hWalls[r][col + 1];
+          }
+          hWalls[r][c] = false;
+          logEvent(`${cp.name} slid horizontal wall left.`);
+        } 
+        else if (direction === 'right') {
+          let endCol = c;
+          while (endCol < BOARD_SIZE - 1 && hWalls[r][endCol + 1]) {
+            endCol++;
+          }
+          if (endCol + 1 >= BOARD_SIZE) {
+            showToast("Cannot slide further. Edge of the grid reached.");
+            return;
+          }
+          for (let col = endCol + 1; col > c; col--) {
+            hWalls[r][col] = hWalls[r][col - 1];
+          }
+          hWalls[r][c] = false;
+          logEvent(`${cp.name} slid horizontal wall right.`);
+        }
+      } 
+      else if (type === 'v') {
+        if (direction === 'up') {
+          let startRow = r;
+          while (startRow > 0 && vWalls[startRow - 1][c]) {
+            startRow--;
+          }
+          if (startRow - 1 < 0) {
+            showToast("Cannot slide further. Edge of the grid reached.");
+            return;
+          }
+          for (let row = startRow - 1; row < r; row++) {
+            vWalls[row][c] = vWalls[row + 1][c];
+          }
+          vWalls[r][c] = false;
+          logEvent(`${cp.name} slid vertical wall up.`);
+        } 
+        else if (direction === 'down') {
+          let endRow = r;
+          while (endRow < BOARD_SIZE - 1 && vWalls[endRow + 1][c]) {
+            endRow++;
+          }
+          if (endRow + 1 >= BOARD_SIZE) {
+            showToast("Cannot slide further. Edge of the grid reached.");
+            return;
+          }
+          for (let row = endRow + 1; row > r; row--) {
+            vWalls[row][c] = vWalls[row - 1][c];
+          }
+          vWalls[r][c] = false;
+          logEvent(`${cp.name} slid vertical wall down.`);
+        }
+      }
+
+      selectedWallForAction = null;
+      endTurn();
+    }
+
+    // Domino Toppling chain-reactions with default plate creation on empty fields
+    function executeWallTopple(direction) {
+      if (!selectedWallForAction) return;
+      const { type, r, c } = selectedWallForAction;
+      const cp = players[currentPlayer];
+
+      let toppledCount = 0;
+      let crushedPlayers = [];
+
+      if (type === 'h') {
+        if (direction === 'up') {
+          let targetRow = r;
+          let currentWallRow = r;
+          
+          while (targetRow >= 0) {
+            crushTargetSpace(targetRow, c, crushedPlayers);
+            // Wall falls onto empty space and always becomes a new Plate
+            fields[targetRow][c] = true;
+            hWalls[currentWallRow][c] = false;
+            toppledCount++;
+
+            if (targetRow - 1 >= 0 && hWalls[targetRow - 1][c]) {
+              currentWallRow = targetRow - 1;
+              targetRow = targetRow - 1;
+            } else {
+              break;
+            }
+          }
+        } 
+        else if (direction === 'down') {
+          let targetRow = r + 1;
+          let currentWallRow = r;
+
+          while (targetRow < BOARD_SIZE) {
+            crushTargetSpace(targetRow, c, crushedPlayers);
+            fields[targetRow][c] = true;
+            hWalls[currentWallRow][c] = false;
+            toppledCount++;
+
+            if (targetRow < BOARD_SIZE - 1 && hWalls[targetRow][c]) {
+              currentWallRow = targetRow;
+              targetRow = targetRow + 1;
+            } else {
+              break;
+            }
+          }
+        }
+      } 
+      else if (type === 'v') {
+        if (direction === 'left') {
+          let targetCol = c;
+          let currentWallCol = c;
+
+          while (targetCol >= 0) {
+            crushTargetSpace(r, targetCol, crushedPlayers);
+            fields[r][targetCol] = true;
+            vWalls[r][currentWallCol] = false;
+            toppledCount++;
+
+            if (targetCol - 1 >= 0 && vWalls[r][targetCol - 1]) {
+              currentWallCol = targetCol - 1;
+              targetCol = targetCol - 1;
+            } else {
+              break;
+            }
+          }
+        } 
+        else if (direction === 'right') {
+          let targetCol = c + 1;
+          let currentWallCol = c;
+
+          while (targetCol < BOARD_SIZE) {
+            crushTargetSpace(r, targetCol, crushedPlayers);
+            fields[r][targetCol] = true;
+            vWalls[r][currentWallCol] = false;
+            toppledCount++;
+
+            if (targetCol < BOARD_SIZE - 1 && vWalls[r][targetCol]) {
+              currentWallCol = targetCol;
+              targetCol = targetCol + 1;
+            } else {
+              break;
+            }
+          }
+        }
+      }
+
+      let logMsg = `${cp.name} toppled wall chain. Flattened ${toppledCount} wall(s) into flat plate path cells (created plate paths on landing).`;
+      if (crushedPlayers.length > 0) {
+        logMsg += ` Crushed stones: ${crushedPlayers.join(', ')} (returned to reserve).`;
+      }
+      logEvent(logMsg);
+
+      selectedWallForAction = null;
+      endTurn();
+    }
+
+    function crushTargetSpace(r, col, crushedList) {
+      players.forEach(p => {
+        if (p.row === r && p.col === col) {
+          crushedList.push(p.name);
+          p.row = null; 
+          p.col = null;
+        }
+      });
+    }
+
+    function endTurn() {
+      currentPlayer = (currentPlayer + 1) % numPlayers;
+      updateUI();
+    }
+
+    function checkWinCondition(player) {
+      let reachedGoal = false;
+      if (player.goalRow !== null && player.row === player.goalRow) {
+        reachedGoal = true;
+      } else if (player.goalCol !== null && player.col === player.goalCol) {
+        reachedGoal = true;
+      }
+
+      if (reachedGoal) {
+        winner = player;
+        logEvent(`🎉 WINNER! ${player.name} reached the goal!`);
+        document.getElementById('game-status').innerHTML = `
+          <span class="text-emerald-400 font-extrabold">🎉 ${player.name} Wins!</span> Reached the opposite goal line. Play again?
+        `;
+        showWinOverlay(player);
+      }
+    }
+
+    function showWinOverlay(p) {
+      const overlay = document.createElement('div');
+      overlay.id = "win-overlay";
+      overlay.className = "fixed inset-0 bg-slate-950/80 z-50 flex flex-col items-center justify-center p-6";
+      overlay.innerHTML = `
+        <div class="bg-slate-800 border border-teal-400 p-8 rounded-2xl text-center shadow-2xl max-w-sm w-full space-y-4">
+          <div class="w-16 h-16 mx-auto bg-teal-500 rounded-full flex items-center justify-center text-slate-900 text-3xl font-black">
+            👑
+          </div>
+          <h2 class="text-3xl font-black ${p.color.text}">${p.name} Wins!</h2>
+          <p class="text-slate-300 text-sm">Guided their stone safely to the opposite side of the board against the changing labyrinth of cascading walls.</p>
+          <div class="pt-4 flex gap-3">
+            <button onclick="resetGame()" class="flex-1 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold py-2 px-4 rounded-xl transition shadow-lg shadow-teal-500/20">
+              New Game
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+    }
+
+    function logEvent(msg) {
+      const log = document.getElementById('game-log');
+      log.innerText = msg;
+    }
+
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.className = "fixed bottom-5 right-5 bg-slate-800 border-l-4 border-amber-500 text-slate-200 px-4 py-3 rounded shadow-2xl z-50 flex items-center gap-2 transition duration-300 transform translate-y-10 opacity-0";
+      toast.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-500"></i> <span class="text-xs font-semibold">${message}</span>`;
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.classList.remove('translate-y-10', 'opacity-0');
+      }, 50);
+
+      setTimeout(() => {
+        toast.classList.add('translate-y-10', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function resetGame() {
+      const winOverlay = document.getElementById('win-overlay');
+      if (winOverlay) winOverlay.remove();
+      document.getElementById('setup-screen').classList.remove('hidden');
+    }
+
+    function openRules() {
+      document.getElementById('rules-modal').classList.remove('hidden');
+    }
+    
+    function closeRules() {
+      document.getElementById('rules-modal').classList.add('hidden');
+    }
+
+    window.onload = function() {
+      initGame(2);
+    };
+  </script>
+    <script src="global-keys.js"></script>
+</body>
+</html>

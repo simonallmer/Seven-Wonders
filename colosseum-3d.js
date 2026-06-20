@@ -314,7 +314,8 @@ function colUpdateViews() {
         if (!st.gameOver) {
             if (st.selStone && st.selStone.cell === cell) { col = 0xf0d060; op = 0.65; }
             else if (st.validCells.indexOf(cell) !== -1) { col = COL_COLORS[st.turn].hi; op = 0.6; }
-            else if (cell !== 0 && colRing(cell) !== 4 && st.territory[cell]) { col = COL_COLORS[st.territory[cell]].terr; op = 0.5; }
+            else if (cell === 0 || colRing(cell) === 4) { col = 0x888888; op = 0.3; }
+            else if (st.territory[cell]) { col = COL_COLORS[st.territory[cell]].terr; op = 0.5; }
         }
         mesh.material.color.setHex(col);
         mesh.material.opacity = op;
