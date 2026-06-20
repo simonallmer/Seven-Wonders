@@ -24,6 +24,11 @@
         .changelog li a { color: var(--gold); text-decoration: none; }
         .changelog li a:hover { text-decoration: underline; }
     </style>
+    <script>
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') window.location.href = 'index.html';
+        });
+    </script>
 </head>
 
 <body>
