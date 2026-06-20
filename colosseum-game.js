@@ -3,8 +3,6 @@
 // Concentric-ring arena. Armies start on the elevated safe outer ring and
 // descend to fight in the arena: majority takes a cell, ties stand off (lock),
 // claimed cells become territory you can redeploy to. Last army standing wins.
-// Tilt mechanic: the stone controlling the centre tilts the arena, flipping
-// the direction of the single-step JUMP (inward vs outward).
 
 // ============================================
 // BOARD MODEL — 5 rings, 89 cells
@@ -20,12 +18,27 @@ function colRing(c) { return c === 0 ? 0 : c <= 8 ? 1 : c <= 24 ? 2 : c <= 56 ? 
 function colSector(c) { return c === 0 ? 0 : c <= 8 ? c - 1 : c <= 24 ? c - 9 : c <= 56 ? c - 25 : c - 57; }
 function colId(ring, sec) { return ring === 0 ? 0 : ring === 1 ? 1 + sec : ring === 2 ? 9 + sec : ring === 3 ? 25 + sec : 57 + sec; }
 
-// centre-high target heights for each tilt state
-var COL_TILT_H = {
-    flat: [0, 7, 15, 24, 44],
-    up:   [50, 38, 26, 12, 0],
-    down: [0, 12, 26, 38, 50]
-};
+function colAdj(cell) {
+    var r = colRing(cell), s = colSector(cell), adj = new Set();
+    if (r === 0) { for (var i = 0; i < 8; i++) adj.add(colId(1, i)); }
+    else if (r === 1) {
+        adj.add(0);
+        adj.add(colId(1, (s + 1) % 8)); adj.add(colId(1, (s + 7) % 8));
+        adj.add(colId(2, s * 2)); adj.add(colId(2, s * 2 + 1));
+    } else if (r === 2) {
+        adj.add(colId(2, (s + 1) % 16)); adj.add(colId(2, (s + 15) % 16));
+        adj.add(colId(1, Math.floor(s / 2)));
+        adj.add(colId(3, s * 2)); adj.add(colId(3, s * 2 + 1));
+    } else if (r === 3) {
+        adj.add(colId(3, (s + 1) % 32)); adj.add(colId(3, (s + 31) % 32));
+        adj.add(colId(2, Math.floor(s / 2)));
+        adj.add(colId(4, s));
+    } else {
+        adj.add(colId(4, (s + 1) % 32)); adj.add(colId(4, (s + 31) % 32));
+        adj.add(colId(3, s));
+    }
+    return [...adj];
+}
 
 // ============================================
 // COLORS / SETUP
@@ -56,40 +69,17 @@ var colBusy = false;
 var colGameOver = false;
 var colIsComputer = {};    // color -> bool
 
-var colTilt = 'flat';                // 'flat' | 'up' | 'down'
-var colTiltStone = null;             // id of the stone currently controlling the tilt
-var colTiltPending = null;           // 'up' | 'down' | 'flat' when choosing
-
 window.getColState = function () {
     var sel = colSelected !== null ? colStones.find(function (s) { return s.id === colSelected; }) : null;
     return {
         stones: colStones, selected: colSelected, selStone: sel, turn: colTurn,
         territory: colTerritory, players: colPlayers, busy: colBusy, gameOver: colGameOver,
-        validCells: sel ? colMoveOptions(sel) : [],
-        tilt: colTilt, tiltStone: colTiltStone, tiltPending: colTiltPending
+        validCells: sel ? colMoveOptions(sel) : []
     };
 };
 window.colInfo = { ringOf: colRing, sectorOf: colSector, idOf: colId, counts: COL_COUNTS, colors: COL_COLORS };
 window.colIsStandoff = isStandoff;
 window.colMoveOptionsFor = colMoveOptions;
-
-function colSetTilt(t) {
-    if (colTiltPending === null) return;
-    colTilt = t;
-    colTiltPending = null;
-    hideTiltArrows();
-    if (window.colAnimateTilt) window.colAnimateTilt(colTilt);
-    if (window.colUpdateViews) window.colUpdateViews();
-}
-function showTiltArrows() {
-    var el = document.getElementById('tilt-arrows');
-    if (el) el.classList.add('visible');
-}
-function hideTiltArrows() {
-    var el = document.getElementById('tilt-arrows');
-    if (el) el.classList.remove('visible');
-}
-window.colSetTilt = colSetTilt;
 
 // ============================================
 // DOM
@@ -128,111 +118,36 @@ function isStandoff(cell) {
     return vals.every(function (v) { return v === vals[0]; });
 }
 
-function colJumpInward(r, s, color) {
-    if (r === 0) return [];
-    var cell;
-    if (r === 4) cell = colId(3, s);
-    else if (r === 3) cell = colId(2, Math.floor(s / 2));
-    else if (r === 2) cell = colId(1, Math.floor(s / 2));
-    else cell = 0;
-    // jump can land on empty or enemy (fight/standoff)
-    return [cell];
-}
-function colJumpOutward(r, s, color) {
-    var cells = [];
-    if (r === 0) { for (var i = 0; i < 8; i++) cells.push(colId(1, i)); }
-    else if (r === 1) { cells.push(colId(2, s * 2), colId(2, s * 2 + 1)); }
-    else if (r === 2) { cells.push(colId(3, s * 2), colId(3, s * 2 + 1)); }
-    else if (r === 3) { var c = colId(4, s); if (!colStones.some(function (x) { return x.cell === c; })) cells.push(c); }
-    return cells;
-}
-
 function colMoveOptions(stone) {
-    var r = colRing(stone.cell), s = colSector(stone.cell), color = stone.color;
+    var r = colRing(stone.cell), s = colSector(stone.cell);
     var dests = new Set();
 
-    // Jump direction depends on tilt:
-    //   flat / down → jump OUTWARD (toward the edge), run INWARD (multi-step)
-    //   up          → jump INWARD (toward centre),  run OUTWARD (multi-step)
-    var jumpIn = colTilt === 'up';
-    var jumpOut = !jumpIn;
+    // base adjacency: rings 0–3 freely; a ring-4 neighbour only if empty (the ring is safe — no landing on others)
+    colAdj(stone.cell).forEach(function (c) {
+        if (colRing(c) === 4) { if (!colStones.some(function (x) { return x.cell === c; })) dests.add(c); }
+        else dests.add(c);
+    });
 
-    // — multi-step run INWARD (always available; downhill when tilt=down)
-    if (r > 0) {
-        var cr = r, cs = s;
-        while (cr > 0) {
-            var nextCell;
-            if (cr === 4)      { nextCell = colId(3, cs); cr = 3; }
-            else if (cr === 3) { var ps = Math.floor(cs / 2); nextCell = colId(2, ps); cr = 2; cs = ps; }
-            else if (cr === 2) { var ps = Math.floor(cs / 2); nextCell = colId(1, ps); cr = 1; cs = ps; }
-            else               { nextCell = 0; cr = 0; }
+    // territory redeploy — your claimed cells on rings 1–3
+    Object.entries(colTerritory).forEach(function (e) {
+        var c = Number(e[0]);
+        if (e[1] === stone.color && c !== stone.cell && colRing(c) !== 4) dests.add(c);
+    });
 
-            var occ = stonesAt(nextCell);
-            var hasEnemy = occ.some(function (x) { return x.color !== color; });
-            if (occ.length === 0) { dests.add(nextCell); }
-            else if (hasEnemy)    { dests.add(nextCell); break; }
-            /* own stones only — may run past them */
-        }
-    }
-
-    // — multi-step run OUTWARD when tilt=up (downhill toward the lower edge)
-    if (colTilt === 'up') {
-        var cr = r, cs = s;
-        while (cr < 4) {
-            var outCells = [];
-            if (cr === 0) { for (var i = 0; i < 8; i++) outCells.push({ r: 1, s: i }); }
-            else if (cr === 1) { outCells.push({ r: 2, s: cs * 2 }, { r: 2, s: cs * 2 + 1 }); }
-            else if (cr === 2) { outCells.push({ r: 3, s: cs * 2 }, { r: 3, s: cs * 2 + 1 }); }
-            else if (cr === 3) { outCells.push({ r: 4, s: cs }); }
-
-            var blocked = true;
-            outCells.forEach(function (oc) {
-                var cell = colId(oc.r, oc.s);
-                if (oc.r === 4 && colStones.some(function (x) { return x.cell === cell; })) return;
-                var occ = stonesAt(cell);
-                var hasEnemy = occ.some(function (x) { return x.color !== color; });
-                if (occ.length === 0) { dests.add(cell); blocked = false; }
-                else if (hasEnemy)    { dests.add(cell); }
-                else                  { blocked = false; } // own stones — keep going
-            });
-            if (blocked) break;
-            // advance along first unblocked branch
-            var next = null;
-            for (var i = 0; i < outCells.length; i++) {
-                var c = colId(outCells[i].r, outCells[i].s);
-                var o = stonesAt(c);
-                var e = o.some(function (x) { return x.color !== color; });
-                if (o.length === 0 || (o.length > 0 && !e)) { next = outCells[i]; break; }
-            }
-            if (!next) break;
-            cr = next.r; cs = next.s;
-        }
-    }
-
-    // — circle run (always available)
-    if (COL_COUNTS[r] > 1) {
+    // The outer ring is neutral ground held by everyone: a stone already on it may slide ANY
+    // distance around the ring, passing empty cells and its OWN stones, blocked only by a stone
+    // of a DIFFERENT colour in the way. It lands on an empty cell.
+    if (r === 4) {
         [1, -1].forEach(function (dir) {
-            for (var k = 1; k < COL_COUNTS[r]; k++) {
-                var nc = colId(r, (s + dir * k + COL_COUNTS[r]) % COL_COUNTS[r]);
-                var occ = stonesAt(nc);
-                var hasEnemy = occ.some(function (x) { return x.color !== color; });
-                if (occ.length === 0) { dests.add(nc); }
-                else if (hasEnemy)    { dests.add(nc); break; }
-                /* own stones — past them */
+            for (var k = 1; k < 32; k++) {
+                var c = colId(4, (s + dir * k + 32) % 32);
+                var occ = colStones.filter(function (x) { return x.cell === c; });
+                if (occ.some(function (x) { return x.color !== stone.color; })) break; // enemy in the way blocks
+                if (occ.length === 0) dests.add(c);                                    // empty cell = valid landing
+                // own stone: pass through, keep sliding
             }
         });
     }
-
-    // — single-step jump
-    var jumpCells = jumpIn ? colJumpInward(r, s, color) : colJumpOutward(r, s, color);
-    jumpCells.forEach(function (c) { dests.add(c); });
-
-    // — territory redeploy (rings 1–3)
-    Object.entries(colTerritory).forEach(function (e) {
-        var c = Number(e[0]);
-        if (e[1] === color && c !== stone.cell && colRing(c) !== 4) dests.add(c);
-    });
-
     return [...dests];
 }
 
@@ -284,34 +199,7 @@ function doMove(s, cell) {
         s.cell = cell;
         if (cell !== 0 && colRing(cell) !== 4) colTerritory[cell] = s.color;
         colSelected = null;
-
-        // tilt control — entering centre shows arrow picker
-        if (cell === 0) {
-            if (colTiltStone === null) {
-                colTiltPending = 'flat';
-                colTiltStone = s.id;
-                showTiltArrows();
-            }
-        }
-        // if the tilt-controlling stone moved away from centre, reset
-        if (colTiltStone !== null && colTiltStone === s.id && cell !== 0) {
-            colTilt = 'flat';
-            colTiltStone = null;
-            colTiltPending = null;
-            hideTiltArrows();
-            if (window.colAnimateTilt) window.colAnimateTilt('flat');
-        }
-
         var removed = resolveConflicts();
-
-        // if the tilt-controlling stone was removed in combat, reset
-        if (colTiltStone !== null && !colStones.some(function (x) { return x.id === colTiltStone; })) {
-            colTilt = 'flat';
-            colTiltStone = null;
-            colTiltPending = null;
-            hideTiltArrows();
-            if (window.colAnimateTilt) window.colAnimateTilt('flat');
-        }
 
         // Eliminate commanders reduced below 4 stones
         var elimMsgs = [];
@@ -323,12 +211,6 @@ function doMove(s, cell) {
                 colStones = colStones.filter(function (x) { return x.color !== p; });
             }
         });
-
-        // if tilt-controlling stone was eliminated, reset
-        if (colTiltStone !== null && !colStones.some(function (x) { return x.id === colTiltStone; })) {
-            colTilt = 'flat'; colTiltStone = null; colTiltPending = null; hideTiltArrows();
-            if (window.colAnimateTilt) window.colAnimateTilt('flat');
-        }
 
         var finish = function () {
             colBusy = false;
@@ -347,7 +229,6 @@ function nextTurn() {
     var idx = (colPlayers.indexOf(colTurn) + 1) % colPlayers.length, tries = 0;
     while (!colStones.some(function (s) { return s.color === colPlayers[idx]; }) && tries < colPlayers.length) { idx = (idx + 1) % colPlayers.length; tries++; }
     colTurn = colPlayers[idx];
-    if (colTiltPending !== null) { colSetTilt('flat'); }
     refresh();
     if (!colGameOver && colIsComputer[colTurn]) setTimeout(colAI, 800);
 }
@@ -389,12 +270,6 @@ function refresh() {
 // ============================================
 function colAI() {
     if (colGameOver || colBusy) return;
-    // if a tilt choice is pending, pick randomly
-    if (colTiltPending !== null) {
-        var choices = ['up', 'down', 'flat'];
-        colSetTilt(choices[Math.floor(Math.random() * 3)]);
-        return;
-    }
     var myStones = colStones.filter(function (s) { return s.color === colTurn; });
     if (!myStones.length) return;
     var bestMove = null, bestScore = -Infinity;
@@ -430,7 +305,6 @@ window.toggleColOpponent = toggleColOpponent;
 function newColosseum() {
     colStones = []; colSelected = null; colTerritory = {}; colNextId = 1;
     colBusy = false; colGameOver = false;
-    colTilt = 'flat'; colTiltStone = null; colTiltPending = null; hideTiltArrows();
     if (messageBox) messageBox.classList.remove('visible');
     colPlayers = COL_SETUP[colPlayerCount].map(function (p) { return p.color; });
     // Set AI defaults

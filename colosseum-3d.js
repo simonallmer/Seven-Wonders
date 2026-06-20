@@ -17,15 +17,12 @@ const groupBirds = new THREE.Group();
 
 const padMeshes = new Map();   // cell -> mesh
 const stoneMeshes = new Map(); // id -> group
-const grooveMeshes = [];       // { ring, mesh } — per-sector grooves
-const lipMeshes = [];          // { ring, mesh } — ring-edge lips
 let hoverCell = null;
 
 // Geometry: radii + tier heights per ring (outer ring highest)
 const RIN = [0, 26, 56, 92, 134];
 const ROUT = [26, 56, 92, 134, 182];
-const H = [0, 7, 15, 24, 44];     // base tier heights
-var colHeights = [0, 7, 15, 24, 44]; // animated runtime heights
+const H = [0, 7, 15, 24, 44];     // tier top height — ring 4 (outer) elevated
 const WALL_R = 202, WALL_TOP = 88;
 const COUNTS = [1, 8, 16, 32, 32];
 const BASE_PAD = 0x000000;
@@ -56,9 +53,9 @@ function cellAngle(cell) {
 }
 function cellPos(cell) {
     const r = colRing(cell);
-    if (cell === 0) return { x: 0, y: colHeights[0], z: 0 };
+    if (cell === 0) return { x: 0, y: H[0], z: 0 };
     const a = cellAngle(cell), radius = (RIN[r] + ROUT[r]) / 2;
-    return { x: radius * Math.cos(a), y: colHeights[r], z: -radius * Math.sin(a) };
+    return { x: radius * Math.cos(a), y: H[r], z: -radius * Math.sin(a) };
 }
 function wedgeGeo(rIn, rOut, a0, a1, segs) {
     segs = segs || 6;
@@ -232,19 +229,16 @@ function buildGrooves() {
         const count = COUNTS[r], step = Math.PI * 2 / count;
         const len = ROUT[r] - RIN[r] + 2, midR = (RIN[r] + ROUT[r]) / 2;
         for (let i = 0; i < count; i++) {
-            const a = -Math.PI / 2 + i * step;
+            const a = -Math.PI / 2 + i * step;          // sector boundary
             const dirX = Math.cos(a), dirZ = -Math.sin(a);
             const groove = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.2, len), matGroove);
             groove.position.set(midR * dirX, H[r] + 0.5, midR * dirZ);
             groove.rotation.y = Math.atan2(dirX, dirZ);
-            groove.userData.ring = r;
             groupArena.add(groove);
-            grooveMeshes.push({ ring: r, mesh: groove, baseY: H[r] + 0.5, midR: midR, dirX: dirX, dirZ: dirZ });
         }
+        // a thin lip line along the ledge's outer edge for extra readability
         const lip = new THREE.Mesh(new THREE.CylinderGeometry(ROUT[r] - 0.5, ROUT[r] - 0.5, 1.4, 96, 1, true), matGroove);
-        lip.position.y = H[r] + 0.4; lip.userData.ring = r;
-        groupArena.add(lip);
-        lipMeshes.push({ ring: r, mesh: lip, baseY: H[r] + 0.4 });
+        lip.position.y = H[r] + 0.4; groupArena.add(lip);
     }
 }
 
@@ -341,40 +335,6 @@ function colUpdateViews() {
 // ============================================
 // ANIMATIONS
 // ============================================
-function colAnimateTilt(tilt) {
-    var target = (window.COL_TILT_H && window.COL_TILT_H[tilt]) || H;
-    var obj = { h0: colHeights[0], h1: colHeights[1], h2: colHeights[2], h3: colHeights[3], h4: colHeights[4] };
-    var tgt = { h0: target[0], h1: target[1], h2: target[2], h3: target[3], h4: target[4] };
-    new TWEEN.Tween(obj).to(tgt, 600).easing(TWEEN.Easing.Quadratic.InOut)
-        .onUpdate(function () {
-            colHeights[0] = obj.h0; colHeights[1] = obj.h1; colHeights[2] = obj.h2;
-            colHeights[3] = obj.h3; colHeights[4] = obj.h4;
-            // reposition pads
-            padMeshes.forEach(function (mesh, cell) {
-                mesh.position.y = colHeights[colRing(cell)] + 0.6;
-            });
-            // reposition grooves
-            grooveMeshes.forEach(function (g) {
-                g.mesh.position.y = colHeights[g.ring] + (g.baseY - H[g.ring]);
-            });
-            // reposition lips
-            lipMeshes.forEach(function (l) {
-                l.mesh.position.y = colHeights[l.ring] + (l.baseY - H[l.ring]);
-            });
-            // reposition non-animating stones
-            stoneMeshes.forEach(function (mesh) {
-                if (!mesh.userData.animating && mesh.userData.cell !== undefined) {
-                    var base = cellPos(mesh.userData.cell);
-                    mesh.position.y = base.y + 1;
-                }
-            });
-            needsRender = true;
-        })
-        .onComplete(function () {
-            if (window.colSync3D) window.colSync3D();
-            needsRender = true;
-        }).start();
-}
 function colAnimMove(stone, fromCell, toCell, done) {
     const mesh = stoneMeshes.get(stone.id);
     if (!mesh) { done && done(); return; }
@@ -413,17 +373,10 @@ function dust(x, y, z) {
 function colVictory(color) { needsRender = true; }
 
 function colRebuild() {
-    colHeights[0] = H[0]; colHeights[1] = H[1]; colHeights[2] = H[2];
-    colHeights[3] = H[3]; colHeights[4] = H[4];
     stoneMeshes.forEach(m => groupStones.remove(m)); stoneMeshes.clear();
-    grooveMeshes.length = 0; lipMeshes.length = 0;
-    while (groupArena.children.length) groupArena.remove(groupArena.children[0]);
-    while (groupPads.children.length) groupPads.remove(groupPads.children[0]);
     while (groupHi.children.length) groupHi.remove(groupHi.children[0]);
     while (groupFX.children.length) groupFX.remove(groupFX.children[0]);
     clearHover();
-    buildAmphitheater();
-    buildPads();
     colSync3D(); colUpdateViews();
 }
 
@@ -498,6 +451,5 @@ window.colRebuild = colRebuild;
 window.colAnimMove = colAnimMove;
 window.colAnimRemove = colAnimRemove;
 window.colVictory = colVictory;
-window.colAnimateTilt = colAnimateTilt;
 
 document.addEventListener('DOMContentLoaded', () => init3D());
