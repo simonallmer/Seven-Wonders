@@ -8,6 +8,10 @@ const game = window.libraryGameInstance;
 
 // --- DOM Elements ---
 const canvasContainer = document.getElementById('canvas3d');
+const btnLay = document.getElementById('btn-action-lay');
+const btnMove = document.getElementById('btn-action-move');
+const btnPush = document.getElementById('btn-action-push');
+const btnTopple = document.getElementById('btn-action-topple');
 const statusText = document.getElementById('status-text');
 const playerColorBox = document.getElementById('player-color');
 
@@ -97,18 +101,6 @@ const activeCellMat = new THREE.MeshStandardMaterial({
     color: 0x06b6d4,
     transparent: true,
     opacity: 0.3,
-});
-
-const wallPushMat = new THREE.MeshStandardMaterial({
-    color: 0xf59e0b,
-    transparent: true,
-    opacity: 0.35,
-});
-
-const wallToppleMat = new THREE.MeshStandardMaterial({
-    color: 0xf43f5e,
-    transparent: true,
-    opacity: 0.35,
 });
 
 // --- Environment Construction (Courtyard & Rooms) ---
@@ -290,75 +282,88 @@ function onPointerMove(event) {
 
     raycaster.setFromCamera(mouse, camera);
     
-    const cp = game.players[game.currentPlayer];
-    const interactables = [...cellMeshes, ...hWallTriggers, ...vWallTriggers];
+    let interactables = [];
+    if (game.selectedAction === 'LAY') {
+        interactables = [...cellMeshes, ...hWallTriggers, ...vWallTriggers];
+    } else if (game.selectedAction === 'MOVE') {
+        interactables = cellMeshes;
+    } else if (game.selectedAction === 'PUSH' || game.selectedAction === 'TOPPLE') {
+        interactables = [...hWallTriggers, ...vWallTriggers];
+    }
 
     const intersects = raycaster.intersectObjects(interactables);
     if (intersects.length > 0) {
         const obj = intersects[0].object;
         const u = obj.userData;
         
+        // Validation logic for hover
         let isValid = false;
-        if (u.type === 'cell') {
-            if (cp.row === u.r && cp.col === u.c) { /* no highlight on self */ }
-            else if (game.fields[u.r][u.c] && game.isValidMoveTarget(cp, u.r, u.c)) isValid = true;
-            else if (!game.fields[u.r][u.c]) isValid = true;
-        } else if (u.type === 'hWall') {
-            isValid = true;
-        } else if (u.type === 'vWall') {
-            isValid = true;
+        if (game.selectedAction === 'LAY') {
+            if (u.type === 'cell' && !game.fields[u.r][u.c]) isValid = true;
+            if (u.type === 'hWall' && !game.hWalls[u.r][u.c]) isValid = true;
+            if (u.type === 'vWall' && !game.vWalls[u.r][u.c]) isValid = true;
+        } else if (game.selectedAction === 'MOVE') {
+            if (u.type === 'cell' && game.isValidMoveTarget(game.players[game.currentPlayer], u.r, u.c)) isValid = true;
+        } else if (game.selectedAction === 'PUSH' || game.selectedAction === 'TOPPLE') {
+            if (u.type === 'hWall' && game.hWalls[u.r][u.c]) isValid = true;
+            if (u.type === 'vWall' && game.vWalls[u.r][u.c]) isValid = true;
         }
 
         if (isValid) {
             const hl = obj.userData.highlight;
             hl.visible = true;
             
+            // Default reset scale/pos
             const { x, z } = getPos(u.r, u.c);
             if (u.type === 'cell') {
                 hl.scale.set(1, 1, 1);
                 hl.position.set(x, 0.2, z);
-                hl.material = activeCellMat;
             } else if (u.type === 'hWall') {
                 const cx = x;
                 const cz = z + TILE_SIZE/2 + GAP_SIZE/2;
-                const p = intersects[0].point;
-                const ox = p.x - cx, oz = p.z - cz;
-
-                if (!game.hWalls[u.r][u.c]) {
+                hl.scale.set(1, 1, 1);
+                hl.position.set(cx, 0.2, cz);
+                
+                if (game.selectedAction === 'PUSH') {
+                    // highlight half of the wall vertically/horizontally
+                    hl.scale.set(0.5, 10, 1); // 10 * 0.2 = 2 (height of wall)
+                    if (intersects[0].point.x < cx) {
+                        hl.position.set(cx - TILE_SIZE/4, 1, cz);
+                    } else {
+                        hl.position.set(cx + TILE_SIZE/4, 1, cz);
+                    }
+                } else if (game.selectedAction === 'TOPPLE') {
+                    hl.scale.set(1, 10, 0.5);
+                    if (intersects[0].point.z < cz) {
+                        hl.position.set(cx, 1, cz - GAP_SIZE/4);
+                    } else {
+                        hl.position.set(cx, 1, cz + GAP_SIZE/4);
+                    }
+                } else {
                     hl.scale.set(1, 1, 1);
                     hl.position.set(cx, 0.2, cz);
-                    hl.material = activeCellMat;
-                } else {
-                    if (Math.abs(ox) > Math.abs(oz)) {
-                        hl.material = wallPushMat;
-                        hl.scale.set(0.4, 10, 1);
-                        hl.position.set(cx + (ox < 0 ? -0.4 : 0.4), 1, cz);
-                    } else {
-                        hl.material = wallToppleMat;
-                        hl.scale.set(1, 10, 0.4);
-                        hl.position.set(cx, 1, cz + (oz < 0 ? -0.2 : 0.2));
-                    }
                 }
             } else if (u.type === 'vWall') {
                 const cx = x + TILE_SIZE/2 + GAP_SIZE/2;
                 const cz = z;
-                const p = intersects[0].point;
-                const ox = p.x - cx, oz = p.z - cz;
-
-                if (!game.vWalls[u.r][u.c]) {
+                
+                if (game.selectedAction === 'PUSH') {
+                    hl.scale.set(1, 10, 0.5);
+                    if (intersects[0].point.z < cz) {
+                        hl.position.set(cx, 1, cz - TILE_SIZE/4);
+                    } else {
+                        hl.position.set(cx, 1, cz + TILE_SIZE/4);
+                    }
+                } else if (game.selectedAction === 'TOPPLE') {
+                    hl.scale.set(0.5, 10, 1);
+                    if (intersects[0].point.x < cx) {
+                        hl.position.set(cx - GAP_SIZE/4, 1, cz);
+                    } else {
+                        hl.position.set(cx + GAP_SIZE/4, 1, cz);
+                    }
+                } else {
                     hl.scale.set(1, 1, 1);
                     hl.position.set(cx, 0.2, cz);
-                    hl.material = activeCellMat;
-                } else {
-                    if (Math.abs(oz) > Math.abs(ox)) {
-                        hl.material = wallPushMat;
-                        hl.scale.set(1, 10, 0.4);
-                        hl.position.set(cx, 1, cz + (oz < 0 ? -0.4 : 0.4));
-                    } else {
-                        hl.material = wallToppleMat;
-                        hl.scale.set(0.4, 10, 1);
-                        hl.position.set(cx + (ox < 0 ? -0.2 : 0.2), 1, cz);
-                    }
                 }
             }
         }
@@ -385,9 +390,12 @@ function onPointerClick(event) {
 
     raycaster.setFromCamera(mouse, camera);
     
-    const targets = [...cellMeshes, ...hWallTriggers, ...vWallTriggers];
+    let interactables = [];
+    if (game.selectedAction === 'MOVE') interactables = cellMeshes;
+    else if (game.selectedAction === 'PUSH' || game.selectedAction === 'TOPPLE') interactables = [...hWallTriggers, ...vWallTriggers];
+    else interactables = [...cellMeshes, ...hWallTriggers, ...vWallTriggers];
     
-    const intersects = raycaster.intersectObjects(targets);
+    const intersects = raycaster.intersectObjects(interactables);
 
     if (intersects.length > 0) {
         const u = intersects[0].object.userData;
@@ -395,17 +403,45 @@ function onPointerClick(event) {
         if (u.type === 'cell') {
             game.handleCellClick(u.r, u.c);
         } else if (u.type === 'hWall') {
-            const p = intersects[0].point;
-            const { x, z } = getPos(u.r, u.c);
-            const cx = x;
-            const cz = z + TILE_SIZE/2 + GAP_SIZE/2;
-            game.handleWallAction('h', u.r, u.c, p.x - cx, p.z - cz);
+            if (game.selectedAction === 'PUSH' || game.selectedAction === 'TOPPLE') {
+                const wallInfo = game.handleWallClick('h', u.r, u.c);
+                if (wallInfo) {
+                    const { x, z } = getPos(u.r, u.c);
+                    const cx = x;
+                    const cz = z + TILE_SIZE/2 + GAP_SIZE/2;
+                    const clickX = intersects[0].point.x;
+                    const clickZ = intersects[0].point.z;
+                    if (game.selectedAction === 'PUSH') {
+                        if (clickX < cx) game.executePush('right');
+                        else game.executePush('left');
+                    } else { // TOPPLE
+                        if (clickZ < cz) game.executeTopple('down');
+                        else game.executeTopple('up');
+                    }
+                }
+            } else {
+                game.handleWallClick('h', u.r, u.c);
+            }
         } else if (u.type === 'vWall') {
-            const p = intersects[0].point;
-            const { x, z } = getPos(u.r, u.c);
-            const cx = x + TILE_SIZE/2 + GAP_SIZE/2;
-            const cz = z;
-            game.handleWallAction('v', u.r, u.c, p.x - cx, p.z - cz);
+            if (game.selectedAction === 'PUSH' || game.selectedAction === 'TOPPLE') {
+                const wallInfo = game.handleWallClick('v', u.r, u.c);
+                if (wallInfo) {
+                    const { x, z } = getPos(u.r, u.c);
+                    const cx = x + TILE_SIZE/2 + GAP_SIZE/2;
+                    const cz = z;
+                    const clickX = intersects[0].point.x;
+                    const clickZ = intersects[0].point.z;
+                    if (game.selectedAction === 'PUSH') {
+                        if (clickZ < cz) game.executePush('down');
+                        else game.executePush('up');
+                    } else { // TOPPLE
+                        if (clickX < cx) game.executeTopple('right');
+                        else game.executeTopple('left');
+                    }
+                }
+            } else {
+                game.handleWallClick('v', u.r, u.c);
+            }
         }
     }
 }
@@ -508,6 +544,15 @@ function createPlayerFigure(player) {
 
 // --- UI Interaction ---
 
+function setUIAction(action) {
+    game.setAction(action);
+}
+
+btnLay.onclick = () => setUIAction('LAY');
+btnMove.onclick = () => setUIAction('MOVE');
+btnPush.onclick = () => setUIAction('PUSH');
+btnTopple.onclick = () => setUIAction('TOPPLE');
+
 // HUD logic
 document.getElementById('btn-p2').onclick = (e) => startNewGame(2, e.target);
 document.getElementById('btn-p3').onclick = (e) => startNewGame(3, e.target);
@@ -554,7 +599,10 @@ game.on('onInit', (data) => {
             if (data.fields[r][c]) createPlate(r, c);
         }
     }
+    setUIAction('LAY');
 });
+
+game.on('onTurnStart', (data) => {
     statusText.innerText = `${data.player.name} to move`;
     playerColorBox.style.backgroundColor = '#' + data.player.colorHex.toString(16).padStart(6, '0');
 });
@@ -565,6 +613,15 @@ game.on('onPlateLaid', (data) => {
 
 game.on('onWallLaid', (data) => {
     createWall(data.type, data.r, data.c);
+});
+
+game.on('onActionChanged', (action) => {
+    document.querySelectorAll('.action-btn-custom').forEach(b => b.classList.remove('active'));
+    
+    if (action === 'LAY') btnLay.classList.add('active');
+    else if (action === 'MOVE') btnMove.classList.add('active');
+    else if (action === 'PUSH') btnPush.classList.add('active');
+    else if (action === 'TOPPLE') btnTopple.classList.add('active');
 });
 
 game.on('onFigureMoved', (data) => {
@@ -707,7 +764,15 @@ window.addEventListener('keydown', (e) => {
     const newC = cp.col + targetC;
     
     if (newR >= 0 && newR < BOARD_SIZE && newC >= 0 && newC < BOARD_SIZE) {
-        game.handleCellClick(newR, newC);
+        const oldAction = game.selectedAction;
+        game.setAction('MOVE');
+        
+        if (game.isValidMoveTarget(cp, newR, newC)) {
+            game.handleCellClick(newR, newC);
+        } else {
+            game.setAction(oldAction);
+            game.log("Invalid move in that direction.");
+        }
     }
 });
 

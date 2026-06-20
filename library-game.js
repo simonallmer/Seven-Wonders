@@ -17,6 +17,7 @@ class LibraryGame {
         this.boardSize = BOARD_SIZE;
         this.numPlayers = 2;
         this.currentPlayer = 0;
+        this.selectedAction = 'LAY'; // LAY, MOVE, PUSH, TOPPLE
         this.selectedWallForAction = null; // {type: 'h'|'v', r, c}
         this.winner = null;
         this.players = [];
@@ -30,6 +31,7 @@ class LibraryGame {
         this.listeners = {
             onInit: [],
             onTurnStart: [],
+            onActionChanged: [],
             onPlateLaid: [],
             onWallLaid: [],
             onFigureMoved: [],
@@ -61,6 +63,7 @@ class LibraryGame {
         this.numPlayers = pCount;
         this.winner = null;
         this.currentPlayer = 0;
+        this.selectedAction = 'LAY';
         this.selectedWallForAction = null;
 
         // Reset boards
@@ -125,64 +128,74 @@ class LibraryGame {
         this.log(`Game started with ${this.numPlayers} players. Lay plates or walls.`);
     }
 
+    setAction(action) {
+        if (this.winner) return;
+        this.selectedAction = action;
+        this.selectedWallForAction = null;
+        this.trigger('onActionChanged', action);
+    }
+
     handleCellClick(r, c) {
         if (this.winner) return;
         const cp = this.players[this.currentPlayer];
 
-        if (cp.row === r && cp.col === c) return;
-
-        if (this.fields[r][c] && this.isValidMoveTarget(cp, r, c)) {
-            const oldR = cp.row, oldC = cp.col;
-            cp.row = r;
-            cp.col = c;
-            this.trigger('onFigureMoved', { player: cp, r, c, oldR, oldC });
-            this.checkWinCondition(cp);
-            if (!this.winner) this.endTurn();
-            return;
-        }
-
-        if (!this.fields[r][c]) {
+        if (this.selectedAction === 'LAY') {
+            if (this.fields[r][c]) {
+                this.log("A plate is already placed here.");
+                return;
+            }
             this.fields[r][c] = true;
+            this.log(`${cp.name} laid a plate at [${r}, ${c}].`);
             this.trigger('onPlateLaid', { r, c });
             this.endTurn();
-            return;
+        } 
+        else if (this.selectedAction === 'MOVE') {
+            if (this.isValidMoveTarget(cp, r, c)) {
+                cp.row = r;
+                cp.col = c;
+                this.log(`${cp.name} moved figure to [${r}, ${c}].`);
+                this.trigger('onFigureMoved', { player: cp, r, c });
+                
+                this.checkWinCondition(cp);
+                if (!this.winner) {
+                    this.endTurn();
+                }
+            } else {
+                this.log("Invalid destination. Choose a connected adjacent Plate.");
+            }
         }
-
-        this.log("Can't do that.");
     }
 
-    handleWallAction(type, r, c, offsetX, offsetZ) {
+    handleWallClick(type, r, c) {
         if (this.winner) return;
         const cp = this.players[this.currentPlayer];
 
-        const hasWall = type === 'h' ? this.hWalls[r][c] : this.vWalls[r][c];
-
-        if (!hasWall) {
+        if (this.selectedAction === 'LAY') {
             if (type === 'h') {
+                if (this.hWalls[r][c]) return this.log("A wall already exists here.");
+                if (r === 0 || r === BOARD_SIZE - 2) return this.log("Cannot place walls on starting outer lines.");
+                
                 this.hWalls[r][c] = true;
+                this.log(`${cp.name} laid a horizontal wall.`);
                 this.trigger('onWallLaid', { type, r, c });
+                this.endTurn();
             } else {
+                if (this.vWalls[r][c]) return this.log("A wall already exists here.");
+                if ((c === 0 || c === BOARD_SIZE - 2) && this.numPlayers > 2) return this.log("Cannot place walls on side outer lines in 3/4 player mode.");
+                
                 this.vWalls[r][c] = true;
+                this.log(`${cp.name} laid a vertical wall.`);
                 this.trigger('onWallLaid', { type, r, c });
+                this.endTurn();
             }
-            this.endTurn();
-            return;
-        }
-
-        this.selectedWallForAction = { type, r, c };
-
-        if (type === 'h') {
-            if (Math.abs(offsetX) > Math.abs(offsetZ)) {
-                this.executePush(offsetX < 0 ? 'left' : 'right');
-            } else {
-                this.executeTopple(offsetZ < 0 ? 'up' : 'down');
-            }
-        } else {
-            if (Math.abs(offsetZ) > Math.abs(offsetX)) {
-                this.executePush(offsetZ < 0 ? 'up' : 'down');
-            } else {
-                this.executeTopple(offsetX < 0 ? 'left' : 'right');
-            }
+        } 
+        else if (this.selectedAction === 'PUSH' || this.selectedAction === 'TOPPLE') {
+            const hasWall = (type === 'h' ? this.hWalls[r][c] : this.vWalls[r][c]);
+            if (!hasWall) return this.log("Select an active standing wall.");
+            
+            this.selectedWallForAction = { type, r, c };
+            // Allow UI to prompt for direction
+            return this.selectedWallForAction; 
         }
     }
 
@@ -367,6 +380,7 @@ class LibraryGame {
 
     endTurn() {
         this.currentPlayer = (this.currentPlayer + 1) % this.numPlayers;
+        this.setAction('LAY');
         this.trigger('onTurnStart', { player: this.players[this.currentPlayer] });
     }
 
