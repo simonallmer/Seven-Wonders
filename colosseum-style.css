@@ -487,6 +487,9 @@ body {
     border-radius: 24px;
     cursor: pointer;
     transition: all 0.25s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
 }
 
 .action-chip:hover {
@@ -502,7 +505,7 @@ body {
 }
 
 .action-chip:disabled {
-    opacity: 0.35;
+    opacity: 0.55;
     cursor: not-allowed;
 }
 
@@ -608,8 +611,14 @@ body {
         padding: 0 16px;
     }
     .action-chip {
-        padding: 8px 14px;
+        padding: 10px 16px;
         font-size: 0.8rem;
+        min-width: 64px;
+    }
+    .action-bar {
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 32px;
     }
     .dir-grid {
         grid-template-columns: repeat(3, 54px);
