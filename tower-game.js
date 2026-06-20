@@ -236,9 +236,9 @@ function setMode(m) {
     mode = m;
     selected = null;
     attackTargets = [];
-    if (m === 'place') setPrompt(pool[turn] > 0 ? 'PLACE — tap an empty slot to raise a tile (faces you, number 1).' : 'No tiles left in your pool.');
-    if (m === 'move') setPrompt('MOVE / ATTACK — tap your tile, then an empty slot to slide, or an enemy chain to strike.');
-    if (m === 'levelup') setPrompt('LEVEL UP — tap your tile to rotate its number up (3 → 1 grants a bonus move).');
+    if (m === 'place') setPrompt(pool[turn] > 0 ? '' : '');
+    if (m === 'move') setPrompt('');
+    if (m === 'levelup') setPrompt('');
     drawBoard();
 }
 
@@ -246,9 +246,7 @@ function setMode(m) {
 function selectMover(l, s) {
     selected = { level: l, slot: s };
     attackTargets = computeAttackTargets(l, s);
-    setPrompt(attackTargets.length
-        ? 'Tap an empty slot to move — or the highlighted enemy chain to attack (green = you win).'
-        : 'Tap an adjacent empty slot to move.');
+    setPrompt('');
     drawBoard();
 }
 
@@ -325,7 +323,7 @@ function doLevelUp(l, s) {
             bonusActive = true;
             mode = 'bonus';
             selected = null;
-            setPrompt('BONUS — the cycle rang the bell! Move ANY one tile to an adjacent empty slot.');
+            setPrompt('');
             drawBoard();
         } else {
             showMessage('Tile leveled to ' + t.num + '.');
@@ -336,7 +334,7 @@ function doLevelUp(l, s) {
 }
 function handleBonus(l, s, t) {
     if (!selected) {
-        if (t) { selected = { level: l, slot: s }; setPrompt('Now tap an adjacent empty slot for that tile.'); drawBoard(); }
+        if (t) { selected = { level: l, slot: s }; setPrompt(''); drawBoard(); }
         return;
     }
     if (selected.level === l && selected.slot === s) { selected = null; drawBoard(); return; }
