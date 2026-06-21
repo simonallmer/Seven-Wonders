@@ -6,10 +6,10 @@
 const BOARD_SIZE = 7;
 
 const PLAYER_COLORS = [
-    { id: 0, name: 'Player 1', hex: 0x06b6d4 }, // Cyan
-    { id: 1, name: 'Player 2', hex: 0xf43f5e }, // Rose
-    { id: 2, name: 'Player 3', hex: 0xf59e0b }, // Amber
-    { id: 3, name: 'Player 4', hex: 0xa855f7 }  // Purple
+    { id: 0, name: 'Player 1', hex: 0xf8f8f8 }, // White
+    { id: 1, name: 'Player 2', hex: 0x2a2a2a }, // Black
+    { id: 2, name: 'Player 3', hex: 0xcc3333 }, // Red
+    { id: 3, name: 'Player 4', hex: 0x3366cc }  // Blue
 ];
 
 class LibraryGame {
@@ -23,9 +23,9 @@ class LibraryGame {
         this.players = [];
         
         // State matrices
-        this.fields = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(false));
-        this.hWalls = Array(BOARD_SIZE - 1).fill(null).map(() => Array(BOARD_SIZE).fill(false));
-        this.vWalls = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE - 1).fill(false));
+        this.fields = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
+        this.hWalls = Array(BOARD_SIZE - 1).fill(null).map(() => Array(BOARD_SIZE).fill(null));
+        this.vWalls = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE - 1).fill(null));
 
         // Event listeners (for 3D renderer)
         this.listeners = {
@@ -69,17 +69,17 @@ class LibraryGame {
         // Reset boards
         for (let r = 0; r < BOARD_SIZE; r++) {
             for (let c = 0; c < BOARD_SIZE; c++) {
-                this.fields[r][c] = false;
+                this.fields[r][c] = null;
             }
         }
         for (let r = 0; r < BOARD_SIZE - 1; r++) {
             for (let c = 0; c < BOARD_SIZE; c++) {
-                this.hWalls[r][c] = false;
+                this.hWalls[r][c] = null;
             }
         }
         for (let r = 0; r < BOARD_SIZE; r++) {
             for (let c = 0; c < BOARD_SIZE - 1; c++) {
-                this.vWalls[r][c] = false;
+                this.vWalls[r][c] = null;
             }
         }
 
@@ -102,26 +102,13 @@ class LibraryGame {
                 id: i,
                 name: PLAYER_COLORS[i].name,
                 colorHex: PLAYER_COLORS[i].hex,
-                row: null, 
+                row: null,
                 col: null,
                 startRow, startCol, goalRow, goalCol, directionDesc
             });
         }
 
-        // Starting plate defaults - ONE in the middle of each starting line
-        const mid = Math.floor(BOARD_SIZE / 2);
-        for (let i = 0; i < this.numPlayers; i++) {
-            const p = this.players[i];
-            if (p.startRow !== null) {
-                this.fields[p.startRow][mid] = true;
-                p.row = p.startRow;
-                p.col = mid;
-            } else if (p.startCol !== null) {
-                this.fields[mid][p.startCol] = true;
-                p.row = mid;
-                p.col = p.startCol;
-            }
-        }
+        // Stone starts in the room — no starting plates, deploy to any edge cell
 
         this.trigger('onInit', { players: this.players, fields: this.fields });
         this.trigger('onTurnStart', { player: this.players[this.currentPlayer] });
@@ -140,13 +127,13 @@ class LibraryGame {
         const cp = this.players[this.currentPlayer];
 
         if (this.selectedAction === 'LAY') {
-            if (this.fields[r][c]) {
+            if (this.fields[r][c] !== null) {
                 this.log("A plate is already placed here.");
                 return;
             }
-            this.fields[r][c] = true;
+            this.fields[r][c] = this.currentPlayer;
             this.log(`${cp.name} laid a plate at [${r}, ${c}].`);
-            this.trigger('onPlateLaid', { r, c });
+            this.trigger('onPlateLaid', { r, c, owner: this.currentPlayer });
             this.endTurn();
         } 
         else if (this.selectedAction === 'MOVE') {
@@ -172,24 +159,24 @@ class LibraryGame {
 
         if (this.selectedAction === 'LAY') {
             if (type === 'h') {
-                if (this.hWalls[r][c]) return this.log("A wall already exists here.");
-                
-                this.hWalls[r][c] = true;
+                if (this.hWalls[r][c] !== null) return this.log("A wall already exists here.");
+
+                this.hWalls[r][c] = this.currentPlayer;
                 this.log(`${cp.name} laid a horizontal wall.`);
-                this.trigger('onWallLaid', { type, r, c });
+                this.trigger('onWallLaid', { type, r, c, owner: this.currentPlayer });
                 this.endTurn();
             } else {
-                if (this.vWalls[r][c]) return this.log("A wall already exists here.");
-                
-                this.vWalls[r][c] = true;
+                if (this.vWalls[r][c] !== null) return this.log("A wall already exists here.");
+
+                this.vWalls[r][c] = this.currentPlayer;
                 this.log(`${cp.name} laid a vertical wall.`);
-                this.trigger('onWallLaid', { type, r, c });
+                this.trigger('onWallLaid', { type, r, c, owner: this.currentPlayer });
                 this.endTurn();
             }
         } 
         else if (this.selectedAction === 'PUSH' || this.selectedAction === 'TOPPLE') {
             const hasWall = (type === 'h' ? this.hWalls[r][c] : this.vWalls[r][c]);
-            if (!hasWall) return this.log("Select an active standing wall.");
+            if (hasWall === null) return this.log("Select an active standing wall.");
             
             this.selectedWallForAction = { type, r, c };
             // Allow UI to prompt for direction
@@ -198,28 +185,58 @@ class LibraryGame {
     }
 
     isValidMoveTarget(player, r, c) {
-        if (!this.fields[r][c]) return false;
         if (this.players.find(p => p.row === r && p.col === c)) return false;
 
-        // Deploying from offboard
+        // Deploying from room — must have your own plate on the edge
         if (player.row === null) {
-            const mid = Math.floor(BOARD_SIZE / 2);
-            if (player.startRow !== null) return r === player.startRow && c === mid;
-            if (player.startCol !== null) return c === player.startCol && r === mid;
+            if (this.fields[r][c] !== player.id) return false;
+            if (player.startRow !== null) return r === player.startRow;
+            if (player.startCol !== null) return c === player.startCol;
             return false;
         }
 
-        const rDiff = Math.abs(player.row - r);
-        const cDiff = Math.abs(player.col - c);
-        
-        if ((rDiff === 1 && cDiff === 0) || (rDiff === 0 && cDiff === 1)) {
-            // Check walls
-            if (player.row === r) {
-                const minCol = Math.min(player.col, c);
-                return !this.vWalls[r][minCol];
-            } else {
-                const minRow = Math.min(player.row, r);
-                return !this.hWalls[minRow][c];
+        if (this.fields[r][c] === null) return false;
+
+        // BFS through own-color plates to find reachable territory
+        const visited = new Set();
+        const queue = [[player.row, player.col]];
+        visited.add(`${player.row},${player.col}`);
+
+        while (queue.length > 0) {
+            const [cr, cc] = queue.shift();
+            if (cr === r && cc === c) return true;
+
+            const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+            for (const [dr, dc] of dirs) {
+                const nr = cr + dr, nc = cc + dc;
+                const key = `${nr},${nc}`;
+                if (visited.has(key)) continue;
+                if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) continue;
+
+                // Check wall between current and next
+                if (dr !== 0) {
+                    const minRow = Math.min(cr, nr);
+                    if (this.hWalls[minRow][cc] !== null) continue;
+                } else {
+                    const minCol = Math.min(cc, nc);
+                    if (this.vWalls[cr][minCol] !== null) continue;
+                }
+
+                const cell = this.fields[nr][nc];
+                if (cell === null) continue;
+
+                if (cell === player.id) {
+                    // Own plate — can traverse through
+                    visited.add(key);
+                    queue.push([nr, nc]);
+                } else if (cr === player.row && cc === player.col) {
+                    // Enemy plate adjacent to player's current cell — one-step reachable
+                    if (nr === r && nc === c) return true;
+                    visited.add(key); // mark seen so we don't re-check
+                } else if (nr === r && nc === c) {
+                    // Enemy plate adjacent to a reachable own cell
+                    return true;
+                }
             }
         }
         return false;
@@ -235,48 +252,48 @@ class LibraryGame {
         if (type === 'h') {
             if (direction === 'left') {
                 let targetCol = c;
-                while(targetCol >= 0 && this.hWalls[r][targetCol]) { shiftMap.push(targetCol); targetCol--; }
+                while(targetCol >= 0 && this.hWalls[r][targetCol] !== null) { shiftMap.push(targetCol); targetCol--; }
                 if (targetCol < 0) return this.log("Push blocked: edge of board.");
-                
+
                 for(let i = shiftMap.length - 1; i >= 0; i--) {
                     let col = shiftMap[i];
-                    this.hWalls[r][col] = false;
-                    this.hWalls[r][col - 1] = true;
+                    this.hWalls[r][col - 1] = this.hWalls[r][col];
+                    this.hWalls[r][col] = null;
                     this.trigger('onWallMoved', { type: 'h', r, oldC: col, newC: col - 1 });
                 }
             } else if (direction === 'right') {
                 let targetCol = c;
-                while(targetCol < BOARD_SIZE && this.hWalls[r][targetCol]) { shiftMap.push(targetCol); targetCol++; }
+                while(targetCol < BOARD_SIZE && this.hWalls[r][targetCol] !== null) { shiftMap.push(targetCol); targetCol++; }
                 if (targetCol >= BOARD_SIZE) return this.log("Push blocked: edge of board.");
-                
+
                 for(let i = shiftMap.length - 1; i >= 0; i--) {
                     let col = shiftMap[i];
-                    this.hWalls[r][col] = false;
-                    this.hWalls[r][col + 1] = true;
+                    this.hWalls[r][col + 1] = this.hWalls[r][col];
+                    this.hWalls[r][col] = null;
                     this.trigger('onWallMoved', { type: 'h', r, oldC: col, newC: col + 1 });
                 }
             }
         } else if (type === 'v') {
             if (direction === 'up') {
                 let targetRow = r;
-                while(targetRow >= 0 && this.vWalls[targetRow][c]) { shiftMap.push(targetRow); targetRow--; }
+                while(targetRow >= 0 && this.vWalls[targetRow][c] !== null) { shiftMap.push(targetRow); targetRow--; }
                 if (targetRow < 0) return this.log("Push blocked: edge of board.");
-                
+
                 for(let i = shiftMap.length - 1; i >= 0; i--) {
                     let row = shiftMap[i];
-                    this.vWalls[row][c] = false;
-                    this.vWalls[row - 1][c] = true;
+                    this.vWalls[row - 1][c] = this.vWalls[row][c];
+                    this.vWalls[row][c] = null;
                     this.trigger('onWallMoved', { type: 'v', oldR: row, newR: row - 1, c });
                 }
             } else if (direction === 'down') {
                 let targetRow = r;
-                while(targetRow < BOARD_SIZE && this.vWalls[targetRow][c]) { shiftMap.push(targetRow); targetRow++; }
+                while(targetRow < BOARD_SIZE && this.vWalls[targetRow][c] !== null) { shiftMap.push(targetRow); targetRow++; }
                 if (targetRow >= BOARD_SIZE) return this.log("Push blocked: edge of board.");
-                
+
                 for(let i = shiftMap.length - 1; i >= 0; i--) {
                     let row = shiftMap[i];
-                    this.vWalls[row][c] = false;
-                    this.vWalls[row + 1][c] = true;
+                    this.vWalls[row + 1][c] = this.vWalls[row][c];
+                    this.vWalls[row][c] = null;
                     this.trigger('onWallMoved', { type: 'v', oldR: row, newR: row + 1, c });
                 }
             }
@@ -297,26 +314,26 @@ class LibraryGame {
         if (type === 'h') {
             if (direction === 'up') {
                 let currentRow = r;
-                while(currentRow >= 0 && this.hWalls[currentRow][c]) {
+                while(currentRow >= 0 && this.hWalls[currentRow][c] !== null) {
                     toppleChain.push({r: currentRow, c: c});
                     currentRow--;
                 }
-                
+
                 toppleChain.forEach(wall => {
-                    this.hWalls[wall.r][wall.c] = false;
+                    this.hWalls[wall.r][wall.c] = null;
                     this.trigger('onWallToppled', { type: 'h', r: wall.r, c: wall.c, dir: direction });
                     if (direction === 'up') this.makePlateAndCrush(wall.r, wall.c);
                     else this.makePlateAndCrush(wall.r + 1, wall.c);
                 });
             } else if (direction === 'down') {
                 let currentRow = r;
-                while(currentRow < BOARD_SIZE - 1 && this.hWalls[currentRow][c]) {
+                while(currentRow < BOARD_SIZE - 1 && this.hWalls[currentRow][c] !== null) {
                     toppleChain.push({r: currentRow, c: c});
                     currentRow++;
                 }
-                
+
                 toppleChain.forEach(wall => {
-                    this.hWalls[wall.r][wall.c] = false;
+                    this.hWalls[wall.r][wall.c] = null;
                     this.trigger('onWallToppled', { type: 'h', r: wall.r, c: wall.c, dir: direction });
                     if (direction === 'up') this.makePlateAndCrush(wall.r, wall.c);
                     else this.makePlateAndCrush(wall.r + 1, wall.c);
@@ -325,26 +342,26 @@ class LibraryGame {
         } else if (type === 'v') {
             if (direction === 'left') {
                 let currentCol = c;
-                while(currentCol >= 0 && this.vWalls[r][currentCol]) {
+                while(currentCol >= 0 && this.vWalls[r][currentCol] !== null) {
                     toppleChain.push({r: r, c: currentCol});
                     currentCol--;
                 }
-                
+
                 toppleChain.forEach(wall => {
-                    this.vWalls[wall.r][wall.c] = false;
+                    this.vWalls[wall.r][wall.c] = null;
                     this.trigger('onWallToppled', { type: 'v', r: wall.r, c: wall.c, dir: direction });
                     if (direction === 'left') this.makePlateAndCrush(wall.r, wall.c);
                     else this.makePlateAndCrush(wall.r, wall.c + 1);
                 });
             } else if (direction === 'right') {
                 let currentCol = c;
-                while(currentCol < BOARD_SIZE - 1 && this.vWalls[r][currentCol]) {
+                while(currentCol < BOARD_SIZE - 1 && this.vWalls[r][currentCol] !== null) {
                     toppleChain.push({r: r, c: currentCol});
                     currentCol++;
                 }
-                
+
                 toppleChain.forEach(wall => {
-                    this.vWalls[wall.r][wall.c] = false;
+                    this.vWalls[wall.r][wall.c] = null;
                     this.trigger('onWallToppled', { type: 'v', r: wall.r, c: wall.c, dir: direction });
                     if (direction === 'left') this.makePlateAndCrush(wall.r, wall.c);
                     else this.makePlateAndCrush(wall.r, wall.c + 1);
@@ -360,10 +377,13 @@ class LibraryGame {
     makePlateAndCrush(r, c) {
         if (r < 0 || r >= BOARD_SIZE || c < 0 || c >= BOARD_SIZE) return;
         
-        if (!this.fields[r][c]) {
-            this.fields[r][c] = true;
-            this.trigger('onPlateLaid', { r, c });
+        // Remove enemy plate if present
+        if (this.fields[r][c] !== null && this.fields[r][c] !== this.currentPlayer) {
+            this.trigger('onPlateRemoved', { r, c });
         }
+        
+        this.fields[r][c] = this.currentPlayer;
+        this.trigger('onPlateLaid', { r, c, owner: this.currentPlayer });
         
         // Crush check
         this.players.forEach(p => {
@@ -378,7 +398,9 @@ class LibraryGame {
 
     endTurn() {
         this.currentPlayer = (this.currentPlayer + 1) % this.numPlayers;
-        this.setAction('LAY');
+        if (this.selectedAction !== 'MOVE') {
+            this.setAction('LAY');
+        }
         this.trigger('onTurnStart', { player: this.players[this.currentPlayer] });
     }
 

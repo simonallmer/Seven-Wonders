@@ -17,8 +17,8 @@ const playerColorBox = document.getElementById('player-color');
 
 // --- Three.js Setup ---
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1a1512); // Deep night sky
-scene.fog = new THREE.FogExp2(0x1a1512, 0.015);
+scene.background = new THREE.Color(0x2a1f14); // Warm parchment dark
+scene.fog = new THREE.FogExp2(0x2a1f14, 0.012);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 20, 25);
@@ -40,10 +40,14 @@ controls.minDistance = 10;
 controls.maxDistance = 50;
 
 // --- Lighting (PS5 Quality Vibes) ---
-const ambientLight = new THREE.AmbientLight(0xfff0e6, 0.3); // Warm ambient
+const ambientLight = new THREE.AmbientLight(0xffeedd, 0.25); // Warm ambient
 scene.add(ambientLight);
 
-const moonLight = new THREE.DirectionalLight(0x99badd, 1.2);
+const fillLight = new THREE.DirectionalLight(0xffcc88, 0.4);
+fillLight.position.set(-10, 20, 10);
+scene.add(fillLight);
+
+const moonLight = new THREE.DirectionalLight(0xffeecc, 1.0);
 moonLight.position.set(20, 40, -20);
 moonLight.castShadow = true;
 moonLight.shadow.mapSize.width = 2048;
@@ -74,27 +78,30 @@ const addTorch = (x, z) => {
 };
 
 // --- Materials ---
-const marbleMat = new THREE.MeshStandardMaterial({
-    color: 0xebd9c8,
-    roughness: 0.3,
-    metalness: 0.1,
+
+const floorTileMat1 = new THREE.MeshStandardMaterial({
+    color: 0x8a7a64,
+    roughness: 0.85,
+    metalness: 0.05,
+});
+const floorTileMat2 = new THREE.MeshStandardMaterial({
+    color: 0x9a8a72,
+    roughness: 0.85,
+    metalness: 0.05,
 });
 
-const darkStoneMat = new THREE.MeshStandardMaterial({
-    color: 0x3d352b,
-    roughness: 0.8,
-    metalness: 0.2,
-});
-
-const woodMat = new THREE.MeshStandardMaterial({
-    color: 0x5c4033,
+const cellMat = new THREE.MeshStandardMaterial({
+    color: 0x6b5a48,
     roughness: 0.9,
 });
 
-const plateMat = new THREE.MeshStandardMaterial({
-    color: 0xf5f5dc,
-    roughness: 0.4,
-    metalness: 0.1,
+const roomMat = new THREE.MeshStandardMaterial({
+    color: 0x7a6a58,
+    roughness: 0.8,
+});
+const shelfMat = new THREE.MeshStandardMaterial({
+    color: 0x4a3525,
+    roughness: 0.9,
 });
 
 const activeCellMat = new THREE.MeshStandardMaterial({
@@ -107,12 +114,26 @@ const activeCellMat = new THREE.MeshStandardMaterial({
 const courtyardGroup = new THREE.Group();
 scene.add(courtyardGroup);
 
-// Floor
-const floorGeo = new THREE.PlaneGeometry(40, 40);
-const floor = new THREE.Mesh(floorGeo, darkStoneMat);
-floor.rotation.x = -Math.PI / 2;
-floor.receiveShadow = true;
-courtyardGroup.add(floor);
+// Floor — geometric tile pattern
+const floorGroup = new THREE.Group();
+courtyardGroup.add(floorGroup);
+const TILE_COUNT = 8;
+const FLOOR_SIZE = 40;
+const tileDim = FLOOR_SIZE / TILE_COUNT;
+for (let tr = 0; tr < TILE_COUNT; tr++) {
+    for (let tc = 0; tc < TILE_COUNT; tc++) {
+        const mat = (tr + tc) % 2 === 0 ? floorTileMat1 : floorTileMat2;
+        const tile = new THREE.Mesh(new THREE.PlaneGeometry(tileDim - 0.1, tileDim - 0.1), mat);
+        tile.rotation.x = -Math.PI / 2;
+        tile.position.set(
+            -FLOOR_SIZE / 2 + tileDim / 2 + tc * tileDim,
+            0,
+            -FLOOR_SIZE / 2 + tileDim / 2 + tr * tileDim
+        );
+        tile.receiveShadow = true;
+        floorGroup.add(tile);
+    }
+}
 
 // Generate 4 Study Rooms (North, South, East, West)
 const createStudyRoom = (x, z, rot) => {
@@ -120,27 +141,33 @@ const createStudyRoom = (x, z, rot) => {
     roomGroup.position.set(x, 0, z);
     roomGroup.rotation.y = rot;
 
-    const base = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 6), marbleMat);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 6), roomMat);
     base.position.y = 0.25;
     base.receiveShadow = true;
     roomGroup.add(base);
 
-    // Archway
-    const archGeo = new THREE.TorusGeometry(3, 0.5, 16, 32, Math.PI);
-    const arch = new THREE.Mesh(archGeo, marbleMat);
-    arch.position.set(0, 4, 3);
-    arch.castShadow = true;
-    roomGroup.add(arch);
-    
-    const pillarGeo = new THREE.CylinderGeometry(0.5, 0.5, 4, 16);
-    const p1 = new THREE.Mesh(pillarGeo, marbleMat);
-    p1.position.set(-3, 2, 3);
-    p1.castShadow = true;
-    roomGroup.add(p1);
-    
-    const p2 = p1.clone();
-    p2.position.set(3, 2, 3);
-    roomGroup.add(p2);
+    // Pillars
+    const pillarGeo = new THREE.CylinderGeometry(0.4, 0.4, 4, 12);
+    const pillarMat = new THREE.MeshStandardMaterial({ color: 0x8a7a64, roughness: 0.7 });
+    [-3, 3].forEach(offX => {
+        const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+        pillar.position.set(offX, 2.2, 2.8);
+        pillar.castShadow = true;
+        roomGroup.add(pillar);
+    });
+
+    // Bookshelf along back wall
+    const shelfMat = new THREE.MeshStandardMaterial({ color: 0x4a3525, roughness: 0.9 });
+    const shelfColors = [0x6b3a2a, 0x8b5e3c, 0x3d2b1f, 0x7a4a2a, 0x5c3a1e];
+    for (let i = 0; i < 5; i++) {
+        const book = new THREE.Mesh(
+            new THREE.BoxGeometry(0.6 + Math.random() * 0.4, 0.8 + Math.random() * 0.6, 0.5),
+            new THREE.MeshStandardMaterial({ color: shelfColors[i % 5], roughness: 0.8 })
+        );
+        book.position.set(-3 + i * 1.4 + Math.random() * 0.2, 0.8 + Math.random() * 0.3, 3.2);
+        book.castShadow = true;
+        roomGroup.add(book);
+    }
 
     addTorch(x, z);
 
@@ -185,7 +212,7 @@ for (let r = 0; r < BOARD_SIZE; r++) {
         // Base grid visual (darker indentation)
         const cellBase = new THREE.Mesh(
             new THREE.BoxGeometry(TILE_SIZE, 0.1, TILE_SIZE),
-            new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 })
+            cellMat
         );
         cellBase.position.set(x, 0.05, z);
         cellBase.receiveShadow = true;
@@ -414,9 +441,9 @@ function onPointerClick(event) {
                     if (game.selectedAction === 'PUSH') {
                         if (clickX < cx) game.executePush('right');
                         else game.executePush('left');
-                    } else { // TOPPLE
-                        if (clickZ < cz) game.executeTopple('down');
-                        else game.executeTopple('up');
+                    } else { // TOPPLE — falls toward where you click
+                        if (clickZ < cz) game.executeTopple('up');
+                        else game.executeTopple('down');
                     }
                 }
             } else {
@@ -434,9 +461,9 @@ function onPointerClick(event) {
                     if (game.selectedAction === 'PUSH') {
                         if (clickZ < cz) game.executePush('down');
                         else game.executePush('up');
-                    } else { // TOPPLE
-                        if (clickX < cx) game.executeTopple('right');
-                        else game.executeTopple('left');
+                    } else { // TOPPLE — falls toward where you click
+                        if (clickX < cx) game.executeTopple('left');
+                        else game.executeTopple('right');
                     }
                 }
             } else {
@@ -457,29 +484,66 @@ function onWindowResize() {
 
 // --- Visual Helpers ---
 
-function createPlate(r, c) {
+function createPlate(r, c, owner) {
     const { x, z } = getPos(r, c);
-    const plate = new THREE.Mesh(
-        new THREE.BoxGeometry(TILE_SIZE - 0.1, 0.2, TILE_SIZE - 0.1),
-        plateMat
+    const bookGroup = new THREE.Group();
+    bookGroup.position.set(x, 0, z);
+
+    const ownerColors = [0xf8f8f8, 0x2a2a2a, 0xcc3333, 0x3366cc];
+    const col = ownerColors[owner % ownerColors.length];
+
+    // Cover — neutral brown
+    const cover = new THREE.Mesh(
+        new THREE.BoxGeometry(TILE_SIZE - 0.15, 0.08, TILE_SIZE - 0.1),
+        new THREE.MeshStandardMaterial({
+            color: 0x5c3a1e,
+            roughness: 0.8,
+        })
     );
-    plate.position.set(x, 0.1, z);
-    plate.castShadow = true;
-    plate.receiveShadow = true;
-    boardGroup.add(plate);
-    plateMeshes[`${r}_${c}`] = plate;
-    
+    cover.position.y = 0.04;
+    cover.castShadow = true;
+    cover.receiveShadow = true;
+    bookGroup.add(cover);
+
+    // Pages — owner color (most visible from above)
+    const pages = new THREE.Mesh(
+        new THREE.BoxGeometry(TILE_SIZE - 0.3, 0.12, TILE_SIZE - 0.2),
+        new THREE.MeshStandardMaterial({
+            color: col,
+            roughness: 0.85,
+        })
+    );
+    pages.position.y = 0.14;
+    pages.castShadow = true;
+    bookGroup.add(pages);
+
+    // Spine accent
+    const spine = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, 0.18, TILE_SIZE - 0.2),
+        new THREE.MeshStandardMaterial({
+            color: 0x3d2010,
+            roughness: 0.9,
+        })
+    );
+    spine.position.set(-(TILE_SIZE / 2 - 0.15), 0.15, 0);
+    bookGroup.add(spine);
+
+    boardGroup.add(bookGroup);
+    plateMeshes[`${r}_${c}`] = bookGroup;
+
     // Animate in
-    plate.scale.set(0.1, 0.1, 0.1);
-    new TWEEN.Tween(plate.scale)
+    bookGroup.scale.set(0.1, 0.1, 0.1);
+    new TWEEN.Tween(bookGroup.scale)
         .to({ x: 1, y: 1, z: 1 }, 400)
         .easing(TWEEN.Easing.Back.Out)
         .start();
 }
 
-function createWall(type, r, c) {
+function createWall(type, r, c, owner) {
     const { x, z } = getPos(r, c);
-    
+    const ownerColors = [0xf8f8f8, 0x2a2a2a, 0xcc3333, 0x3366cc];
+    const col = ownerColors[(owner || 0) % ownerColors.length];
+
     let geo, meshX, meshZ;
     if (type === 'h') {
         geo = new THREE.BoxGeometry(TILE_SIZE, 2, GAP_SIZE - 0.1);
@@ -491,7 +555,13 @@ function createWall(type, r, c) {
         meshZ = z;
     }
 
-    const wall = new THREE.Mesh(geo, woodMat);
+    const wallMat = new THREE.MeshStandardMaterial({
+        color: col,
+        roughness: 0.65,
+        metalness: 0.1,
+    });
+
+    const wall = new THREE.Mesh(geo, wallMat);
     wall.position.set(meshX, 1, meshZ);
     wall.castShadow = true;
     wall.receiveShadow = true;
@@ -510,27 +580,47 @@ function createWall(type, r, c) {
 
 function createPlayerFigure(player) {
     const group = new THREE.Group();
-    
-    // Small scholar figure abstraction
-    const baseGeo = new THREE.CylinderGeometry(0.3, 0.4, 0.2, 16);
-    const bodyGeo = new THREE.CylinderGeometry(0.1, 0.3, 1.2, 16);
-    const headGeo = new THREE.SphereGeometry(0.25, 16, 16);
-    
-    const mat = new THREE.MeshStandardMaterial({ color: player.colorHex, roughness: 0.2, metalness: 0.8 });
-    
-    const base = new THREE.Mesh(baseGeo, mat);
-    base.position.y = 0.1;
-    base.castShadow = true;
-    
-    const body = new THREE.Mesh(bodyGeo, mat);
-    body.position.y = 0.8;
+
+    const stoneMat = new THREE.MeshStandardMaterial({
+        color: player.colorHex,
+        roughness: 0.25,
+        metalness: 0.3,
+    });
+
+    // Body — tapered cylinder
+    const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.48, 0.54, 0.65, 24),
+        stoneMat
+    );
+    body.position.y = 0.325;
     body.castShadow = true;
-    
-    const head = new THREE.Mesh(headGeo, mat);
-    head.position.y = 1.6;
-    head.castShadow = true;
-    
-    group.add(base, body, head);
+    body.receiveShadow = true;
+    group.add(body);
+
+    // Top — dome (half sphere)
+    const top = new THREE.Mesh(
+        new THREE.SphereGeometry(0.48, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+        stoneMat
+    );
+    top.position.y = 0.65;
+    top.castShadow = true;
+    group.add(top);
+
+    // Bevel — gold ring
+    const bevel = new THREE.Mesh(
+        new THREE.TorusGeometry(0.48, 0.035, 12, 32),
+        new THREE.MeshStandardMaterial({
+            color: 0xD4AF37,
+            roughness: 0.2,
+            metalness: 0.8,
+            emissive: 0x332200,
+            emissiveIntensity: 0.1,
+        })
+    );
+    bevel.rotation.x = Math.PI / 2;
+    bevel.position.y = 0.64;
+    bevel.castShadow = true;
+    group.add(bevel);
     
     // Position in study room based on ID
     if (player.id === 0) group.position.set(0, 0, 12);
@@ -590,13 +680,23 @@ game.on('onInit', (data) => {
         createPlayerFigure(p);
         if (p.row !== null) {
             const { x, z } = getPos(p.row, p.col);
-            playerMeshes[p.id].position.set(x, 1, z);
+            playerMeshes[p.id].position.set(x, 0, z);
+        } else {
+            // Place in study room
+            const roomPositions = [
+                { x: 0, z: 12 },  // player 0
+                { x: 0, z: -12 }, // player 1
+                { x: -12, z: 0 }, // player 2
+                { x: 12, z: 0 },  // player 3
+            ];
+            const pos = roomPositions[p.id] || { x: 0, z: 0 };
+            playerMeshes[p.id].position.set(pos.x, 0, pos.z);
         }
     });
     
     for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
-            if (data.fields[r][c]) createPlate(r, c);
+            if (data.fields[r][c] !== null) createPlate(r, c, data.fields[r][c]);
         }
     }
     setUIAction('LAY');
@@ -608,11 +708,17 @@ game.on('onTurnStart', (data) => {
 });
 
 game.on('onPlateLaid', (data) => {
-    createPlate(data.r, data.c);
+    const key = `${data.r}_${data.c}`;
+    const existing = plateMeshes[key];
+    if (existing) {
+        boardGroup.remove(existing);
+        delete plateMeshes[key];
+    }
+    createPlate(data.r, data.c, data.owner);
 });
 
 game.on('onWallLaid', (data) => {
-    createWall(data.type, data.r, data.c);
+    createWall(data.type, data.r, data.c, data.owner);
 });
 
 game.on('onActionChanged', (action) => {
@@ -726,13 +832,104 @@ function animate() {
     renderer.render(scene, camera);
 }
 
+// --- Move Target Cycling ---
+let moveTargets = [];
+let moveTargetIdx = -1;
+let targetRing = null;
+
+function updateTargetRing() {
+    if (!targetRing) {
+        const ringGeo = new THREE.RingGeometry(0.35, 0.5, 32);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+        targetRing = new THREE.Mesh(ringGeo, ringMat);
+        targetRing.rotation.x = -Math.PI / 2;
+        boardGroup.add(targetRing);
+    }
+    if (moveTargetIdx >= 0 && moveTargetIdx < moveTargets.length) {
+        const { r, c } = moveTargets[moveTargetIdx];
+        const { x, z } = getPos(r, c);
+        targetRing.position.set(x, 0.25, z);
+        targetRing.visible = true;
+    } else {
+        targetRing.visible = false;
+    }
+}
+
+function computeMoveTargets() {
+    moveTargets = [];
+    moveTargetIdx = -1;
+    if (game.winner || !game.players) return;
+    const cp = game.players[game.currentPlayer];
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            if (game.isValidMoveTarget(cp, r, c)) {
+                moveTargets.push({ r, c });
+            }
+        }
+    }
+    if (moveTargets.length > 0) moveTargetIdx = 0;
+    updateTargetRing();
+}
+
+game.on('onTurnStart', () => {
+    if (game.selectedAction === 'MOVE') computeMoveTargets();
+    else {
+        moveTargets = [];
+        moveTargetIdx = -1;
+        if (targetRing) targetRing.visible = false;
+    }
+});
+
+game.on('onActionChanged', (action) => {
+    if (action === 'MOVE') computeMoveTargets();
+    else {
+        moveTargets = [];
+        moveTargetIdx = -1;
+        if (targetRing) targetRing.visible = false;
+    }
+});
+
 // --- Keyboard Movement ---
 window.addEventListener('keydown', (e) => {
     if (game.winner) return;
-    
+    const key = e.key.toLowerCase();
+
+    // MOVE mode: A/D cycle targets, Enter to confirm
+    if (game.selectedAction === 'MOVE') {
+        if (key === 'a') {
+            e.preventDefault();
+            if (moveTargets.length === 0) computeMoveTargets();
+            if (moveTargets.length === 0) return;
+            moveTargetIdx = (moveTargetIdx - 1 + moveTargets.length) % moveTargets.length;
+            updateTargetRing();
+            return;
+        }
+        if (key === 'd') {
+            e.preventDefault();
+            if (moveTargets.length === 0) computeMoveTargets();
+            if (moveTargets.length === 0) return;
+            moveTargetIdx = (moveTargetIdx + 1) % moveTargets.length;
+            updateTargetRing();
+            return;
+        }
+        if (key === 'enter') {
+            e.preventDefault();
+            if (moveTargets.length === 0) return;
+            if (moveTargetIdx >= 0 && moveTargetIdx < moveTargets.length) {
+                const { r, c } = moveTargets[moveTargetIdx];
+                game.handleCellClick(r, c);
+                moveTargets = [];
+                moveTargetIdx = -1;
+                if (targetRing) targetRing.visible = false;
+            }
+            return;
+        }
+    }
+
+    // WASD directional movement
     const keys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Numpad8', 'Numpad4', 'Numpad2', 'Numpad6'];
     if (!keys.includes(e.code)) return;
-    
+
     let dirX = 0, dirZ = 0;
     if (e.code === 'KeyW' || e.code === 'ArrowUp' || e.code === 'Numpad8') dirZ = -1;
     if (e.code === 'KeyS' || e.code === 'ArrowDown' || e.code === 'Numpad2') dirZ = 1;
