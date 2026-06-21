@@ -87,6 +87,10 @@ var messageTitle = document.getElementById('message-title');
 var messageText = document.getElementById('message-text');
 var gameMessage = document.getElementById('game-message');
 var actionPrompt = document.getElementById('action-prompt');
+var hudWCount = document.getElementById('hud-w-count');
+var hudWRes = document.getElementById('hud-w-res');
+var hudBCount = document.getElementById('hud-b-count');
+var hudBRes = document.getElementById('hud-b-res');
 
 function showMessage(text, duration) {
     if (!gameMessage) return;
@@ -278,10 +282,16 @@ function colorName(c) { return c === 'W' ? 'White' : 'Black'; }
 // HUD / RENDERING
 // ============================================
 function drawBoard() {
-    if (wBoardHud) wBoardHud.textContent = warriors.filter(function (w) { return w.color === 'W'; }).length;
-    if (bBoardHud) bBoardHud.textContent = warriors.filter(function (w) { return w.color === 'B'; }).length;
+    var wCount = warriors.filter(function (w) { return w.color === 'W'; }).length;
+    var bCount = warriors.filter(function (w) { return w.color === 'B'; }).length;
+    if (wBoardHud) wBoardHud.textContent = wCount;
+    if (bBoardHud) bBoardHud.textContent = bCount;
     if (wResHud) wResHud.textContent = reserve.W;
     if (bResHud) bResHud.textContent = reserve.B;
+    if (hudWCount) hudWCount.textContent = wCount;
+    if (hudWRes) hudWRes.textContent = reserve.W;
+    if (hudBCount) hudBCount.textContent = bCount;
+    if (hudBRes) hudBRes.textContent = reserve.B;
 
     if (statusName) statusName.textContent = colorName(turn) + "'s Turn";
     if (statusIndicator) statusIndicator.style.backgroundColor = turn === 'W' ? '#ffffff' : '#1a1a1a';

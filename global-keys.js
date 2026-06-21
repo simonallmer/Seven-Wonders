@@ -6,6 +6,7 @@ window.addEventListener('keydown', (e) => {
         const suffix = __newWonders.includes(page) ? '?menu=new' : '';
         window.location.href = 'index.html' + suffix;
     } else if (e.code === 'Space') {
+        if (typeof window.dirPickerOpen === 'function' && window.dirPickerOpen()) return;
         const menuToggle = document.getElementById('menu-toggle');
         if (menuToggle) {
             e.preventDefault();

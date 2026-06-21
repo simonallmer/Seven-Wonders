@@ -119,6 +119,59 @@ body {
     transform: rotate(-45deg) translate(4px, -4.5px);
 }
 
+/* Overlay for menu */
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(2px);
+}
+.overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* Stone Count HUD (always visible on main screen) */
+.stone-hud {
+    position: fixed;
+    top: 78px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 12px;
+    z-index: 200;
+    pointer-events: none;
+}
+.stone-hud-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(197, 160, 89, 0.25);
+    border-radius: 20px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    backdrop-filter: blur(6px);
+}
+.stone-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+.stone-dot.white { background: #fff; }
+.stone-dot.black { background: #1a1a1a; }
+.hud-reserve {
+    opacity: 0.6;
+    font-size: 0.75rem;
+}
+
 /* Side Menu */
 .side-menu {
     position: fixed;

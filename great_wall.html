@@ -13,8 +13,21 @@
 </head>
 
 <body class="view-3d">
+    <div id="overlay" class="overlay"></div>
     <div id="game-container">
         <div id="canvas3d" class="canvas-container"></div>
+    </div>
+
+    <!-- Stone Count HUD (always visible) -->
+    <div id="stone-hud" class="stone-hud">
+        <div class="stone-hud-item">
+            <span class="stone-dot white"></span>
+            <span id="hud-w-count">0</span><span class="hud-reserve">+<span id="hud-w-res">10</span></span>
+        </div>
+        <div class="stone-hud-item">
+            <span class="stone-dot black"></span>
+            <span id="hud-b-count">0</span><span class="hud-reserve">+<span id="hud-b-res">10</span></span>
+        </div>
     </div>
 
     <!-- Top Bar -->
@@ -115,6 +128,7 @@
     <script>
         const menuToggle = document.getElementById('menu-toggle');
         const sideMenu = document.getElementById('side-menu');
+        const overlay = document.getElementById('overlay');
         const closeMenuBtn = document.getElementById('close-menu-btn');
         const rulesBtn = document.getElementById('rules-btn');
         const rulesModal = document.getElementById('rules-modal');
@@ -123,24 +137,18 @@
         function toggleMenu() {
             menuToggle.classList.toggle('active');
             sideMenu.classList.toggle('open');
+            overlay.classList.toggle('active');
         }
 
         menuToggle.addEventListener('click', toggleMenu);
         closeMenuBtn.addEventListener('click', toggleMenu);
+        overlay.addEventListener('click', toggleMenu);
 
         rulesBtn.addEventListener('click', () => {
             rulesModal.style.display = 'flex';
             if (sideMenu.classList.contains('open')) toggleMenu();
         });
         rulesCloseBtn.addEventListener('click', () => rulesModal.style.display = 'none');
-
-        // Spacebar shortcut for menu
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && !window.dirPickerOpen()) {
-                e.preventDefault();
-                toggleMenu();
-            }
-        });
 
         // Pin the bottom UI to the VISIBLE viewport. On mobile Safari a `position:fixed;
         // bottom` bar anchors to the layout viewport — CSS `env(safe-area-inset-bottom)` handles it now.
