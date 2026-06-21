@@ -44,7 +44,7 @@ let hand = []; // Stones currently being moved
 let moveHistory = []; // Track path to prevent backward movement in same turn
 let messageTimeout = null;
 let handFullWarningShown = false; // Track if "Hand Full" warning has been shown
-let isVsComputer = false; // AI opponent flag
+let isVsComputer = true; // AI opponent flag
 
 // Track AI behavior to prevent loops and freezes
 let aiLastMovedStone = null; // {area, row, col}

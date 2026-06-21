@@ -26,7 +26,7 @@ var currentPlayer = PLAYER_1;
 var selectedStone = null; // { r, c }
 var validMoves = [];
 var gameOver = false;
-var isVsComputer = false;
+var isVsComputer = true;
 var playerCount = 2;
 
 window.board = board;

@@ -25,7 +25,7 @@ var attackTargets = [];    // [{ tiles:[{level,slot}], yourSum, enemySum, win }]
 var bonusActive = false;   // true while resolving the 3->1 bonus move
 var busy = false;
 var gameOver = false;
-var isVsComputer = false;
+var isVsComputer = true;
 
 window.getTowerState = function () {
     return {

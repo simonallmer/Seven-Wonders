@@ -250,7 +250,7 @@ function buildEnvironment() {
 // THE WALL — body, parapets, towers, fields
 // ============================================
 function buildWall() {
-    const playLen = GW_COLS * CELL;          // 408
+    const playLen = GW_COLS * CELL;          // 360
     const wallLen = playLen + 36;
     const wallDepth = GW_ROWS * CELL + 38;   // walkway + parapet ledges
 

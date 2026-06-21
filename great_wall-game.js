@@ -6,7 +6,7 @@
 // CONSTANTS
 // ============================================
 var GW_ROWS = 5;
-var GW_COLS = 17;
+var GW_COLS = 15;
 
 // 8 directions, clockwise from North. On the board: row 0 = North edge, col 0 = West (Black) end.
 var DIRS = [
@@ -55,7 +55,7 @@ var selectedWarrior = null;
 var previewWarriorId = null; // shield-arc preview (informational)
 var busy = false;
 var gameOver = false;
-var isVsComputer = false;
+var isVsComputer = true;
 var hiddenFacing = false;
 var _validPlaceCache = null;
 var lastChain = [];          // supply-chain nodes of current player (for 3D glow)

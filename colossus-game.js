@@ -25,7 +25,7 @@ let selectedStone = null;
 let validMoves = [];
 let gameState = 'SELECT_STONE';
 let lastPushedStone = null; // Prevents immediate push-back
-let isVsComputer = false;
+let isVsComputer = true;
 
 // Track AI behavior to prevent loops
 let aiLastMovedStone = null; // {r, c}

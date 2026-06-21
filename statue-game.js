@@ -35,7 +35,7 @@ let onBoardDice = [];
 let reserveDice = { 1: 8, 2: 8 };
 let currentPlayer = 1; // 1 (White) or 2 (Black)
 let gamePhase = 'ACTION_SELECT'; // 'ACTION_SELECT', 'PLACE', 'STRIDE_MOVE', 'DIMINISH_SELECT', 'FORCED_MOVE_SELECT', 'GAME_OVER'
-let isAIGame = false; // Start with AI enabled
+let isAIGame = true; // Start with AI enabled
 
 // Track AI behavior to prevent loops
 let aiLastMovedStoneId = null;
