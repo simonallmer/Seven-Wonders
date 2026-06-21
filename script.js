@@ -77,19 +77,19 @@ const games = {
     library: {
         name: 'Library',
         description: 'The Library of Alexandria',
-        status: 'playtest',
+        status: 'available',
         url: 'library.html'
     },
     cathedral: {
         name: 'Cathedral',
         description: 'The Gothic Cathedral',
-        status: 'playtest',
+        status: 'available',
         url: 'cathedral.html'
     },
     palace: {
         name: 'Palace',
         description: 'The Crystal Palace',
-        status: 'playtest',
+        status: 'available',
         url: 'palace.html'
     },
     skyscraper: {
