@@ -83,13 +83,13 @@ const games = {
     cathedral: {
         name: 'Cathedral',
         description: 'The Gothic Cathedral',
-        status: 'available',
+        status: 'playtest',
         url: 'cathedral.html'
     },
     palace: {
         name: 'Palace',
         description: 'The Crystal Palace',
-        status: 'available',
+        status: 'playtest',
         url: 'palace.html'
     },
     skyscraper: {
