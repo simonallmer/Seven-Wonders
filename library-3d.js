@@ -297,7 +297,7 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
 function onPointerMove(event) {
-    if (game.winner) return;
+    if (game.winner || isAiTurn) return;
     
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -404,6 +404,7 @@ window.addEventListener('pointerdown', (e) => {
 });
 
 window.addEventListener('pointerup', (e) => {
+    if (isAiTurn) return;
     const dx = e.clientX - pointerDownPos.x;
     const dy = e.clientY - pointerDownPos.y;
     if (Math.sqrt(dx*dx + dy*dy) < 5) {
@@ -699,7 +700,7 @@ game.on('onInit', (data) => {
             if (data.fields[r][c] !== null) createPlate(r, c, data.fields[r][c]);
         }
     }
-    setUIAction('LAY');
+    setUIAction('MOVE');
 });
 
 game.on('onTurnStart', (data) => {
@@ -970,6 +971,277 @@ window.addEventListener('keydown', (e) => {
             game.setAction(oldAction);
             game.log("Invalid move in that direction.");
         }
+    }
+});
+
+// --- AI Opponent ---
+let opponentType = 'computer';
+let isAiTurn = false;
+let ai = null;
+let aiTimeout = null;
+
+function setOpponentType(type) {
+    opponentType = type;
+    document.getElementById('opponent-btn').innerText = `Opponent: ${type === 'computer' ? 'Computer' : 'Human'}`;
+
+    document.querySelectorAll('#opponent-menu button').forEach(b => b.classList.remove('active'));
+    const target = document.querySelector(`#opponent-menu button[data-opp="${type}"]`);
+    if (target) target.classList.add('active');
+
+    // Restart game with new opponent setting
+    startNewGame(game.numPlayers, null);
+}
+
+document.querySelectorAll('#opponent-menu button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const opp = btn.dataset.opp;
+        if (opp) setOpponentType(opp);
+    });
+});
+
+// Override startNewGame to handle player count vs AI
+const _origStartNewGame = startNewGame;
+startNewGame = function(pCount, btnElem) {
+    if (aiTimeout) clearTimeout(aiTimeout);
+    isAiTurn = false;
+    if (pCount > 2 && opponentType === 'computer') {
+        opponentType = 'human';
+        document.getElementById('opponent-btn').innerText = 'Opponent: Human';
+        document.querySelectorAll('#opponent-menu button').forEach(b => b.classList.remove('active'));
+        const target = document.querySelector('#opponent-menu button[data-opp="human"]');
+        if (target) target.classList.add('active');
+    }
+    _origStartNewGame(pCount, btnElem);
+};
+
+class LibraryAI {
+    constructor(game, playerId) {
+        this.game = game;
+        this.playerId = playerId;
+    }
+
+    takeTurn() {
+        if (aiTimeout) clearTimeout(aiTimeout);
+        isAiTurn = true;
+        aiTimeout = setTimeout(() => this.think(), 600);
+    }
+
+    think() {
+        isAiTurn = false;
+        const player = this.game.players[this.playerId];
+
+        if (this.tryWin(player)) return;
+        if (this.tryMoveAdvance(player)) return;
+
+        if (player.row === null) {
+            if (this.tryDeploy(player)) return;
+        }
+
+        if (this.tryExtendTerritory(player)) return;
+        if (this.tryBlockOpponent(player)) return;
+        this.layAnywhere(player);
+    }
+
+    distToGoal(r, c, player) {
+        if (player.goalRow !== null) return Math.abs(r - player.goalRow);
+        if (player.goalCol !== null) return Math.abs(c - player.goalCol);
+        return Infinity;
+    }
+
+    tryWin(player) {
+        for (let r = 0; r < BOARD_SIZE; r++) {
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                const isGoal = (player.goalRow !== null && r === player.goalRow) ||
+                              (player.goalCol !== null && c === player.goalCol);
+                if (!isGoal) continue;
+                if (this.game.isValidMoveTarget(player, r, c)) {
+                    this.game.setAction('MOVE');
+                    this.game.handleCellClick(r, c);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    tryMoveAdvance(player) {
+        if (player.row === null) return false;
+
+        let bestTarget = null;
+        let bestDist = Infinity;
+
+        for (let r = 0; r < BOARD_SIZE; r++) {
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                if (!this.game.isValidMoveTarget(player, r, c)) continue;
+                const dist = this.distToGoal(r, c, player);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestTarget = { r, c };
+                }
+            }
+        }
+
+        if (bestTarget) {
+            this.game.setAction('MOVE');
+            this.game.handleCellClick(bestTarget.r, bestTarget.c);
+            return true;
+        }
+        return false;
+    }
+
+    tryDeploy(player) {
+        for (let r = 0; r < BOARD_SIZE; r++) {
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                const isEdge = (player.startRow !== null && r === player.startRow) ||
+                              (player.startCol !== null && c === player.startCol);
+                if (!isEdge) continue;
+                if (this.game.fields[r][c] !== player.id) continue;
+                if (this.game.isValidMoveTarget(player, r, c)) {
+                    this.game.setAction('MOVE');
+                    this.game.handleCellClick(r, c);
+                    return true;
+                }
+            }
+        }
+        return this.layOnStartingEdge(player);
+    }
+
+    layOnStartingEdge(player) {
+        const edgeCells = [];
+        for (let r = 0; r < BOARD_SIZE; r++) {
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                const isEdge = (player.startRow !== null && r === player.startRow) ||
+                              (player.startCol !== null && c === player.startCol);
+                if (!isEdge) continue;
+                if (this.game.fields[r][c] !== null) continue;
+                edgeCells.push({ r, c });
+            }
+        }
+
+        edgeCells.sort((a, b) => Math.abs(a.c - 3) - Math.abs(b.c - 3));
+
+        if (edgeCells.length > 0) {
+            const cell = edgeCells[0];
+            this.game.setAction('LAY');
+            this.game.handleCellClick(cell.r, cell.c);
+            return true;
+        }
+        return false;
+    }
+
+    tryExtendTerritory(player) {
+        let bestCell = null;
+        let bestDist = Infinity;
+
+        for (let r = 0; r < BOARD_SIZE; r++) {
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                if (this.game.fields[r][c] !== null) continue;
+                if (!this.isAdjacentToOwn(r, c, player)) continue;
+                const dist = this.distToGoal(r, c, player);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestCell = { r, c };
+                }
+            }
+        }
+
+        if (bestCell) {
+            this.game.setAction('LAY');
+            this.game.handleCellClick(bestCell.r, bestCell.c);
+            return true;
+        }
+        return false;
+    }
+
+    isAdjacentToOwn(r, c, player) {
+        const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+        for (const [dr, dc] of dirs) {
+            const nr = r + dr, nc = c + dc;
+            if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) continue;
+            if (this.game.fields[nr][nc] === player.id) return true;
+        }
+        return false;
+    }
+
+    tryBlockOpponent(player) {
+        const opponent = this.game.players.find(p => p.id !== player.id);
+        if (!opponent || opponent.row === null) return false;
+
+        const goalDir = opponent.goalRow !== null
+            ? (opponent.goalRow > opponent.row ? 1 : -1)
+            : (opponent.goalCol !== null ? (opponent.goalCol > opponent.col ? 1 : -1) : 0);
+
+        if (goalDir === 0) return false;
+
+        let blockRow, blockCol, type, checkWalls;
+        if (opponent.goalRow !== null) {
+            blockRow = opponent.row + goalDir;
+            type = 'h';
+            checkWalls = (r, c) => r >= 0 && r < BOARD_SIZE - 1 && this.game.hWalls[r][c] === null;
+            for (let c = Math.max(0, opponent.col - 1); c <= Math.min(BOARD_SIZE - 1, opponent.col + 1); c++) {
+                if (checkWalls(blockRow, c)) {
+                    this.game.setAction('LAY');
+                    this.game.handleWallClick('h', blockRow, c);
+                    return true;
+                }
+            }
+        } else {
+            blockCol = opponent.col + goalDir;
+            type = 'v';
+            checkWalls = (r, c) => c >= 0 && c < BOARD_SIZE - 1 && this.game.vWalls[r][c] === null;
+            for (let r = Math.max(0, opponent.row - 1); r <= Math.min(BOARD_SIZE - 1, opponent.row + 1); r++) {
+                if (checkWalls(r, blockCol)) {
+                    this.game.setAction('LAY');
+                    this.game.handleWallClick('v', r, blockCol);
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    layAnywhere(player) {
+        let bestCell = null;
+        let bestDist = Infinity;
+
+        for (let r = 0; r < BOARD_SIZE; r++) {
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                if (this.game.fields[r][c] !== null) continue;
+                const dist = this.distToGoal(r, c, player);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestCell = { r, c };
+                }
+            }
+        }
+
+        if (bestCell) {
+            this.game.setAction('LAY');
+            this.game.handleCellClick(bestCell.r, bestCell.c);
+            return;
+        }
+
+        for (let r = 0; r < BOARD_SIZE - 1; r++) {
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                if (this.game.hWalls[r][c] === null) {
+                    this.game.setAction('LAY');
+                    this.game.handleWallClick('h', r, c);
+                    return;
+                }
+            }
+        }
+
+        // Safety fallback — end turn if nothing possible
+        this.game.endTurn();
+    }
+}
+
+game.on('onTurnStart', (data) => {
+    if (opponentType === 'computer' && data.player.id === 1 && !game.winner) {
+        if (!ai) ai = new LibraryAI(game, 1);
+        ai.takeTurn();
     }
 });
 

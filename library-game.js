@@ -17,7 +17,7 @@ class LibraryGame {
         this.boardSize = BOARD_SIZE;
         this.numPlayers = 2;
         this.currentPlayer = 0;
-        this.selectedAction = 'LAY'; // LAY, MOVE, PUSH, TOPPLE
+        this.selectedAction = 'MOVE'; // LAY, MOVE, PUSH, TOPPLE
         this.selectedWallForAction = null; // {type: 'h'|'v', r, c}
         this.winner = null;
         this.players = [];
@@ -63,7 +63,7 @@ class LibraryGame {
         this.numPlayers = pCount;
         this.winner = null;
         this.currentPlayer = 0;
-        this.selectedAction = 'LAY';
+        this.selectedAction = 'MOVE';
         this.selectedWallForAction = null;
 
         // Reset boards
@@ -177,7 +177,8 @@ class LibraryGame {
         else if (this.selectedAction === 'PUSH' || this.selectedAction === 'TOPPLE') {
             const hasWall = (type === 'h' ? this.hWalls[r][c] : this.vWalls[r][c]);
             if (hasWall === null) return this.log("Select an active standing wall.");
-            
+            if (hasWall !== this.currentPlayer) return this.log("That's not your wall.");
+
             this.selectedWallForAction = { type, r, c };
             // Allow UI to prompt for direction
             return this.selectedWallForAction; 
@@ -398,9 +399,7 @@ class LibraryGame {
 
     endTurn() {
         this.currentPlayer = (this.currentPlayer + 1) % this.numPlayers;
-        if (this.selectedAction !== 'MOVE') {
-            this.setAction('LAY');
-        }
+        this.setAction('MOVE');
         this.trigger('onTurnStart', { player: this.players[this.currentPlayer] });
     }
 

@@ -71,9 +71,7 @@
             <button id="chip-mode" class="action-chip">Walls: Off</button>
             <button id="chip-clear" class="action-chip">Clear</button>
         </span>
-        <span id="play-chips" style="display:none">
-            <button id="chip-shatter" class="action-chip">💥 Shatter</button>
-        </span>
+        <span id="play-chips" style="display:none"></span>
         <button id="chip-phase" class="action-chip">▶ Play</button>
     </div>
     <div id="action-prompt" class="action-prompt"></div>
@@ -99,12 +97,11 @@
         <div class="rules-content">
             <h2>Palace — “The Span”</h2>
             <div class="rules-body">
-                <p><strong>PROTOTYPE</strong><br>This is a shape-and-pool sandbox, not the finished game. Set stones to feel out the board; movement comes next.</p>
-                <p><strong>THE BOARD</strong><br>An elongated stepped pyramid, 15 long × 5 deep. The cross-section rises L1 → L2 → L3 → L2 → L1. A transept crosses at the centre, lifting that line to the top — so the highest level forms an elongated <em>+</em> (the long nave ridge crossed by the short transept).</p>
-                <p><strong>RUN</strong><br>Slide along one level in a straight line, as far as you like, until a wall, a stone or the edge stops you.</p>
-                <p><strong>JUMP</strong><br>Hop to an adjacent field exactly one level higher or lower. Never two levels — so a two-high step is an impassable wall. That is how you build <em>traps</em>.</p>
-                <p><strong>SHATTER</strong><br>Destroy a whole glass block. You must be next to the block you break, or you may shatter the block beneath your own feet — in which case you drop straight down to the ground and stand upright. Next turn you can run through the opening.</p>
-                <p><strong>NO RESTING INSIDE</strong><br>You can only ever stand on an open surface, never enclosed within the building — pass through, don't dwell.</p>
+                <p><strong>PROTOTYPE</strong><br>Race your stones across the Crystal Palace. First stone to the opposite end wins.</p>
+                <p><strong>THE BOARD</strong><br>The nave runs 7 columns from west to east, 5 rows deep. 7 White stones start on the south row, 7 Black on the north row. The race: White to the west edge (x=0), Black to the east edge (x=6).</p>
+                <p><strong>RUN</strong><br>Roll in a straight line across the nave in any of the four cardinal directions. Stop when you reach the edge, a friendly stone blocks you, or land on an enemy to capture it.</p>
+                <p><strong>CAPTURE</strong><br>Roll directly onto an enemy stone and it's removed from the board. Clear a path to the far end to win.</p>
+                <p><strong>THE BUILDING</strong><br>The glass structure is purely decorative — it does not affect movement. Race through the open spaces between the columns.</p>
             </div>
             <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
         </div>
@@ -139,7 +136,6 @@
         document.getElementById('chip-mode').addEventListener('click', () => window.palToggleMode());
         document.getElementById('chip-clear').addEventListener('click', () => window.palClear());
         document.getElementById('chip-phase').addEventListener('click', () => window.palTogglePhase());
-        document.getElementById('chip-shatter').addEventListener('click', () => window.palToggleShatterMode());
         document.getElementById('clear-btn').addEventListener('click', () => { window.palClear(); if (sideMenu.classList.contains('open')) toggleMenu(); });
 
         // keyboard: S = swap colour, R = reset, F = walls mode, ENTER = Play/Setup
@@ -150,7 +146,6 @@
             if (k === 's') { window.palToggleColor(); }
             else if (k === 'r') { window.palClear(); }
             else if (k === 'f') { window.palToggleMode(); }
-            else if (k === 'x') { window.palToggleShatterMode(); }
             else if (e.key === 'Enter') { window.palTogglePhase(); }
         });
 
