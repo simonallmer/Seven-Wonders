@@ -22,6 +22,7 @@
         <button id="menu-toggle" class="top-bar-btn menu-toggle-btn"><span></span><span></span><span></span></button>
     </div>
 
+    <div id="overlay" class="overlay"></div>
     <div id="side-menu" class="side-menu">
         <div class="menu-content">
             <h1 class="game-title">COLOSSEUM</h1>
@@ -98,8 +99,10 @@
         const rulesBtn = document.getElementById('rules-btn');
         const rulesModal = document.getElementById('rules-modal');
         const rulesCloseBtn = document.getElementById('rules-close-btn');
-        function toggleMenu() { menuToggle.classList.toggle('active'); sideMenu.classList.toggle('open'); }
+        const overlay = document.getElementById('overlay');
+        function toggleMenu() { menuToggle.classList.toggle('active'); sideMenu.classList.toggle('open'); overlay.classList.toggle('active'); }
         menuToggle.addEventListener('click', toggleMenu);
+        overlay.addEventListener('click', toggleMenu);
         closeMenuBtn.addEventListener('click', toggleMenu);
         rulesBtn.addEventListener('click', () => { rulesModal.style.display = 'flex'; if (sideMenu.classList.contains('open')) toggleMenu(); });
         rulesCloseBtn.addEventListener('click', () => rulesModal.style.display = 'none');

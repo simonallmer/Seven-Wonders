@@ -304,7 +304,7 @@ function newColosseum() {
     colPlayers = COL_SETUP[colPlayerCount].map(function (p) { return p.color; });
     colPlayers.forEach(function (p) {
         if (p === 'W') colIsComputer[p] = false;
-        else colIsComputer[p] = colPlayerCount > 2 || !!colIsComputer[p];
+        else colIsComputer[p] = colPlayerCount <= 2 || !!colIsComputer[p];
     });
     var ob = document.getElementById('col-opponent-btn');
     if (ob) {

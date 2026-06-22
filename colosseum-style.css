@@ -119,6 +119,21 @@ body {
     transform: rotate(-45deg) translate(4px, -4.5px);
 }
 
+/* Overlay */
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    z-index: 1999;
+    transition: all 0.3s;
+}
+.overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
 /* Side Menu */
 .side-menu {
     position: fixed;
