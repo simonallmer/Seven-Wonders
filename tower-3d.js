@@ -393,11 +393,22 @@ function towerUpdateViews() {
         needsRender = true; return;
     }
     if (st.mode === 'place') {
-        if (st.pool[st.turn] > 0) for (let l = 0; l < window.TOWER_LEVELS; l++) for (let s = 0; s < window.TOWER_SLOTS; s++) if (empty(l, s)) ringAt(l, s, matHiPlace);
+        const canPlaceOn = (c, L) => {
+            if (L === 0) return true;
+            for (let lv = 0; lv < window.TOWER_LEVELS; lv++) for (let sl = 0; sl < window.TOWER_SLOTS; sl++) {
+                const t = st.board[lv][sl]; if (t && t.owner === c && lv === L) return true;
+                if (t && t.owner === c && L > 0 && lv === L - 1) return true;
+            }
+            return false;
+        };
+        if (st.pool[st.turn] > 0) for (let l = 0; l < window.TOWER_LEVELS; l++) for (let s = 0; s < window.TOWER_SLOTS; s++)
+            if (empty(l, s) && canPlaceOn(st.turn, l)) ringAt(l, s, matHiPlace);
     } else if (st.mode === 'move') {
         if (st.selected) {
             ringAt(st.selected.level, st.selected.slot, matHiSel, 8, 10);
             window.towerNeighbors(st.selected.level, st.selected.slot).forEach(n => { if (empty(n.level, n.slot)) ringAt(n.level, n.slot, matHiMove); });
+            // gravity falls: all empty cells below in same column
+            for (let gl = st.selected.level - 1; gl >= 0; gl--) if (empty(gl, st.selected.slot)) ringAt(gl, st.selected.slot, matHiMove);
             // attack targets are reachable from the same selection
             st.attackTargets.forEach(g => { g.tiles.forEach(p => ringAt(p.level, p.slot, g.win ? matHiWin : matHiNo, 7.5, 10)); });
         } else {

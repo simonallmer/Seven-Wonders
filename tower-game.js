@@ -209,7 +209,7 @@ function drawBoard() {
     if (statusIndicator) statusIndicator.style.backgroundColor = turn === 'W' ? '#ffffff' : '#1a1a1a';
 
     var hasOwn = !gameOver && countOnBoard(turn) > 0;
-    var canPlace = !gameOver && pool[turn] > 0 && hasEmptySlot();
+    var canPlace = !gameOver && pool[turn] > 0 && placeableSlots(turn).length > 0;
     setChip('act-place', canPlace);
     setChip('act-move', hasOwn);
     setChip('act-levelup', hasOwn);
@@ -226,6 +226,32 @@ function setChip(id, enabled) {
 function hasEmptySlot() {
     for (var l = 0; l < LEVELS; l++) for (var s = 0; s < SLOTS; s++) if (!tileAt(l, s)) return true;
     return false;
+}
+function playerLevels(color) {
+    var levels = [];
+    for (var L = 0; L < LEVELS; L++) {
+        for (var s = 0; s < SLOTS; s++) { var t = tileAt(L, s); if (t && t.owner === color) { levels.push(L); break; } }
+    }
+    return levels;
+}
+function canPlaceOn(color, L) {
+    if (L === 0) return true;
+    var levels = playerLevels(color);
+    if (levels.indexOf(L) !== -1) return true;
+    if (L > 0 && levels.indexOf(L - 1) !== -1) return true;
+    return false;
+}
+function placeableSlots(color) {
+    var out = [];
+    for (var l = 0; l < LEVELS; l++) {
+        if (!canPlaceOn(color, l)) continue;
+        for (var s = 0; s < SLOTS; s++) { if (!tileAt(l, s)) out.push({ level: l, slot: s }); }
+    }
+    return out;
+}
+function canMoveTo(from, to) {
+    if (to.slot === from.slot && to.level < from.level) return true;
+    return isAdjacent(from, to);
 }
 
 // ============================================
@@ -260,6 +286,7 @@ function onSlotTap(l, s) {
     if (mode === 'place') {
         if (t) { showMessage('That slot is taken.'); return; }
         if (pool[turn] <= 0) { showMessage('Your pool is empty.'); return; }
+        if (!canPlaceOn(turn, l)) { showMessage('Must place on level 0 or a level you have presence on.'); return; }
         doPlace(l, s);
         return;
     }
@@ -269,8 +296,8 @@ function onSlotTap(l, s) {
             // tapping an enemy chain = attack
             var tgt = attackTargets.find(function (g) { return g.tiles.some(function (p) { return p.level === l && p.slot === s; }); });
             if (tgt) { doAttack(tgt); return; }
-            // empty adjacent = move
-            if (!t && isAdjacent(selected, { level: l, slot: s })) { doMove(selected, { level: l, slot: s }, false); return; }
+            // empty adjacent = move (or gravity fall down the column)
+            if (!t && canMoveTo(selected, { level: l, slot: s })) { doMove(selected, { level: l, slot: s }, false); return; }
             // another of your tiles = re-aim
             if (t && t.owner === turn) { selectMover(l, s); return; }
             showMessage('Tap an empty adjacent slot to move, or a highlighted enemy chain to attack.'); return;
@@ -338,7 +365,7 @@ function handleBonus(l, s, t) {
         return;
     }
     if (selected.level === l && selected.slot === s) { selected = null; drawBoard(); return; }
-    if (!t && isAdjacent(selected, { level: l, slot: s })) { doMove(selected, { level: l, slot: s }, true); return; }
+    if (!t && canMoveTo(selected, { level: l, slot: s })) { doMove(selected, { level: l, slot: s }, true); return; }
     if (t) { selected = { level: l, slot: s }; drawBoard(); return; }
     showMessage('Must move to an adjacent empty slot.');
 }
@@ -369,7 +396,7 @@ function endTurn() {
 
     turn = opp(turn);
     // sensible default mode for the new player
-    mode = (pool[turn] > 0 && hasEmptySlot()) ? 'place' : 'move';
+    mode = (pool[turn] > 0 && placeableSlots(turn).length > 0) ? 'place' : 'move';
     setMode(mode);
 
     if (!gameOver && isVsComputer && turn === 'B') setTimeout(makeAIMove, 750);
@@ -440,7 +467,7 @@ function makeAIMove() {
 
     // 2. Place toward the level/column where Black is strongest
     if (pool.B > 0) {
-        var empties = emptySlots();
+        var empties = placeableSlots('B');
         if (empties.length) {
             empties.sort(function (a, b) { return blackAffinity(b) - blackAffinity(a); });
             var pick = empties[Math.floor(Math.random() * Math.min(3, empties.length))];
@@ -478,8 +505,12 @@ function aiBonusMove() {
     var movers = allTiles('B');
     for (var i = 0; i < movers.length; i++) {
         var p = movers[i];
-        var nbrs = neighbors(p.level, p.slot).filter(function (n) { return !tileAt(n.level, n.slot); });
-        if (nbrs.length) { doMove(p, nbrs[Math.floor(Math.random() * nbrs.length)], true); return; }
+        var targets = [];
+        // adjacent empty slots
+        neighbors(p.level, p.slot).filter(function (n) { return !tileAt(n.level, n.slot); }).forEach(function (n) { targets.push(n); });
+        // gravity falls
+        for (var l = p.level - 1; l >= 0; l--) { if (!tileAt(l, p.slot)) targets.push({ level: l, slot: p.slot }); }
+        if (targets.length) { doMove(p, targets[Math.floor(Math.random() * targets.length)], true); return; }
     }
     // nothing movable — just end via a no-op move of the leveled tile's neighbour search failing
     bonusActive = false; endTurn();
