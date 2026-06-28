@@ -49,6 +49,7 @@
 
             <div class="menu-divider" style="height: 1px; background: rgba(100, 90, 80, 0.2); margin: 20px 0;"></div>
 
+            <button id="players-btn-menu" class="menu-btn">Players: 2</button>
             <button id="opponent-btn-menu" class="menu-btn">Opponent: Computer</button>
             <div class="view-dropdown">
                 <button id="view-toggle-btn" class="menu-btn">View: 3D</button>
@@ -262,6 +263,14 @@
                 if (typeof drawBoard === 'function') drawBoard();
                 if (typeof updateStatus === 'function') updateStatus();
             }
+            toggleMenu();
+        });
+
+        const playersBtnMenu = document.getElementById('players-btn-menu');
+        if (playersBtnMenu) playersBtnMenu.addEventListener('click', () => {
+            const next = (typeof numPlayers !== 'undefined' && numPlayers === 2) ? 4 : 2;
+            playersBtnMenu.textContent = `Players: ${next}`;
+            if (typeof setNumPlayers === 'function') setNumPlayers(next);
             toggleMenu();
         });
 

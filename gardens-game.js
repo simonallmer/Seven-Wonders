@@ -45,6 +45,26 @@ let moveHistory = []; // Track path to prevent backward movement in same turn
 let messageTimeout = null;
 let handFullWarningShown = false; // Track if "Hand Full" warning has been shown
 let isVsComputer = true; // AI opponent flag
+let numPlayers = 2; // 2 = classic board, 4 = step-pyramid board (read by gardens-3d.js)
+
+// ===== 4-PLAYER MODEL =====
+// Turn order is clockwise: white(front-left) -> black(front-right) -> blue(back-right) -> red(back-left)
+const COLORS4 = ['white', 'black', 'blue', 'red'];
+let turnIndex4 = 0;
+// Each player's goal high garden (shared: white+red -> left, black+blue -> right)
+const HIGH_OF = { white: 'left', red: 'left', black: 'right', blue: 'right' };
+// Each player's home garden is keyed by their own colour ('home', <color>)
+// Coloured staircase bridges: terrace corner cell <-> plaza corner cell, usable only by that colour.
+// Front terrace = 'bottom' (white left col0 / black right col4), back terrace = 'back' (red col0 / blue col4).
+const STAIRS4 = {
+    white: { terrace: { area: 'bottom', row: 0, col: 0 }, plaza: { area: 'plaza', row: 4, col: 0 } },
+    black: { terrace: { area: 'bottom', row: 0, col: 4 }, plaza: { area: 'plaza', row: 4, col: 4 } },
+    red:   { terrace: { area: 'back', row: 0, col: 0 },   plaza: { area: 'plaza', row: 0, col: 0 } },
+    blue:  { terrace: { area: 'back', row: 0, col: 4 },   plaza: { area: 'plaza', row: 0, col: 4 } }
+};
+
+function isFieldArea(area) { return area === 'top' || area === 'bottom' || area === 'back' || area === 'plaza'; }
+function isGardenArea(area) { return area === 'garden' || area === 'home' || area === 'high'; }
 
 // Track AI behavior to prevent loops and freezes
 let aiLastMovedStone = null; // {area, row, col}
@@ -82,6 +102,8 @@ function initializeGame() {
     isAiThinking = false;
     currentTurnId++;
 
+    if (numPlayers === 4) { initializeGame4(); return; }
+
     // Initialize empty board
     board.topField = createGrid(3, 5);
     board.bottomField = createGrid(3, 5);
@@ -100,6 +122,26 @@ function initializeGame() {
     drawBoard();
     updateStatus();
     updateCounts();
+    updateCounts();
+    hideMessage();
+    hideGameOverModal();
+}
+
+function initializeGame4() {
+    board.bottomField = createGrid(3, 5); // front terrace
+    board.backField = createGrid(3, 5);   // back terrace
+    board.plaza = createGrid(5, 5);       // battle plaza
+    board.homes = { white: [], black: [], blue: [], red: [] };
+    board.highs = { left: [], right: [] };
+    // 10 stones in each player's home garden
+    COLORS4.forEach(c => { for (let i = 0; i < 10; i++) board.homes[c].push(c); });
+
+    turnIndex4 = 0;
+    currentPlayer = COLORS4[turnIndex4];
+    resetTurnState();
+
+    drawBoard();
+    updateStatus();
     updateCounts();
     hideMessage();
     hideGameOverModal();
@@ -144,6 +186,11 @@ function getStack(area, row, col) {
     if (area === 'garden') return board.gardens[row]; // row is index for gardens
     if (area === 'top') return board.topField[row][col];
     if (area === 'bottom') return board.bottomField[row][col];
+    // 4-player areas
+    if (area === 'back') return board.backField[row][col];
+    if (area === 'plaza') return board.plaza[row][col];
+    if (area === 'home') return board.homes[row];  // row is colour
+    if (area === 'high') return board.highs[row];   // row is 'left' | 'right'
     return null;
 }
 
@@ -157,9 +204,10 @@ function isOwner(stack, player) {
 }
 
 function handleCellClick(area, row, col) {
-    // STRICT LOCK: If it's the AI's turn, do not allow any human clicks to interfere
-    if (isVsComputer && currentPlayer === 'black' && turnPhase !== 'GAME_OVER') {
-        return;
+    // STRICT LOCK: do not allow human clicks during an AI turn.
+    if (turnPhase !== 'GAME_OVER' && isVsComputer) {
+        if (numPlayers === 4 && currentPlayer !== 'white') return; // AI controls non-white
+        if (numPlayers !== 4 && currentPlayer === 'black') return;
     }
 
     if (turnPhase === 'SELECT') {
@@ -178,7 +226,7 @@ function handleSelectPhase(area, row, col) {
     const stack = getStack(area, row, col);
 
     // Validation: Must be own stack (for playing fields) OR contain own stones (for gardens)
-    if (area === 'garden') {
+    if (isGardenArea(area)) {
         const myStones = stack.filter(s => s === currentPlayer);
         if (myStones.length === 0) return; // No stones of own color
 
@@ -206,7 +254,7 @@ function handleSelectPhase(area, row, col) {
     }
 
     // Logic for Playing Fields: ALWAYS pick up the entire stack
-    if (area === 'top' || area === 'bottom') {
+    if (isFieldArea(area)) {
         selectedSource = { area, row, col };
 
         const blocked = isPlayerBlocked(currentPlayer);
@@ -301,6 +349,7 @@ function handleMovePhase(area, row, col) {
 
 function isValidMove(targetArea, targetRow, targetCol) {
     if (!selectedSource) return false;
+    if (numPlayers === 4) return isValidMove4(targetArea, targetRow, targetCol);
 
     // 1. Adjacency Check
     // Get current position (last in history, or source)
@@ -398,6 +447,7 @@ function isValidMove(targetArea, targetRow, targetCol) {
 }
 
 function isAdjacent(pos1, pos2) {
+    if (numPlayers === 4) return isAdjacent4(pos1, pos2);
     // Garden Adjacency Logic is complex
     // Gardens connect to specific cells in playing fields
 
@@ -500,7 +550,7 @@ function executeMoveStep(area, row, col) {
     if (moveHistory.length === 0) {
         const sourceStack = getStack(selectedSource.area, selectedSource.row, selectedSource.col);
 
-        if (selectedSource.area === 'garden') {
+        if (isGardenArea(selectedSource.area)) {
             // Remove specific colored stones (Separated by Color logic)
             // We need to remove hand.length stones of currentPlayer color
             // We remove the top-most instances of that color to minimize visual disruption
@@ -554,7 +604,7 @@ function executeMoveStep(area, row, col) {
     // Special Rule: If entering a Garden (specifically opposite home?), drop ALL stones.
     // User said: "when stones enter the Garden... all remaining stones are dropped there"
     // Let's apply this to ANY Garden entry for now, as it seems to be the "dumping" mechanic.
-    if (area === 'garden') {
+    if (isGardenArea(area)) {
         // Drop ALL stones
         while (hand.length > 0) {
             targetStack.push(hand.shift());
@@ -593,6 +643,24 @@ function executeMoveStep(area, row, col) {
 
 function endTurn() {
     if (turnPhase === 'GAME_OVER') return;
+
+    if (numPlayers === 4) {
+        // No auto-staircases in 4-player (passages are walkable)
+        if (checkWin()) return;
+        turnIndex4 = (turnIndex4 + 1) % COLORS4.length;
+        currentPlayer = COLORS4[turnIndex4];
+        currentTurnId++;
+        resetTurnState();
+        drawBoard();
+        updateStatus();
+        updateCounts();
+        // AI controls every non-white player when Opponent: Computer is on
+        if (isVsComputer && currentPlayer !== 'white' && turnPhase !== 'GAME_OVER') {
+            if (aiActionTimeout) clearTimeout(aiActionTimeout);
+            aiActionTimeout = setTimeout(makeAIMove4, 600);
+        }
+        return;
+    }
 
     // 1. Staircase Logic
     processStaircases();
@@ -1091,7 +1159,8 @@ function updateStatus(msg) {
         }
     }
 
-    playerColorElement.style.backgroundColor = currentPlayer === 'white' ? '#fff' : '#333';
+    const PLAYER_CSS = { white: '#fff', black: '#333', blue: '#2a6fdb', red: '#c0392b' };
+    playerColorElement.style.backgroundColor = PLAYER_CSS[currentPlayer] || '#333';
     
     // Sync with Side Menu
     if (document.getElementById('player-name')) {
@@ -1217,6 +1286,7 @@ function processStaircases() {
 }
 
 function checkWin() {
+    if (numPlayers === 4) return checkWin4();
     // Goal: 7 stones in High Garden
     // Journey: Start Garden -> Field -> Launchpad -> Upstairs -> Field -> Win Garden
 
@@ -1247,6 +1317,7 @@ function checkWin() {
 
 // Helper for rules
 function isHomeGarden(area, index) {
+    if (numPlayers === 4) return area === 'home' && index === currentPlayer;
     if (area !== 'garden') return false;
     if (currentPlayer === 'white') return index === G_BOT_LEFT;
     if (currentPlayer === 'black') return index === G_BOT_RIGHT;
@@ -1254,6 +1325,7 @@ function isHomeGarden(area, index) {
 }
 
 function isTargetHighGarden(area, index) {
+    if (numPlayers === 4) return area === 'high' && index === HIGH_OF[currentPlayer];
     if (area !== 'garden') return false;
     // White Win: G0 (Top Left)
     // Black Win: G3 (Top Right)
@@ -1263,6 +1335,7 @@ function isTargetHighGarden(area, index) {
 }
 
 function isPlayerBlocked(player) {
+    if (numPlayers === 4) return isPlayerBlocked4(player);
     // 1. Check gardens (except the Goal Garden)
     const targetGoal = player === 'white' ? G_TOP_LEFT : G_TOP_RIGHT;
     for (let i = 0; i < 4; i++) {
@@ -1307,6 +1380,11 @@ function hasValidMoves(player) {
 // ============================================
 
 function drawBoard() {
+    // 4-player uses the 3D board only (2D grid view is classic-only / "coming soon")
+    if (numPlayers === 4) {
+        if (typeof sync3D === 'function') sync3D();
+        return;
+    }
     // Draw Top Field
     drawGrid('top', board.topField);
     drawGrid('bottom', board.bottomField);
@@ -1475,6 +1553,18 @@ function createStackElement(stack) {
 }
 
 function updateCounts() {
+    if (numPlayers === 4) {
+        const score = c => board.highs[HIGH_OF[c]].filter(s => s === c).length;
+        const wEl = document.getElementById('white-count');
+        const bEl = document.getElementById('black-count');
+        if (wEl) wEl.textContent = `${score('white')}/${BOARD_CONFIG.winCount}`;
+        if (bEl) bEl.textContent = `${score('black')}/${BOARD_CONFIG.winCount}`;
+        const wMenu = document.getElementById('white-count-menu');
+        const bMenu = document.getElementById('black-count-menu');
+        if (wMenu) wMenu.textContent = `${score('white')}`;
+        if (bMenu) bMenu.textContent = `${score('black')}`;
+        return;
+    }
     const wScore = board.gardens[G_TOP_LEFT].filter(s => s === 'white').length;
     const bScore = board.gardens[G_TOP_RIGHT].filter(s => s === 'black').length;
 
@@ -1502,6 +1592,262 @@ function hideMessage() {
 }
 
 // ============================================
+// 4-PLAYER RULES
+// ============================================
+
+// True when (a -> b) is one of the colour-coded terrace<->plaza staircase bridges.
+function bridgeOwner(a, b) {
+    for (const c of COLORS4) {
+        const t = STAIRS4[c].terrace, p = STAIRS4[c].plaza;
+        const same = (x, y) => x.area === y.area && x.row === y.row && x.col === y.col;
+        if ((same(a, t) && same(b, p)) || (same(a, p) && same(b, t))) return c;
+    }
+    return null;
+}
+
+function adj4Pair(a, b) {
+    // home <-> its terrace edge column
+    if (a.area === 'home') {
+        if (a.row === 'white') return b.area === 'bottom' && b.col === 0;
+        if (a.row === 'black') return b.area === 'bottom' && b.col === 4;
+        if (a.row === 'red')   return b.area === 'back' && b.col === 0;
+        if (a.row === 'blue')  return b.area === 'back' && b.col === 4;
+    }
+    // high garden <-> plaza edge column
+    if (a.area === 'high') {
+        if (a.row === 'left')  return b.area === 'plaza' && b.col === 0;
+        if (a.row === 'right') return b.area === 'plaza' && b.col === 4;
+    }
+    return false;
+}
+
+function isAdjacent4(p1, p2) {
+    // Within the same playing field: orthogonal grid neighbours
+    if (p1.area === p2.area && isFieldArea(p1.area)) {
+        const dr = Math.abs(p1.row - p2.row);
+        const dc = Math.abs(p1.col - p2.col);
+        return (dr === 1 && dc === 0) || (dr === 0 && dc === 1);
+    }
+    // Garden connections (either direction)
+    if (adj4Pair(p1, p2) || adj4Pair(p2, p1)) return true;
+    // Staircase bridges (colour enforced later, in isValidMove4)
+    if (bridgeOwner(p1, p2) !== null) return true;
+    return false;
+}
+
+function isValidMove4(tArea, tRow, tCol) {
+    const currentPos = moveHistory.length > 0 ? moveHistory[moveHistory.length - 1] : selectedSource;
+    const target = { area: tArea, row: tRow, col: tCol };
+
+    // Dropping more stones on the current cell (only after the first step)
+    if (tArea === currentPos.area && tRow === currentPos.row && tCol === currentPos.col) {
+        return moveHistory.length > 0;
+    }
+
+    if (!isAdjacent4(currentPos, target)) return false;
+
+    // Colour-locked staircases: only the owner may traverse their bridge
+    const owner = bridgeOwner(currentPos, target);
+    if (owner !== null && owner !== currentPlayer) return false;
+
+    // No revisiting cells (incl. the source) within a turn
+    if (moveHistory.some(p => p.area === tArea && p.row === tRow && p.col === tCol)) return false;
+    if (tArea === selectedSource.area && tRow === selectedSource.row && tCol === selectedSource.col) return false;
+
+    const targetStack = getStack(tArea, tRow, tCol);
+
+    // Tower capacity on playing fields
+    if (isFieldArea(tArea) && targetStack.length >= BOARD_CONFIG.maxStackHeight) return false;
+
+    // Garden entry: only your own home, only your own goal high garden
+    if (tArea === 'home' && tRow !== currentPlayer) return false;
+    if (tArea === 'high' && tRow !== HIGH_OF[currentPlayer]) return false;
+
+    return true;
+}
+
+function isPlayerBlocked4(player) {
+    if (board.homes[player] && board.homes[player].includes(player)) return false;
+    const fields = [board.bottomField, board.backField, board.plaza];
+    for (const f of fields) for (const row of f) for (const st of row) if (getTopColor(st) === player) return false;
+    // Has buried stones -> can emergency-lift; otherwise truly out of play
+    for (const f of fields) for (const row of f) for (const st of row) if (st.includes(player)) return true;
+    return false;
+}
+
+function checkWin4() {
+    for (const c of COLORS4) {
+        const score = board.highs[HIGH_OF[c]].filter(s => s === c).length;
+        if (score >= BOARD_CONFIG.winCount) {
+            turnPhase = 'GAME_OVER';
+            const name = c.charAt(0).toUpperCase() + c.slice(1);
+            showGameOverModal(`${name} Wins!`, `${name} gathered ${BOARD_CONFIG.winCount} stones in the ${HIGH_OF[c]} High Garden!`);
+            return true;
+        }
+    }
+    return false;
+}
+
+// ============================================
+// 4-PLAYER AI (heuristic, greedy toward own goal)
+// ============================================
+
+function sameCell4(a, b) { return a.area === b.area && a.row === b.row && a.col === b.col; }
+
+function allCells4() {
+    const cells = [];
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) { cells.push({ area: 'bottom', row: r, col: c }); cells.push({ area: 'back', row: r, col: c }); }
+    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) cells.push({ area: 'plaza', row: r, col: c });
+    COLORS4.forEach(c => cells.push({ area: 'home', row: c, col: 0 }));
+    ['left', 'right'].forEach(id => cells.push({ area: 'high', row: id, col: 0 }));
+    return cells;
+}
+
+// Pure step legality (mirrors isValidMove4 but takes no global state)
+function canStep4(player, from, to, visited, source) {
+    if (sameCell4(to, source)) return false;
+    if (visited.some(v => sameCell4(v, to))) return false;
+    if (!isAdjacent4(from, to)) return false;
+    const owner = bridgeOwner(from, to);
+    if (owner !== null && owner !== player) return false;
+    const st = getStack(to.area, to.row, to.col);
+    if (isFieldArea(to.area) && st.length >= BOARD_CONFIG.maxStackHeight) return false;
+    if (to.area === 'home' && to.row !== player) return false;
+    if (to.area === 'high' && to.row !== HIGH_OF[player]) return false;
+    return true;
+}
+
+// How "advanced toward goal" a position is (higher = closer to scoring)
+function progress4(player, pos) {
+    const goal = HIGH_OF[player];
+    if (pos.area === 'high') return pos.row === goal ? 100000 : -100000;
+    if (pos.area === 'plaza') {
+        const goalCol = goal === 'left' ? 0 : 4;
+        return 600 - Math.abs(pos.col - goalCol) * 40;
+    }
+    const stair = STAIRS4[player].terrace;
+    if (pos.area === stair.area) {
+        return 120 - (Math.abs(pos.row - stair.row) + Math.abs(pos.col - stair.col)) * 6;
+    }
+    return 0;
+}
+
+// Greedy path of `count` drops from a source toward the goal
+function greedyPath4(player, source, count) {
+    const path = [];
+    const visited = [{ area: source.area, row: source.row, col: source.col }];
+    let pos = source;
+    let remaining = count;
+    const cells = allCells4();
+    while (remaining > 0) {
+        const neighbors = cells.filter(c => canStep4(player, pos, c, visited, source));
+        if (neighbors.length === 0) {
+            if (path.length > 0) { path.push(path[path.length - 1]); remaining--; continue; } // drop in place
+            break;
+        }
+        neighbors.sort((a, b) => progress4(player, b) - progress4(player, a));
+        const next = neighbors[0];
+        path.push(next); visited.push(next); pos = next; remaining--;
+        if (next.area === 'high') break; // depositing dumps all remaining stones
+    }
+    return path;
+}
+
+function scoreCandidate4(player, m) {
+    const goal = HIGH_OF[player];
+    const last = m.path[m.path.length - 1];
+    let score = progress4(player, last);
+    if (last.area === 'high' && last.row === goal) {
+        const fieldSteps = m.path.filter(p => p.area !== 'high').length;
+        const deposited = Math.max(1, m.src.count - fieldSteps);
+        score += 60000 * deposited;
+    }
+    for (const p of m.path) {
+        if (isFieldArea(p.area)) {
+            const top = getTopColor(getStack(p.area, p.row, p.col));
+            if (top && top !== player) score += 200; // capture opportunity
+        }
+    }
+    if (m.src.area === 'home') score += 30;   // mobilise stones
+    if (m.src.area === 'plaza') score += 60;  // push advanced stones
+    return score;
+}
+
+function generateCandidates4(player) {
+    const cands = [];
+    const add = (src) => {
+        const path = greedyPath4(player, { area: src.area, row: src.row, col: src.col }, src.count);
+        if (path.length > 0) cands.push({ src, path });
+    };
+    const homeLen = board.homes[player].length;
+    if (homeLen > 0) {
+        [...new Set([Math.min(homeLen, 5), Math.min(homeLen, 3), 1])].forEach(cnt => {
+            if (cnt > 0) add({ area: 'home', row: player, col: 0, count: cnt });
+        });
+    }
+    const addField = (area, grid) => {
+        for (let r = 0; r < grid.length; r++) for (let c = 0; c < grid[0].length; c++) {
+            const st = grid[r][c];
+            if (st.length > 0 && getTopColor(st) === player) add({ area, row: r, col: c, count: st.length });
+        }
+    };
+    addField('bottom', board.bottomField);
+    addField('back', board.backField);
+    addField('plaza', board.plaza);
+
+    // Emergency lift: if nothing is movable on top, retrieve buried stones
+    if (cands.length === 0) {
+        const addBuried = (area, grid) => {
+            for (let r = 0; r < grid.length; r++) for (let c = 0; c < grid[0].length; c++) {
+                if (grid[r][c].includes(player)) add({ area, row: r, col: c, count: grid[r][c].length });
+            }
+        };
+        addBuried('bottom', board.bottomField);
+        addBuried('back', board.backField);
+        addBuried('plaza', board.plaza);
+    }
+    return cands;
+}
+
+function makeAIMove4() {
+    if (turnPhase === 'GAME_OVER' || numPlayers !== 4) return;
+    const player = currentPlayer;
+    const cands = generateCandidates4(player);
+    if (cands.length === 0) { endTurn(); return; }
+
+    let best = null, bestScore = -Infinity;
+    for (const m of cands) {
+        const s = scoreCandidate4(player, m) + Math.random() * 5;
+        if (s > bestScore) { bestScore = s; best = m; }
+    }
+    executeAIMove4(best);
+}
+
+function executeAIMove4(m) {
+    const tid = currentTurnId;
+    resetTurnState();
+    selectedSource = null;
+    if (m.src.area === 'home') {
+        for (let i = 0; i < m.src.count; i++) {
+            if (currentTurnId !== tid) return;
+            handleSelectPhase('home', m.src.row, 0); // cycle pick-up count
+        }
+    } else {
+        handleSelectPhase(m.src.area, m.src.row, m.src.col);
+    }
+    let i = 0;
+    const step = () => {
+        if (turnPhase === 'GAME_OVER' || currentTurnId !== tid) return;
+        if (i < m.path.length) {
+            handleMovePhase(m.path[i].area, m.path[i].row, m.path[i].col);
+            i++;
+            aiActionTimeout = setTimeout(step, 350);
+        }
+    };
+    aiActionTimeout = setTimeout(step, 350);
+}
+
+// ============================================
 // EVENT LISTENERS
 // ============================================
 
@@ -1520,6 +1866,14 @@ opponentButton.addEventListener('click', () => {
         setTimeout(makeAIMove, 600);
     }
 });
+
+// Switch player count: rebuilds the 3D board (classic vs step-pyramid) then restarts.
+function setNumPlayers(n) {
+    if (n !== 2 && n !== 4) return;
+    numPlayers = n;
+    if (typeof createBoardGeometry === 'function') createBoardGeometry();
+    initializeGame();
+}
 
 // Start Game
 initializeGame();
