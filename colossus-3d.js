@@ -22,8 +22,14 @@ const fieldMeshes = new Map();
 
 // Constants
 const TILE_SIZE = 20;
-const BOARD_DIM = 11;
-const BOARD_OFFSET = (BOARD_DIM - 1) * TILE_SIZE / 2;
+let BOARD_DIM = 11; // synced from the game's BOARD_SIZE (11 for 2p, 13 for 4p)
+let BOARD_OFFSET = (BOARD_DIM - 1) * TILE_SIZE / 2;
+
+// Keep the 3D board dimensions in step with the game's current player count
+function refreshBoardDim() {
+    BOARD_DIM = (typeof BOARD_SIZE !== 'undefined') ? BOARD_SIZE : 11;
+    BOARD_OFFSET = (BOARD_DIM - 1) * TILE_SIZE / 2;
+}
 
 // Materials
 const matBronze = new THREE.MeshStandardMaterial({ 
@@ -36,6 +42,9 @@ const matMarble = new THREE.MeshStandardMaterial({ color: 0xf5f0e8, roughness: 0
 const matGold = new THREE.MeshStandardMaterial({ color: 0xD4AF37, roughness: 0.2, metalness: 0.9 });
 const matWhiteStone = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 });
 const matBlackStone = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3, metalness: 0.3 });
+const matRedStone = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.3, metalness: 0.2 });
+const matBlueStone = new THREE.MeshStandardMaterial({ color: 0x2a6fdb, roughness: 0.3, metalness: 0.2 });
+const STONE_MATS = { white: matWhiteStone, black: matBlackStone, red: matRedStone, blue: matBlueStone };
 const matHighlight = new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.5, depthTest: false });
 const matSelection = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.6, depthTest: false });
 
@@ -50,7 +59,7 @@ function init3D() {
 
     // Camera setup
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 20000);
-    camera.position.set(0, 800, 1500);
+    camera.position.set(0, 2010, 690); // Start above the board, looking down — near framing of the gameboard
 
     // Renderer setup
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -110,6 +119,7 @@ function init3D() {
     buildEnvironment();
     buildColossus();
     build3DBoard();
+    applyCameraForBoard();
 
     window.addEventListener('resize', onWindowResize);
     raycaster = new THREE.Raycaster();
@@ -345,18 +355,29 @@ function buildColossus() {
 }
 
 function build3DBoard() {
+    refreshBoardDim();
     fieldMeshes.clear();
     while (groupTiles.children.length > 0) groupTiles.remove(groupTiles.children[0]);
 
+    const mid = Math.floor(BOARD_DIM / 2);
+    const hasGameBoard = (typeof board !== 'undefined' && board && board.length === BOARD_DIM);
+
     for (let r = 0; r < BOARD_DIM; r++) {
         for (let c = 0; c < BOARD_DIM; c++) {
-            // Check if cell is active based on 2D board structure logic
-            let isActive = false;
-            if (r >= 1 && r <= 9 && c >= 1 && c <= 9) isActive = true;
-            if (r === 0 && c >= 4 && c <= 6) isActive = true;
-            if (r === 10 && c >= 4 && c <= 6) isActive = true;
-            if (c === 0 && r >= 4 && r <= 6) isActive = true;
-            if (c === 10 && r >= 4 && r <= 6) isActive = true;
+            // Prefer the game board's active flags; otherwise compute the cross shape
+            let isActive, dirField = null;
+            if (hasGameBoard) {
+                isActive = board[r][c].isActive;
+                dirField = board[r][c].directionField;
+            } else {
+                const last = BOARD_DIM - 1;
+                isActive = (r >= 1 && r <= last - 1 && c >= 1 && c <= last - 1) ||
+                    (r === 0 && c >= mid - 1 && c <= mid + 1) ||
+                    (r === last && c >= mid - 1 && c <= mid + 1) ||
+                    (c === 0 && r >= mid - 1 && r <= mid + 1) ||
+                    (c === last && r >= mid - 1 && r <= mid + 1);
+                if ((r === 0 && c === mid) || (r === last && c === mid) || (r === mid && c === 0) || (r === mid && c === last)) dirField = 'x';
+            }
 
             if (!isActive) continue;
 
@@ -366,10 +387,10 @@ function build3DBoard() {
             // Tile
             const tileGeom = new THREE.BoxGeometry(TILE_SIZE - 1, 4, TILE_SIZE - 1);
             const tileMat = matMarble.clone();
-            
-            // Highlight direction fields
+
+            // Highlight direction (gravity) fields
             let isDirField = false;
-            if ((r === 0 && c === 5) || (r === 10 && c === 5) || (r === 5 && c === 0) || (r === 5 && c === 10)) {
+            if (dirField) {
                 tileMat.color.set(0xef4444);
                 isDirField = true;
             } else if ((r + c) % 2 !== 0) {
@@ -428,9 +449,32 @@ function build3DBoard() {
     window.fireParticles = fireGroup;
 }
 
+// Frame the camera for the current board size (4-player board is larger)
+function applyCameraForBoard() {
+    if (!camera || !controls) return;
+    const scale = BOARD_DIM / 11;
+    controls.target.set(0, 1530, 0);
+    camera.position.set(0, 1530 + 480 * scale, 690 * scale);
+    controls.update();
+    needsRender = true;
+}
+
+// Rebuild tiles + pieces after a player-count change, then reframe the camera
+function rebuild3DBoard() {
+    if (typeof scene === 'undefined' || !scene) return;
+    refreshBoardDim();
+    // Clear tracked stones so sync rebuilds cleanly for the new layout
+    stoneMeshes.forEach(mesh => groupPieces.remove(mesh));
+    stoneMeshes.clear();
+    build3DBoard();
+    if (typeof sync3D === 'function') sync3D();
+    applyCameraForBoard();
+}
+window.rebuild3DBoard = rebuild3DBoard;
+
 function createStoneMesh(color) {
     const group = new THREE.Group();
-    const material = color === 'white' ? matWhiteStone : matBlackStone;
+    const material = STONE_MATS[color] || matBlackStone;
     
     const body = new THREE.Mesh(new THREE.CylinderGeometry(6, 7, 8, 24), material);
     body.position.y = 4;
@@ -453,6 +497,7 @@ function createStoneMesh(color) {
 
 function sync3D() {
     if (typeof board === 'undefined') return;
+    refreshBoardDim(); // keep board dimensions in sync with the current player count
 
     const currentBoardKeys = new Set();
     for (let r = 0; r < BOARD_DIM; r++) {

@@ -4,17 +4,39 @@
 // CONSTANTS & BOARD STRUCTURE
 // ============================================
 
-const BOARD_SIZE = 11; // 11x11 grid for cross shape
-const CORE_SIZE = 9; // 9x9 core area
+// Board size depends on player count:
+//  - 2 players: 9x9 core inside an 11x11 cross (classic).
+//  - 4 players: 11x11 core inside a 13x13 cross (expanded).
+let BOARD_SIZE = 11; // full grid incl. the cross extensions
+let CORE_SIZE = 9;   // playable core (excl. gravitational fields)
 
-// Direction field positions (row, col, direction)
-// Arrows point in the direction stones will slide
-const DIRECTION_FIELDS = [
-    { row: 0, col: 5, dir: 'up' },      // Top - arrow points up
-    { row: 10, col: 5, dir: 'down' },   // Bottom - arrow points down
-    { row: 5, col: 0, dir: 'left' },    // Left - arrow points left
-    { row: 5, col: 10, dir: 'right' }   // Right - arrow points right
-];
+// Direction (gravity) fields — recomputed by configureBoard() for the current size.
+let DIRECTION_FIELDS = [];
+
+// ---- PLAYERS ----
+// Clockwise order copied from Pyramid: white, red, black, blue (white/black opposite, red/blue opposite).
+const PLAYERS_4 = ['white', 'red', 'black', 'blue'];
+let numPlayers = 2;
+let turnIndex = 0;
+let eliminated = {}; // color -> true once it drops below 4 stones (4-player)
+
+function activeColors() {
+    return numPlayers === 4 ? PLAYERS_4 : ['white', 'black'];
+}
+
+// Set board dimensions + gravity-field positions for the current player count.
+function configureBoard() {
+    if (numPlayers === 4) { BOARD_SIZE = 13; CORE_SIZE = 11; }
+    else { BOARD_SIZE = 11; CORE_SIZE = 9; }
+    const mid = Math.floor(BOARD_SIZE / 2);
+    const last = BOARD_SIZE - 1;
+    DIRECTION_FIELDS = [
+        { row: 0, col: mid, dir: 'up' },
+        { row: last, col: mid, dir: 'down' },
+        { row: mid, col: 0, dir: 'left' },
+        { row: mid, col: last, dir: 'right' }
+    ];
+}
 
 // ============================================
 // GAME STATE
@@ -27,9 +49,22 @@ let gameState = 'SELECT_STONE';
 let lastPushedStone = null; // Prevents immediate push-back
 let isVsComputer = true;
 
+// Per-stone "no push-back": a stone pushed in a direction can't be pushed back the
+// opposite way until it next moves (or a gravity tilt reshuffles the board).
+let pushDir = {}; // `${r},${c}` -> direction the stone there was last pushed
+const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' };
+function dirName(dr, dc) {
+    if (dr === -1) return 'up';
+    if (dr === 1) return 'down';
+    if (dc === -1) return 'left';
+    if (dc === 1) return 'right';
+    return null;
+}
+
 // Track AI behavior to prevent loops
 let aiLastMovedStone = null; // {r, c}
 let aiConsecutiveMoveCount = 0;
+let aiRecentMoves = []; // signatures of recent AI moves, to detect ping-pong loops
 let lastMovedStonePos = null; // {row, col}
 let gravityOptions = []; // [{row, col, dir}]
 
@@ -58,6 +93,10 @@ const menuBtnModal = document.getElementById('menu-btn-modal');
 // ============================================
 
 function initializeBoard() {
+    configureBoard();
+    const mid = Math.floor(BOARD_SIZE / 2);
+    const last = BOARD_SIZE - 1;
+
     board = Array(BOARD_SIZE).fill(0).map(() =>
         Array(BOARD_SIZE).fill(0).map(() => ({ piece: null, isActive: false, directionField: null }))
     );
@@ -65,26 +104,13 @@ function initializeBoard() {
     // Mark active cells (cross shape)
     for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
-            // Center 9x9 core is always active
-            if (r >= 1 && r <= 9 && c >= 1 && c <= 9) {
-                board[r][c].isActive = true;
-            }
-            // Top extension (row 0, cols 4-6) - only 1 field on each side of direction field
-            if (r === 0 && c >= 4 && c <= 6) {
-                board[r][c].isActive = true;
-            }
-            // Bottom extension (row 10, cols 4-6)
-            if (r === 10 && c >= 4 && c <= 6) {
-                board[r][c].isActive = true;
-            }
-            // Left extension (col 0, rows 4-6)
-            if (c === 0 && r >= 4 && r <= 6) {
-                board[r][c].isActive = true;
-            }
-            // Right extension (col 10, rows 4-6)
-            if (c === 10 && r >= 4 && r <= 6) {
-                board[r][c].isActive = true;
-            }
+            // Central core (excludes the outer cross extensions)
+            if (r >= 1 && r <= last - 1 && c >= 1 && c <= last - 1) board[r][c].isActive = true;
+            // Cross extensions: one field on each side of each gravity field
+            if (r === 0 && c >= mid - 1 && c <= mid + 1) board[r][c].isActive = true;
+            if (r === last && c >= mid - 1 && c <= mid + 1) board[r][c].isActive = true;
+            if (c === 0 && r >= mid - 1 && r <= mid + 1) board[r][c].isActive = true;
+            if (c === last && r >= mid - 1 && r <= mid + 1) board[r][c].isActive = true;
         }
     }
 
@@ -96,13 +122,19 @@ function initializeBoard() {
     // Place starting stones
     placeStartingStones();
 
-    currentPlayer = 'white';
+    turnIndex = 0;
+    eliminated = {};
+    currentPlayer = activeColors()[0]; // white
     selectedStone = null;
     validMoves = [];
     gameState = 'SELECT_STONE';
     lastPushedStone = null;
     lastMovedStonePos = null;
     gravityOptions = [];
+    pushDir = {};
+    aiRecentMoves = [];
+    aiLastMovedStone = null;
+    aiConsecutiveMoveCount = 0;
 
     drawBoard();
     updateStatus();
@@ -142,6 +174,7 @@ function hideGameOverModal() {
 }
 
 function placeStartingStones() {
+    if (numPlayers === 4) { placeStartingStones4(); return; }
     // Black stones (top-left)
     board[1][1].piece = 'black';
     board[1][2].piece = 'black';
@@ -173,6 +206,25 @@ function placeStartingStones() {
     board[9][7].piece = 'black';
     board[9][8].piece = 'black';
     board[9][9].piece = 'black';
+}
+
+// 4-player: 10 stones per player in a triangular cluster in each corner of the 11x11 core.
+// Clockwise (matching Pyramid): white TL, red TR, black BR, blue BL.
+function placeStartingStones4() {
+    const lo = 1;               // inner core edge
+    const hi = BOARD_SIZE - 2;   // outer core edge (11 on a 13-grid)
+    // Place a 4+3+2+1 triangle anchored at a corner, growing inward by drSign/dcSign.
+    const placeCorner = (color, cornerR, cornerC, drSign, dcSign) => {
+        for (let i = 0; i < 4; i++) {            // row away from corner
+            for (let j = 0; j < 4 - i; j++) {     // shrinking width
+                board[cornerR + i * drSign][cornerC + j * dcSign].piece = color;
+            }
+        }
+    };
+    placeCorner('white', lo, lo, +1, +1); // top-left
+    placeCorner('red', lo, hi, +1, -1);   // top-right
+    placeCorner('black', hi, hi, -1, -1); // bottom-right
+    placeCorner('blue', hi, lo, -1, +1);  // bottom-left
 }
 
 // ============================================
@@ -231,7 +283,8 @@ function drawBoard() {
 }
 
 function updateStatus(message = null) {
-    playerColorElement.style.backgroundColor = currentPlayer === 'white' ? '#ffffff' : '#1a1a1a';
+    const COLOR_HEX = { white: '#ffffff', black: '#1a1a1a', red: '#c0392b', blue: '#2a6fdb' };
+    playerColorElement.style.backgroundColor = COLOR_HEX[currentPlayer] || '#1a1a1a';
     playerColorElement.style.borderColor = currentPlayer === 'white' ? '#1a1a1a' : '#ffffff';
 
     if (gameState === 'GAME_OVER') return;
@@ -258,32 +311,54 @@ function updateStatus(message = null) {
     }
 }
 
-function updateStoneCounts() {
-    let whiteCount = 0;
-    let blackCount = 0;
-
+function countStones() {
+    const counts = { white: 0, black: 0, red: 0, blue: 0 };
     for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
-            if (board[r][c].piece === 'white') whiteCount++;
-            if (board[r][c].piece === 'black') blackCount++;
+            const p = board[r][c].piece;
+            if (p) counts[p]++;
         }
     }
+    return counts;
+}
 
-    whiteCountElement.textContent = whiteCount;
-    blackCountElement.textContent = blackCount;
+function updateStoneCounts() {
+    const counts = countStones();
 
-    // Update Side Menu
-    const whiteCountMenu = document.getElementById('white-count-menu');
-    const blackCountMenu = document.getElementById('black-count-menu');
-    if (whiteCountMenu) whiteCountMenu.textContent = whiteCount;
-    if (blackCountMenu) blackCountMenu.textContent = blackCount;
+    if (whiteCountElement) whiteCountElement.textContent = counts.white;
+    if (blackCountElement) blackCountElement.textContent = counts.black;
+    const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setText('white-count-menu', counts.white);
+    setText('black-count-menu', counts.black);
+    setText('red-count', counts.red);
+    setText('blue-count', counts.blue);
+    setText('red-count-menu', counts.red);
+    setText('blue-count-menu', counts.blue);
 
-    // Check win condition
-    if (whiteCount < 4) {
+    if (numPlayers === 4) {
+        // A player is eliminated below 4 stones; last standing wins.
+        PLAYERS_4.forEach(c => { if (counts[c] < 4) eliminated[c] = true; });
+        const alive = PLAYERS_4.filter(c => !eliminated[c]);
+        if (alive.length <= 1 && gameState !== 'GAME_OVER') {
+            gameState = 'GAME_OVER';
+            if (alive.length === 1) {
+                const name = alive[0].charAt(0).toUpperCase() + alive[0].slice(1);
+                updateStatus(`Game Over! ${name} wins!`);
+                showGameOverModal(`${name} Wins!`, `${name} is the last player with 4+ stones.`, alive[0]);
+            } else {
+                updateStatus('Game Over! Draw.');
+                showGameOverModal('Draw!', 'No player has 4 or more stones left.', null);
+            }
+        }
+        return;
+    }
+
+    // 2-player win condition
+    if (counts.white < 4) {
         gameState = 'GAME_OVER';
         updateStatus('Game Over! Black wins!');
         showGameOverModal('Black Wins!', 'Black wins! White has fewer than 4 stones.', 'black');
-    } else if (blackCount < 4) {
+    } else if (counts.black < 4) {
         gameState = 'GAME_OVER';
         updateStatus('Game Over! White wins!');
         showGameOverModal('White Wins!', 'White wins! Black has fewer than 4 stones.', 'white');
@@ -328,11 +403,21 @@ function toggleOpponent() {
     opponentButton.textContent = text;
     const opponentMenu = document.getElementById('opponent-btn-menu');
     if (opponentMenu) opponentMenu.textContent = text;
-    
-    if (isVsComputer && currentPlayer === 'black' && gameState === 'SELECT_STONE') {
+
+    if (isAITurn() && gameState === 'SELECT_STONE') {
         setTimeout(makeAIMove, 500);
     }
 }
+
+// Switch player count (2 or 4): reconfigure board + restart, and rebuild the 3D scene.
+function setNumPlayers(n) {
+    if (n !== 2 && n !== 4) return;
+    numPlayers = n;
+    initializeBoard();
+    if (window.is3DView && typeof rebuild3DBoard === 'function') rebuild3DBoard();
+    if (isAITurn() && gameState === 'SELECT_STONE') setTimeout(makeAIMove, 500);
+}
+window.setNumPlayers = setNumPlayers;
 
 // Export for menu
 window.handleCancelMove = handleCancelMove;
@@ -399,8 +484,13 @@ function calculatePushMoves(row, col) {
             const pushC = adjC + dc;
 
             if (isInBounds(pushR, pushC) && !board[pushR][pushC].piece) {
-                // Check if this stone was just pushed (prevent immediate push-back)
-                if (!lastPushedStone || lastPushedStone.row !== adjR || lastPushedStone.col !== adjC) {
+                // 1) Can't immediately re-push the very stone you just pushed.
+                const isJustPushed = lastPushedStone && lastPushedStone.row === adjR && lastPushedStone.col === adjC;
+                // 2) Can't push a stone back the opposite way it was last pushed (anti ping-pong).
+                const prevDir = pushDir[`${adjR},${adjC}`];
+                const wouldPushBack = prevDir && OPPOSITE[prevDir] === dirName(dr, dc);
+
+                if (!isJustPushed && !wouldPushBack) {
                     moves.push({
                         row: adjR,
                         col: adjC,
@@ -486,6 +576,9 @@ async function executeMove(move) {
         board[move.row][move.col].piece = board[selectedStone.row][selectedStone.col].piece;
         board[selectedStone.row][selectedStone.col].piece = null;
         lastPushedStone = null;
+        // A voluntary run clears any push-direction memory for this stone
+        delete pushDir[`${selectedStone.row},${selectedStone.col}`];
+        delete pushDir[`${move.row},${move.col}`];
 
         // Redraw to snap stone to grid
         drawBoard();
@@ -533,6 +626,12 @@ async function executeMove(move) {
         board[move.row][move.col].piece = board[selectedStone.row][selectedStone.col].piece;
         board[selectedStone.row][selectedStone.col].piece = null;
 
+        // Record the direction the victim was pushed, so it can't be shoved straight back.
+        const pd = dirName(move.pushTo.row - move.row, move.pushTo.col - move.col);
+        delete pushDir[`${selectedStone.row},${selectedStone.col}`];
+        delete pushDir[`${move.row},${move.col}`]; // pushing stone moved here voluntarily
+        if (pd) pushDir[`${move.pushTo.row},${move.pushTo.col}`] = pd;
+
         // Redraw to snap stones to grid
         drawBoard();
 
@@ -550,7 +649,7 @@ async function executeMove(move) {
     }
 
     // Track AI consecutive moves with the same stone (across turns)
-    if (currentPlayer === 'black') {
+    if (isAITurn()) {
         if (aiLastMovedStone &&
             aiLastMovedStone.row === selectedStone.row &&
             aiLastMovedStone.col === selectedStone.col) {
@@ -698,6 +797,9 @@ async function tiltBoard(direction) {
         updates.forEach(update => {
             board[update.to.row][update.to.col].piece = update.piece;
         });
+
+        // Gravity reshuffles the board — clear push-direction memory
+        pushDir = {};
 
         // 3D Animation
         if (window.is3DView && typeof animateGravityShift === 'function') {
@@ -910,11 +1012,30 @@ function cancelMove() {
     updateUI();
 }
 
+function isAITurn() {
+    if (!isVsComputer || gameState === 'GAME_OVER') return false;
+    return numPlayers === 4 ? currentPlayer !== 'white' : currentPlayer === 'black';
+}
+
+function advancePlayer() {
+    const order = activeColors();
+    if (numPlayers === 4) {
+        // Next non-eliminated player, clockwise
+        for (let i = 0; i < order.length; i++) {
+            turnIndex = (turnIndex + 1) % order.length;
+            if (!eliminated[order[turnIndex]]) break;
+        }
+        currentPlayer = order[turnIndex];
+    } else {
+        currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
+    }
+}
+
 function endTurn() {
     if (gameState === 'GAME_OVER') return;
     selectedStone = null;
     validMoves = [];
-    currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
+    advancePlayer();
     gameState = 'SELECT_STONE';
     drawBoard();
     updateStatus();
@@ -926,7 +1047,7 @@ function endTurn() {
         sync3D();
     }
 
-    if (isVsComputer && currentPlayer === 'black' && gameState !== 'GAME_OVER') {
+    if (isAITurn()) {
         setTimeout(makeAIMove, 600);
     }
 }
@@ -940,7 +1061,7 @@ cancelButton.addEventListener('click', cancelMove);
 opponentButton.addEventListener('click', () => {
     isVsComputer = !isVsComputer;
     opponentButton.textContent = isVsComputer ? 'Opponent: Computer' : 'Opponent: Human';
-    if (isVsComputer && currentPlayer === 'black' && gameState !== 'GAME_OVER') {
+    if (isAITurn() && gameState === 'SELECT_STONE') {
         setTimeout(makeAIMove, 600);
     }
 });
@@ -956,19 +1077,18 @@ if (modalOverlay) modalOverlay.addEventListener('click', hideGameOverModal);
 // ============================================
 
 function makeAIMove() {
-    if (gameState === 'GAME_OVER' || currentPlayer !== 'black') return;
+    if (gameState !== 'SELECT_STONE' || !isAITurn()) return;
 
-
-
-    if (gameState !== 'SELECT_STONE') return;
+    const me = currentPlayer;
+    const mid = Math.floor(BOARD_SIZE / 2);
 
     // Colossus AI (Medium heuristic)
-    // 1. Gather all possible moves for all black stones
+    // 1. Gather all possible moves for all of the current player's stones
     let allMoves = [];
 
     for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
-            if (board[r][c].piece === 'black') {
+            if (board[r][c].piece === me) {
                 const runs = calculateRunMoves(r, c);
                 const pushes = calculatePushMoves(r, c);
 
@@ -994,8 +1114,8 @@ function makeAIMove() {
 
         if (action.move.type === 'push') {
             const pushedType = board[mr][mc].piece;
-            if (pushedType === 'white') score += 50; // good to push enemy
-            else score -= 10; // try not to push own stones unecessarily
+            if (pushedType && pushedType !== me) score += 50; // good to push an opponent
+            else score -= 10; // try not to push own stones unnecessarily
 
             const targetR = action.move.pushTo.row;
             const targetC = action.move.pushTo.col;
@@ -1011,7 +1131,7 @@ function makeAIMove() {
         }
 
         // prefer central positions (away from edges)
-        const distFromCenter = Math.abs(mr - 5) + Math.abs(mc - 5);
+        const distFromCenter = Math.abs(mr - mid) + Math.abs(mc - mid);
         score += (8 - distFromCenter) * 2;
 
         // Loop Prevention: Penalize moving the same stone too many times in a row
@@ -1023,7 +1143,7 @@ function makeAIMove() {
         }
 
         // Add random variation
-        score += Math.random() * 5;
+        score += Math.random() * 12;
 
         if (score > bestScore) {
             bestScore = score;
@@ -1031,7 +1151,19 @@ function makeAIMove() {
         }
     });
 
+    const sigOf = a => `${a.stone.r},${a.stone.c}->${a.move.row},${a.move.col}`;
+
+    // Stuck/ping-pong breaker: if the best move repeats a recent one, pick a random move instead.
+    if (bestAction && aiRecentMoves.includes(sigOf(bestAction)) && allMoves.length > 1) {
+        const alternatives = allMoves.filter(a => !aiRecentMoves.includes(sigOf(a)));
+        const pool = alternatives.length > 0 ? alternatives : allMoves;
+        bestAction = pool[Math.floor(Math.random() * pool.length)];
+    }
+
     if (bestAction) {
+        aiRecentMoves.push(sigOf(bestAction));
+        if (aiRecentMoves.length > 8) aiRecentMoves.shift();
+
         handleCellClick(bestAction.stone.r, bestAction.stone.c).then(() => {
             setTimeout(() => {
                 handleCellClick(bestAction.move.row, bestAction.move.col);

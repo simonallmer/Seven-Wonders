@@ -44,6 +44,14 @@
                     <div class="count-stone black"></div>
                     <span id="black-count-menu">9</span>
                 </div>
+                <div class="count-item" id="red-count-item" style="display:none;">
+                    <div class="count-stone" style="background:#c0392b;"></div>
+                    <span id="red-count-menu">10</span>
+                </div>
+                <div class="count-item" id="blue-count-item" style="display:none;">
+                    <div class="count-stone" style="background:#2a6fdb;"></div>
+                    <span id="blue-count-menu">10</span>
+                </div>
             </div>
 
             <div class="menu-divider"></div>
@@ -54,6 +62,7 @@
 
             <div class="menu-divider"></div>
 
+            <button id="players-btn-menu" class="menu-btn">Players: 2</button>
             <button id="opponent-btn-menu" class="menu-btn">Opponent: Computer</button>
             <button id="view-toggle-btn" class="menu-btn">View: 3D</button>
             <button id="rules-btn-menu" class="menu-btn">Rules</button>
@@ -229,6 +238,19 @@
         
         if (opponentBtnMenu) opponentBtnMenu.addEventListener('click', () => {
             if (typeof toggleOpponent === 'function') toggleOpponent();
+        });
+
+        const playersBtnMenu = document.getElementById('players-btn-menu');
+        if (playersBtnMenu) playersBtnMenu.addEventListener('click', () => {
+            const next = (typeof numPlayers !== 'undefined' && numPlayers === 2) ? 4 : 2;
+            playersBtnMenu.textContent = `Players: ${next}`;
+            const show = next === 4 ? 'flex' : 'none';
+            const redItem = document.getElementById('red-count-item');
+            const blueItem = document.getElementById('blue-count-item');
+            if (redItem) redItem.style.display = show;
+            if (blueItem) blueItem.style.display = show;
+            if (typeof setNumPlayers === 'function') setNumPlayers(next);
+            toggleMenu();
         });
 
         if (viewToggleBtn) viewToggleBtn.addEventListener('click', () => {
