@@ -10,61 +10,52 @@
 </head>
 
 <body class="view-3d">
-    <!-- Back to Menu -->
-    <a href="index.html" class="back-link">← Menu</a>
+    <!-- Overlay for side menu -->
+    <div id="overlay" class="overlay"></div>
 
-    <div id="menu-trigger">
-        <div class="sky-line"></div>
-        <div class="sky-line"></div>
-        <div class="sky-line"></div>
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <a href="index.html" class="top-bar-btn">← Menu</a>
+        <button id="menu-toggle" class="top-bar-btn menu-toggle-btn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
     </div>
 
-    <header id="main-header">
-        <h1>TEMPLE</h1>
-    </header>
+    <!-- Side Menu -->
+    <div id="side-menu" class="side-menu">
+        <div class="menu-content">
+            <h1 class="game-title">TEMPLE</h1>
+            <p class="game-subtitle">Temple of Artemis</p>
+
+            <div class="current-player-display">
+                <div id="player-color" class="count-stone white" style="width: 18px; height: 18px;"></div>
+                <span id="status-text">White to move</span>
+            </div>
+
+            <div class="stone-counts-display">
+                <div class="count-item"><div class="count-stone white"></div><span id="white-count-menu">9</span></div>
+                <div class="count-item"><div class="count-stone black"></div><span id="black-count-menu">9</span></div>
+                <div class="count-item" id="red-count-item" style="display:none;"><div class="count-stone" style="background:#c0392b;"></div><span id="red-count-menu">9</span></div>
+                <div class="count-item" id="blue-count-item" style="display:none;"><div class="count-stone" style="background:#2a6fdb;"></div><span id="blue-count-menu">9</span></div>
+            </div>
+
+            <div class="menu-divider"></div>
+
+            <button id="cancel-button" class="menu-btn hidden">Cancel Move</button>
+            <button id="players-btn-menu" class="menu-btn">Players: 2</button>
+            <button id="opponent-btn-menu" class="menu-btn">Opponent: Computer</button>
+            <button id="rules-btn" class="menu-btn">Rules</button>
+            <button id="reset-button" class="menu-btn">New Game</button>
+            <button id="close-menu-btn" class="menu-btn">Close</button>
+        </div>
+    </div>
 
     <div id="game-layout">
         <div id="view-container">
             <svg id="game-board" viewBox="0 0 100 120"></svg>
             <div id="canvas3d"></div>
-        </div>
-
-        <button id="cancel-button" class="hidden">Cancel Move</button>
-
-        <div id="hud">
-            <div id="status-panel-top" style="position: absolute; top: -45px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; color: #4a4a4a; font-family: 'Cinzel', serif; font-size: 0.75rem; white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; font-weight: bold; text-shadow: 0 1px 2px rgba(255,255,255,0.8);">
-                <div id="player-color" style="width: 14px; height: 14px; border: 1px solid #a39e93; border-radius: 50%; background-color: #fff; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2), 0 0 5px rgba(255,255,255,0.5);"></div>
-                <span id="status-text">White to move</span>
-            </div>
-            <div class="controls">
-                <div class="players-dropdown">
-                    <button id="players-btn">2 Players</button>
-                    <div class="players-menu" id="players-menu">
-                        <button class="active">2 Players</button>
-                        <button disabled style="opacity: 0.6; cursor: not-allowed;">3 Players (Coming Soon)</button>
-                        <button disabled style="opacity: 0.6; cursor: not-allowed;">4 Players (Coming Soon)</button>
-                    </div>
-                </div>
-                <div class="opp-dropdown">
-                    <button id="opponent-btn">Opponent: Computer</button>
-                    <div class="opp-menu" id="opponent-menu">
-                        <button id="btn-opp-human" data-opp="human">Human</button>
-                        <button id="btn-opp-easy" data-opp="easy">Computer: Easy</button>
-                        <button id="btn-opp-medium" data-opp="medium">Computer: Medium</button>
-                        <button id="btn-opp-hard" data-opp="hard">Computer: Hard</button>
-                    </div>
-                </div>
-                <div class="view-dropdown">
-                    <button id="view-btn">View: 3D</button>
-                    <div class="view-menu" id="view-menu">
-                        <button id="btn-view-3d" data-view="3d">3D View</button>
-                        <button disabled style="opacity: 0.6; cursor: not-allowed;">2D View (Coming Soon)</button>
-                    </div>
-                </div>
-                <button id="rules-btn">Rules</button>
-                <button id="reset-button">New Game</button>
-                <button id="close-hud-btn">Close</button>
-            </div>
         </div>
     </div>
 
@@ -135,8 +126,64 @@
     <script src="temple-game.js"></script>
     <script src="temple-3d.js"></script>
     <script>
+        // ---- Standard side menu ----
+        const menuToggle = document.getElementById('menu-toggle');
+        const sideMenu = document.getElementById('side-menu');
+        const overlay = document.getElementById('overlay');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+        function toggleSideMenu() {
+            sideMenu.classList.toggle('open');
+            menuToggle.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+        if (menuToggle) menuToggle.addEventListener('click', toggleSideMenu);
+        if (overlay) overlay.addEventListener('click', toggleSideMenu);
+        if (closeMenuBtn) closeMenuBtn.addEventListener('click', toggleSideMenu);
+
+        // ---- Players: toggle 2 <-> 4 (no 3-player mode) ----
+        const playersBtnMenu = document.getElementById('players-btn-menu');
+        if (playersBtnMenu) playersBtnMenu.addEventListener('click', () => {
+            const next = (typeof numPlayers !== 'undefined' && numPlayers === 2) ? 4 : 2;
+            playersBtnMenu.textContent = `Players: ${next}`;
+            const show = next === 4 ? 'flex' : 'none';
+            const r = document.getElementById('red-count-item'), b = document.getElementById('blue-count-item');
+            if (r) r.style.display = show;
+            if (b) b.style.display = show;
+            if (typeof setNumPlayers === 'function') setNumPlayers(next);
+        });
+
+        // ---- Opponent: cycle Human -> Easy -> Medium -> Hard ----
+        const opponentBtnMenu = document.getElementById('opponent-btn-menu');
+        const OPP_CYCLE = ['human', 'easy', 'medium', 'hard'];
+        function oppLabel() {
+            if (typeof isVsComputer !== 'undefined' && !isVsComputer) return 'Opponent: Human';
+            const d = (typeof computerDifficulty !== 'undefined') ? computerDifficulty : 'medium';
+            return `Opponent: ${d.charAt(0).toUpperCase() + d.slice(1)}`;
+        }
+        if (opponentBtnMenu) {
+            opponentBtnMenu.textContent = oppLabel();
+            opponentBtnMenu.addEventListener('click', () => {
+                const cur = (typeof isVsComputer !== 'undefined' && !isVsComputer) ? 'human'
+                    : (typeof computerDifficulty !== 'undefined' ? computerDifficulty : 'medium');
+                const next = OPP_CYCLE[(OPP_CYCLE.indexOf(cur) + 1) % OPP_CYCLE.length];
+                if (next === 'human') {
+                    isVsComputer = false;
+                    localStorage.setItem('templeVsComputer', 'false');
+                } else {
+                    isVsComputer = true;
+                    computerDifficulty = next;
+                    localStorage.setItem('templeVsComputer', 'true');
+                    localStorage.setItem('templeDifficulty', next);
+                }
+                opponentBtnMenu.textContent = oppLabel();
+                if (typeof initializeBoard === 'function') initializeBoard();
+            });
+        }
+
+        // ---- Rules modal ----
         document.getElementById('rules-btn').addEventListener('click', function () {
             document.getElementById('rules-modal').classList.remove('hidden');
+            toggleSideMenu();
         });
         document.getElementById('rules-close-btn').addEventListener('click', function () {
             document.getElementById('rules-modal').classList.add('hidden');

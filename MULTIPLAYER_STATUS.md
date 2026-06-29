@@ -37,5 +37,11 @@ Gardens uses P1 white, P2 black as its established pair — new players use a co
 - [ ] palace
 - [ ] pharos
 - [ ] statue
-- [ ] temple
+- [x] **temple** — 2 & 4 players, with AI
+      - [x] 4-player Greek-cross board: four 5+3+1 arms + free 5×5 centre (61 nodes); 2-player keeps classic
+      - [x] Same connection rule as 2p (orthogonal + diagonals on even-parity cells), not 8-connectivity
+      - [x] Race to the opposite Artemis tip; colours white(bottom)/red(left)/black(top)/blue(right), clockwise
+      - [x] Per-player forward direction; AI controls every non-white player
+      - [x] Standardized right-side menu (gold/dark, Cinzel); Players button toggles 2↔4
+      - [x] 3D: +-shaped temple with 8 pillars + two intertwining gable roofs (4p); classic temple (2p)
 - [ ] tower

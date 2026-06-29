@@ -24,6 +24,9 @@ const matField = new THREE.MeshStandardMaterial({ color: 0xd4cfc4, roughness: 0.
 const matArtemis = new THREE.MeshStandardMaterial({ color: 0xc4b5fd, roughness: 0.4, metalness: 0.2, emissive: 0x4c1d95, emissiveIntensity: 0.5 });
 const matWhitePiece = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 });
 const matBlackPiece = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3, metalness: 0.3 });
+const matRedPiece = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.3, metalness: 0.2 });
+const matBluePiece = new THREE.MeshStandardMaterial({ color: 0x2a6fdb, roughness: 0.3, metalness: 0.2 });
+const PIECE_MATS = { white: matWhitePiece, black: matBlackPiece, red: matRedPiece, blue: matBluePiece };
 const matHighlight = new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.5, depthTest: false });
 const matSelection = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.6, depthTest: false });
 
@@ -121,13 +124,14 @@ function onWindowResize() {
 
 // Convert 2D SVG coords to 3D coords
 function get3DCoord(svgX, svgY) {
-    // 2D center is approx (50, 57) based on the board data.
-    // SVG X: 24 to 76 (center 50)
-    // SVG Y: 5 to 109 (center 57)
+    // 4-player Greek cross: centred at (70,70), full size (temple is widened to fit).
+    if (typeof numPlayers !== 'undefined' && numPlayers === 4) {
+        const scale = 1.5;
+        return { x: (svgX - 70) * scale, z: (svgY - 70) * scale };
+    }
+    // 2-player: SVG X 24-76 (centre 50), Y 5-109 (centre 57)
     const scale = 1.8;
-    const x3d = (svgX - 50) * scale;
-    const z3d = (svgY - 57) * scale;
-    return { x: x3d, z: z3d };
+    return { x: (svgX - 50) * scale, z: (svgY - 57) * scale };
 }
 
 function buildTempleEnvironment() {
@@ -139,33 +143,45 @@ function buildTempleEnvironment() {
     scene.add(groupHighlights);
 
     // Parameters
+    const is4 = (typeof numPlayers !== 'undefined' && numPlayers === 4);
     const baseWidth = 110;
     const baseLength = 202;
     const stepCount = 3;
     const stepHeight = 4;
     const stepDepth = 6;
 
-    // Stairs/Base
-    for (let i = 0; i < stepCount; i++) {
-        const w = baseWidth + (stepCount - i) * stepDepth * 2;
-        const l = baseLength + (stepCount - i) * stepDepth * 2;
-        const geomStep = new THREE.BoxGeometry(w, stepHeight, l);
-        const meshStep = new THREE.Mesh(geomStep, matMarbleBase);
-        meshStep.position.y = - (stepCount - i) * stepHeight + stepHeight/2;
-        meshStep.receiveShadow = true;
-        meshStep.castShadow = true;
-        groupTemple.add(meshStep);
+    // 4-player Greek-cross footprint: two crossing bars (a +). 2-player: single rectangle.
+    const CROSS_HALF_W = 56;   // half-width of each bar
+    const CROSS_HALF_L = 100;  // half-length of each bar (arm reach)
+
+    const addBox = (w, h, l, y) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, l), matMarbleBase);
+        m.position.y = y;
+        m.receiveShadow = true; m.castShadow = true;
+        groupTemple.add(m);
+    };
+
+    if (is4) {
+        // + floor (two crossing slabs) + + steps
+        for (let i = 0; i < stepCount; i++) {
+            const grow = (stepCount - i) * stepDepth * 2;
+            const y = -(stepCount - i) * stepHeight + stepHeight / 2;
+            addBox(CROSS_HALF_W * 2 + grow, stepHeight, CROSS_HALF_L * 2 + grow, y); // vertical bar
+            addBox(CROSS_HALF_L * 2 + grow, stepHeight, CROSS_HALF_W * 2 + grow, y); // horizontal bar
+        }
+        addBox(CROSS_HALF_W * 2, 4, CROSS_HALF_L * 2, 2); // floor — vertical bar
+        addBox(CROSS_HALF_L * 2, 4, CROSS_HALF_W * 2, 2); // floor — horizontal bar
+    } else {
+        // Stairs/Base (rectangular)
+        for (let i = 0; i < stepCount; i++) {
+            const w = baseWidth + (stepCount - i) * stepDepth * 2;
+            const l = baseLength + (stepCount - i) * stepDepth * 2;
+            addBox(w, stepHeight, l, -(stepCount - i) * stepHeight + stepHeight / 2);
+        }
+        addBox(baseWidth, 4, baseLength, 2); // top floor
     }
 
-    // Top floor
-    const geomFloor = new THREE.BoxGeometry(baseWidth, 4, baseLength);
-    const meshFloor = new THREE.Mesh(geomFloor, matMarbleBase);
-    meshFloor.position.y = 2; // Surface is at y=4
-    meshFloor.receiveShadow = true;
-    meshFloor.castShadow = true;
-    groupTemple.add(meshFloor);
-
-    // 4 Pillars at edges - Detailed Ionic Order
+    // Detailed Ionic Order pillar dimensions
     const pRadius = 5.5;
     const pHeight = 80;
     
@@ -255,20 +271,18 @@ function buildTempleEnvironment() {
         return group;
     }
 
-    // Pillars exactly at the theoretical intersections of the outermost columns/rows
-    const pX = 46.8;
-    const pZ = 93.6;
-
-    const positions = [
-        [-pX, -pZ],
-        [pX, -pZ],
-        [-pX, pZ],
-        [pX, pZ]
+    // Pillars: 2-player has 4 at the rectangle corners; 4-player has 8 at the
+    // convex corners of the + (two at the end of each of the four arms).
+    const W = CROSS_HALF_W, L = CROSS_HALF_L;
+    const positions = is4 ? [
+        [-W, -L], [W, -L], [-W, L], [W, L],   // vertical bar (top & bottom arm ends)
+        [-L, -W], [-L, W], [L, -W], [L, W]    // horizontal bar (left & right arm ends)
+    ] : [
+        [-46.8, -93.6], [46.8, -93.6], [-46.8, 93.6], [46.8, 93.6]
     ];
 
     positions.forEach(([x, z]) => {
-        // Floor is at y=4
-        const p = createIonicPillar(x, 4, z);
+        const p = createIonicPillar(x, 4, z); // floor at y=4
         groupTemple.add(p);
     });
 
@@ -291,68 +305,50 @@ function buildTempleEnvironment() {
     const roofGroup = new THREE.Group();
     window.templeRoof = roofGroup;
 
-    // Roof dimensions
-    const overhangLength = 208; // 202 + overhang
-    const overhangWidth = 114;
     const architraveMat = matPillar.clone();
-    architraveMat.transparent = true;
-    architraveMat.opacity = 0;
+    architraveMat.transparent = true; architraveMat.opacity = 0;
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b3a2b, roughness: 0.9, metalness: 0.1, transparent: true, opacity: 0 });
+    const roofBaseY = 94.8;
+    const roofHeight = 16;
 
-    // 1. Architrave
-    const a1 = new THREE.Mesh(new THREE.BoxGeometry(112, 4, 206), architraveMat);
-    a1.position.y = 86.8; 
-    a1.castShadow = true;
-    roofGroup.add(a1);
+    // Build one gable roof: width = span across which the roof pitches (x), length = ridge run (z).
+    function makeGable(width, length) {
+        const g = new THREE.Group();
+        const add = (geo, y, mat) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.castShadow = true; g.add(m); return m; };
+        add(new THREE.BoxGeometry(width - 2, 4, length - 2), 86.8, architraveMat);     // architrave
+        add(new THREE.BoxGeometry(width - 4, 4, length - 4), 90.8, architraveMat);     // frieze
+        add(new THREE.BoxGeometry(width, 2, length), 93.8, architraveMat);            // cornice
+        // Tympana at both gable ends
+        const tympHalf = width / 2 - 5;
+        const tympShape = new THREE.Shape();
+        tympShape.moveTo(-tympHalf, 0); tympShape.lineTo(0, roofHeight - 1); tympShape.lineTo(tympHalf, 0); tympShape.lineTo(-tympHalf, 0);
+        const tymThick = 6;
+        [length / 2 - tymThick, -length / 2].forEach(zPos => {
+            const tm = new THREE.Mesh(new THREE.ExtrudeGeometry(tympShape, { depth: tymThick, bevelEnabled: false }), architraveMat);
+            tm.position.set(0, roofBaseY, zPos);
+            tm.castShadow = true; g.add(tm);
+        });
+        // Pitched panels
+        const panelWidth = Math.sqrt(Math.pow(width / 2, 2) + Math.pow(roofHeight, 2));
+        const panelAngle = Math.atan2(roofHeight, width / 2);
+        const panelGeom = new THREE.BoxGeometry(panelWidth, 2, length);
+        const lp = new THREE.Mesh(panelGeom, roofMat);
+        lp.position.set(-width / 4, roofBaseY + roofHeight / 2, 0); lp.rotation.z = panelAngle; lp.castShadow = true; g.add(lp);
+        const rp = new THREE.Mesh(panelGeom, roofMat);
+        rp.position.set(width / 4, roofBaseY + roofHeight / 2, 0); rp.rotation.z = -panelAngle; rp.castShadow = true; g.add(rp);
+        return g;
+    }
 
-    // 2. Frieze
-    const a2 = new THREE.Mesh(new THREE.BoxGeometry(110, 4, 204), architraveMat);
-    a2.position.y = 90.8;
-    a2.castShadow = true;
-    roofGroup.add(a2);
-
-    // 3. Cornice
-    const cornice = new THREE.Mesh(new THREE.BoxGeometry(overhangWidth, 2, overhangLength), architraveMat);
-    cornice.position.y = 93.8;
-    cornice.castShadow = true;
-    roofGroup.add(cornice);
-
-    const roofBaseY = 94.8; // Top surface of cornice
-    const roofHeight = 16; // Flatter roof
-
-    // 4. Tympanum (Recessed triangular wall "roof wall")
-    const tympShape = new THREE.Shape();
-    tympShape.moveTo(-52, 0); // slightly recessed from 114/2=57
-    tympShape.lineTo(0, roofHeight - 1);
-    tympShape.lineTo(52, 0);
-    tympShape.lineTo(-52, 0);
-
-    const tympExtrude = { depth: 200, bevelEnabled: false }; // recessed from 208
-    const tympGeom = new THREE.ExtrudeGeometry(tympShape, tympExtrude);
-    const tympMesh = new THREE.Mesh(tympGeom, architraveMat);
-    tympMesh.position.set(0, roofBaseY, -100); // centered 
-    tympMesh.castShadow = true;
-    roofGroup.add(tympMesh);
-
-    // 5. Pitched Roof Plates
-    const roofMat = new THREE.MeshStandardMaterial({ 
-        color: 0x8b3a2b, roughness: 0.9, metalness: 0.1, 
-        transparent: true, opacity: 0
-    });
-    const panelWidth = Math.sqrt(Math.pow(overhangWidth/2, 2) + Math.pow(roofHeight, 2));
-    const panelAngle = Math.atan2(roofHeight, overhangWidth/2);
-    const roofPanelGeom = new THREE.BoxGeometry(panelWidth, 2, overhangLength);
-    
-    const leftPanel = new THREE.Mesh(roofPanelGeom, roofMat);
-    leftPanel.position.set(-overhangWidth/4, roofBaseY + roofHeight/2, 0);
-    leftPanel.rotation.z = panelAngle;
-    leftPanel.castShadow = true;
-    roofGroup.add(leftPanel);
-
-    const rightPanel = new THREE.Mesh(roofPanelGeom, roofMat);
-    rightPanel.position.set(overhangWidth/4, roofBaseY + roofHeight/2, 0);
-    rightPanel.rotation.z = -panelAngle;
-    rightPanel.castShadow = true;
-    roofGroup.add(rightPanel);
+    if (is4) {
+        // Two intertwining gable roofs forming a + (one per bar of the cross)
+        const gw = CROSS_HALF_W * 2 + 12; // 124
+        const gl = CROSS_HALF_L * 2 + 12; // 212
+        roofGroup.add(makeGable(gw, gl));               // ridge along z (vertical bar)
+        const gx = makeGable(gw, gl); gx.rotation.y = Math.PI / 2; // ridge along x (horizontal bar)
+        roofGroup.add(gx);
+    } else {
+        roofGroup.add(makeGable(114, 208));
+    }
 
     groupTemple.add(roofGroup);
 }
@@ -472,7 +468,7 @@ function sync3DPieces(animate = false) {
             
             // Replicate Pyramid Game's stone geometry exactly at roughly 10x scale
             const bodyGeo = new THREE.CylinderGeometry(3.2, 3.6, 4.5, 24);
-            const originalMat = color === 'white' ? matWhitePiece : matBlackPiece;
+            const originalMat = PIECE_MATS[color] || matBlackPiece;
             const bodyMat = originalMat.clone(); // Clone to prevent global emissive leaks
             const body = new THREE.Mesh(bodyGeo, bodyMat);
             body.castShadow = true;
@@ -724,12 +720,12 @@ function animate3D(time) {
         let targetOpacity = (dist - 250) / 100;
         targetOpacity = Math.max(0, Math.min(1, targetOpacity));
 
-        window.templeRoof.children.forEach(mesh => {
+        window.templeRoof.traverse(mesh => {
             if (mesh.material) {
                 // If opacity is very close to 0, completely hide it to save rendering performance
                 mesh.visible = targetOpacity > 0.02;
                 mesh.material.opacity = targetOpacity;
-                
+
                 // Keep shadows sharp only when the roof is fully materialized
                 mesh.castShadow = targetOpacity > 0.8;
             }
@@ -739,9 +735,20 @@ function animate3D(time) {
     renderer.render(scene, camera);
 }
 
+// Rebuild the temple architecture (footprint depends on player count) + the board.
+function rebuildTempleAndBoard() {
+    if (typeof groupTemple === 'undefined' || !groupTemple) { build3DBoard(); return; }
+    // Remove all architecture (everything in groupTemple except the board group)
+    for (let i = groupTemple.children.length - 1; i >= 0; i--) {
+        if (groupTemple.children[i] !== groupBoard) groupTemple.remove(groupTemple.children[i]);
+    }
+    buildTempleEnvironment(); // re-adds groups (idempotent) + rebuilds architecture at the new size
+    build3DBoard();
+}
+
 // Hook functions to expose to temple-game.js
 window.init3DSystem = init3D;
-window.rebuild3DBoard = build3DBoard;
+window.rebuild3DBoard = rebuildTempleAndBoard;
 window.sync3D = sync3DPieces;
 window.animate3DMove = animateMove3D;
 window.update3DViews = update3DHighlights;
@@ -760,7 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Ensure 3D Mode is active if body class is present
     if (document.body.classList.contains('view-3d')) {
-        viewBtnText.textContent = 'View: 3D';
+        if (viewBtnText) viewBtnText.textContent = 'View: 3D';
         window.is3DView = true;
         init3D();
     }

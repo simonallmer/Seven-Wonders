@@ -7,9 +7,9 @@
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-// Board structure with proper equal spacing
-// Board structure with logical column offsets (0-4 grid)
-const BOARD_STRUCTURE = [
+// ---- 2-PLAYER BOARD (classic vertical hexagon) ----
+// Logical columns 0-4; x = 50 + (col-2)*13, y = 5 + row*13
+const BOARD_STRUCTURE_2 = [
     { row: 0, count: 1, offset: 2, y: 5 },      // Top Artemis (Col 2)
     { row: 1, count: 3, offset: 1, y: 18 },     // (Cols 1-3)
     { row: 2, count: 5, offset: 0, y: 31 },     // (Cols 0-4)
@@ -20,6 +20,64 @@ const BOARD_STRUCTURE = [
     { row: 7, count: 3, offset: 1, y: 96 },     // (Cols 1-3)
     { row: 8, count: 1, offset: 2, y: 109 }     // Bottom Artemis (Col 2)
 ];
+
+// ---- 4-PLAYER BOARD (Greek cross / plus) ----
+// Four tapered arms (each 5+3+1) around a free 5x5 centre. Rows/cols 2-12, centre at (7,7).
+// Each row is a contiguous column range; arms point up/down/left/right to an Artemis tip.
+const BOARD_STRUCTURE_4 = [
+    { row: 2,  count: 1,  offset: 7 },
+    { row: 3,  count: 3,  offset: 6 },
+    { row: 4,  count: 5,  offset: 5 },
+    { row: 5,  count: 7,  offset: 4 },
+    { row: 6,  count: 9,  offset: 3 },
+    { row: 7,  count: 11, offset: 2 },
+    { row: 8,  count: 9,  offset: 3 },
+    { row: 9,  count: 7,  offset: 4 },
+    { row: 10, count: 5,  offset: 5 },
+    { row: 11, count: 3,  offset: 6 },
+    { row: 12, count: 1,  offset: 7 }
+];
+
+let numPlayers = 2;
+let BOARD_STRUCTURE = BOARD_STRUCTURE_2;
+
+// Clockwise order copied from Pyramid: white(bottom) -> red(left) -> black(top) -> blue(right)
+const PLAYERS_4 = ['white', 'red', 'black', 'blue'];
+let turnIndex = 0;
+
+// Per-colour movement axis + the Artemis tip each races toward (set in configureBoard).
+// dir: 'up'|'down'|'left'|'right' (forward direction). target: {row,col} of the goal tip.
+let PLAYER_CONFIG = {};
+
+function activeColors() {
+    return numPlayers === 4 ? PLAYERS_4 : ['white', 'black'];
+}
+
+// Compute node pixel coords for the current board.
+function nodeXY(row, col) {
+    if (numPlayers === 4) {
+        return { x: 70 + (col - 7) * 12, y: 70 + (row - 7) * 12 };
+    }
+    return { x: 50 + (col - 2) * 13, y: 5 + row * 13 };
+}
+
+function configureBoard() {
+    if (numPlayers === 4) {
+        BOARD_STRUCTURE = BOARD_STRUCTURE_4;
+        PLAYER_CONFIG = {
+            white: { dir: 'up', target: { row: 2, col: 7 } },     // bottom -> top tip
+            black: { dir: 'down', target: { row: 12, col: 7 } },  // top -> bottom tip
+            red: { dir: 'right', target: { row: 7, col: 12 } },   // left -> right tip
+            blue: { dir: 'left', target: { row: 7, col: 2 } }     // right -> left tip
+        };
+    } else {
+        BOARD_STRUCTURE = BOARD_STRUCTURE_2;
+        PLAYER_CONFIG = {
+            white: { dir: 'up', target: { row: 0, col: 2 } },
+            black: { dir: 'down', target: { row: 8, col: 2 } }
+        };
+    }
+}
 
 // ============================================
 // GAME STATE
@@ -60,43 +118,34 @@ const playerColorElement = document.getElementById('player-color') || { style: {
 // ============================================
 
 function initializeBoard() {
+    configureBoard();
+    if (svg && svg.setAttribute) {
+        svg.setAttribute('viewBox', numPlayers === 4 ? '0 0 140 140' : '0 0 100 120');
+    }
     board.clear();
     connections.clear();
 
-    // Create nodes with equal spacing
-    // Create nodes with logical column alignment
-    // Generate alphanumeric labels: A1, B1, B2, B3, C1, C2, C3, C4, C5, etc.
-    const rowLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
+    // Artemis tips are the goal nodes (2 for 2p, 4 for 4p)
+    const tipSet = new Set(Object.values(PLAYER_CONFIG).map(p => `${p.target.row},${p.target.col}`));
+    const rowLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'];
 
-    BOARD_STRUCTURE.forEach(({ row, count, offset, y }) => {
+    BOARD_STRUCTURE.forEach(({ row, count, offset }) => {
         for (let i = 0; i < count; i++) {
-            const col = offset + i; // Logical column (0-4)
-
-            // Calculate x position: 5 columns, centered around 50
-            // Spacing should match Y spacing (13 units) to make it a square grid
-            // Col 2 is center (50). Col 0 is 50 - 2*13, Col 4 is 50 + 2*13
-            const x = 50 + ((col - 2) * 13);
-
+            const col = offset + i;
+            const { x, y } = nodeXY(row, col);
             const key = `${row},${col}`;
-            const isArtemis = (row === 0 || row === 8);
+            const isArtemis = tipSet.has(key);
             const label = `${rowLabels[row]}${i + 1}`;
 
-            board.set(key, {
-                row,
-                col,
-                x,
-                y,
-                piece: null,
-                isArtemis,
-                label
-            });
+            board.set(key, { row, col, x, y, piece: null, isArtemis, label });
         }
     });
 
     buildConnections();
     placeStartingPieces();
 
-    currentPlayer = 'white';
+    turnIndex = 0;
+    currentPlayer = activeColors()[0];
     selectedStone = null;
     validMoves = [];
     gameState = 'SELECT_STONE';
@@ -137,6 +186,30 @@ function buildConnections() {
     board.forEach((node, key) => {
         connections.set(key, []);
     });
+
+    // 4-player Greek cross: same connection pattern as the 2-player board —
+    // orthogonal everywhere, plus diagonals ONLY between even-parity cells (row+col even).
+    // (Adding diagonals from even cells to their down-diagonal neighbours covers each
+    //  diagonal edge once and reproduces the sparse, navigable mesh — not an X per cell.)
+    if (numPlayers === 4) {
+        const link = (r1, c1, r2, c2) => {
+            const k1 = `${r1},${c1}`, k2 = `${r2},${c2}`;
+            if (board.has(k1) && board.has(k2)) {
+                connections.get(k1).push({ row: r2, col: c2 });
+                connections.get(k2).push({ row: r1, col: c1 });
+            }
+        };
+        board.forEach((node) => {
+            const { row, col } = node;
+            link(row, col, row, col + 1); // right
+            link(row, col, row + 1, col); // down
+            if ((row + col) % 2 === 0) {  // diagonals from even-parity cells only
+                link(row, col, row + 1, col + 1); // down-right
+                link(row, col, row + 1, col - 1); // down-left
+            }
+        });
+        return;
+    }
 
     /*
     // Iterate through all nodes and find valid neighbors
@@ -316,7 +389,25 @@ function buildConnections() {
     });
 }
 
+// Which arm (start zone / owner) a node belongs to in the 4-player cross.
+// rows 2-4 = black (top), rows 10-12 = white (bottom), cols 2-4 = red (left),
+// cols 10-12 = blue (right), otherwise the free 5x5 centre.
+function zone4(row, col) {
+    if (row >= 2 && row <= 4) return 'black';
+    if (row >= 10 && row <= 12) return 'white';
+    if (col >= 2 && col <= 4) return 'red';
+    if (col >= 10 && col <= 12) return 'blue';
+    return null;
+}
+
 function placeStartingPieces() {
+    if (numPlayers === 4) {
+        board.forEach((node) => {
+            const owner = zone4(node.row, node.col);
+            if (owner) node.piece = owner;
+        });
+        return;
+    }
     // White starts at bottom (Rows 6, 7, 8)
     // Row 6 (5 stones)
     for (let c = 0; c < 5; c++) board.get(`6,${c}`).piece = 'white';
@@ -456,8 +547,18 @@ function drawBoard() {
 }
 
 function updateStatus(message = null) {
-    playerColorElement.style.backgroundColor = currentPlayer === 'white' ? '#ffffff' : '#1a1a1a';
+    const COLOR_HEX = { white: '#ffffff', black: '#1a1a1a', red: '#c0392b', blue: '#2a6fdb' };
+    playerColorElement.style.backgroundColor = COLOR_HEX[currentPlayer] || '#1a1a1a';
     playerColorElement.style.borderColor = currentPlayer === 'white' ? '#1a1a1a' : '#ffffff';
+
+    // Sync the side-menu stone counts
+    if (typeof countStonesByColor === 'function') {
+        const counts = countStonesByColor();
+        ['white', 'black', 'red', 'blue'].forEach(c => {
+            const el = document.getElementById(`${c}-count-menu`);
+            if (el) el.textContent = counts[c];
+        });
+    }
 
     if (gameState === 'GAME_OVER') return;
 
@@ -486,7 +587,7 @@ function hideMessage() {
 }
 
 function updateUI() {
-    if (selectedStone && !(isVsComputer && currentPlayer === 'black')) {
+    if (selectedStone && !isAITurn()) {
         cancelButton.classList.remove('hidden');
         // Change button text based on leap chain state
         if (isInLeapChain) {
@@ -508,14 +609,14 @@ function getConnections(row, col) {
     return connections.get(key) || [];
 }
 
-function isForwardOrSideways(fromRow, toRow, player) {
-    // White moves upward (decreasing row numbers)
-    // Black moves downward (increasing row numbers)
-    if (player === 'white') {
-        return toRow <= fromRow; // Can move up or sideways
-    } else {
-        return toRow >= fromRow; // Can move down or sideways
-    }
+function isForwardOrSideways(fromRow, fromCol, toRow, toCol, player) {
+    // Each player advances toward their target Artemis tip; sideways allowed, backward not.
+    const dir = (PLAYER_CONFIG[player] && PLAYER_CONFIG[player].dir) || 'up';
+    if (dir === 'up') return toRow <= fromRow;     // white: decreasing row
+    if (dir === 'down') return toRow >= fromRow;   // black: increasing row
+    if (dir === 'right') return toCol >= fromCol;  // red: increasing col
+    if (dir === 'left') return toCol <= fromCol;   // blue: decreasing col
+    return true;
 }
 
 function calculateWalkMoves(row, col) {
@@ -532,7 +633,7 @@ function calculateWalkMoves(row, col) {
         const targetNode = board.get(targetKey);
 
         // Must be empty and forward/sideways
-        if (targetNode && !targetNode.piece && isForwardOrSideways(row, conn.row, player)) {
+        if (targetNode && !targetNode.piece && isForwardOrSideways(row, col, conn.row, conn.col, player)) {
             moves.push({ row: conn.row, col: conn.col, type: 'walk' });
         }
     });
@@ -580,7 +681,7 @@ function calculateLeapMoves(row, col, isChaining = false, previousDirection = nu
                     }
 
                     // Landing spot must be empty AND forward/sideways
-                    if (beyondNode && !beyondNode.piece && isForwardOrSideways(row, beyond.row, player)) {
+                    if (beyondNode && !beyondNode.piece && isForwardOrSideways(row, col, beyond.row, beyond.col, player)) {
                         const captureOpponent = adjacentNode.piece !== player;
                         moves.push({
                             row: beyond.row,
@@ -627,7 +728,7 @@ function calculateLeapMoves(row, col, isChaining = false, previousDirection = nu
                 const offBoardCol = conn.col + dx;
 
                 // Must be forward or sideways movement
-                if (!isForwardOrSideways(row, conn.row, player)) {
+                if (!isForwardOrSideways(row, col, conn.row, conn.col, player)) {
                     return; // Skip backward Leap of Faith
                 }
 
@@ -674,15 +775,15 @@ function handleNodeClick(row, col) {
     // Block ALL clicks if any animation is in progress
     if (isAnimating) return;
 
-    // If VS Computer, block all clicks during Computer's turn
-    if (isVsComputer && currentPlayer === 'black' && gameState !== 'GAME_OVER') {
+    // If VS Computer, block all clicks during an AI player's turn
+    if (isAITurn()) {
         return;
     }
     
     // Also block clicking opponent stones during human turn in SELECT_STONE phase
     const key = `${row},${col}`;
     const node = board.get(key);
-    if (gameState === 'SELECT_STONE' && node.piece === 'black' && isVsComputer) {
+    if (gameState === 'SELECT_STONE' && node.piece && node.piece !== currentPlayer && isVsComputer) {
         return;
     }
 
@@ -761,17 +862,17 @@ function executeMove(move) {
     const leapingPlayer = fromNode.piece;
 
     // Track AI consecutive moves (not during leap chains)
-    if (currentPlayer === 'black' && !isInLeapChain) {
+    if (isAITurn() && !isInLeapChain) {
         if (aiLastMovedStone && aiLastMovedStone.row === selectedStone.row && aiLastMovedStone.col === selectedStone.col) {
             aiConsecutiveMoveCount++;
         } else {
             aiConsecutiveMoveCount = 1;
         }
         aiLastMovedStone = { row: move.row, col: move.col };
-    } else if (currentPlayer === 'white') {
+    } else if (!isAITurn()) {
         aiLastMovedStone = null;
         aiConsecutiveMoveCount = 0;
-    } else if (currentPlayer === 'black' && isInLeapChain) {
+    } else {
         aiLastMovedStone = { row: move.row, col: move.col };
     }
 
@@ -800,9 +901,9 @@ function executeMove(move) {
                 if (overNode) overNode.piece = null;
             }
 
-            // Check for victory
-            if (toNode && toNode.isArtemis && 
-               ((leapingPlayer === 'white' && toNode.row === 0) || (leapingPlayer === 'black' && toNode.row === 8))) {
+            // Check for victory: reaching one's own target Artemis tip (the opposite end)
+            const tgt = PLAYER_CONFIG[leapingPlayer] && PLAYER_CONFIG[leapingPlayer].target;
+            if (toNode && tgt && toNode.row === tgt.row && toNode.col === tgt.col) {
                 gameState = 'GAME_OVER';
                 const winnerText = leapingPlayer.charAt(0).toUpperCase() + leapingPlayer.slice(1);
                 showGameOverModal(`${winnerText} Wins!`, `${winnerText} reached the Artemis field!`);
@@ -827,7 +928,7 @@ function executeMove(move) {
                     drawBoard();
                     updateStatus();
                     updateUI();
-                    if (isVsComputer && currentPlayer === 'black') {
+                    if (isAITurn()) {
                         setTimeout(makeAIMove, 600);
                     }
                     return;
@@ -868,10 +969,17 @@ function endTurn() {
     leapChainStart = null;
     isAnimating = false; // Reset animation flag on turn end just in case
     
-    currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
+    // Advance to the next player who still has stones (clockwise; skip the eliminated)
+    const counts = countStonesByColor();
+    const order = activeColors();
+    for (let i = 0; i < order.length; i++) {
+        turnIndex = (turnIndex + 1) % order.length;
+        if (counts[order[turnIndex]] > 0) break;
+    }
+    currentPlayer = order[turnIndex];
     gameState = 'SELECT_STONE';
     moveHistory = [];
-    
+
     drawBoard();
     if (window.is3DView) {
         // Force complete rebuild if we suspect desync
@@ -879,28 +987,33 @@ function endTurn() {
         else if (window.sync3D) window.sync3D(true);
         if (window.update3DViews) window.update3DViews();
     }
-    
+
     updateStatus();
     updateUI();
 
-    // Win check: If any player has 0 stones left
-    let whiteCount = 0;
-    let blackCount = 0;
-    board.forEach(node => {
-        if (node.piece === 'white') whiteCount++;
-        else if (node.piece === 'black') blackCount++;
-    });
-
-    if (whiteCount === 0 || blackCount === 0) {
-        const winner = whiteCount === 0 ? 'black' : 'white';
+    // Win check: only one player with stones left (others eliminated)
+    const survivors = order.filter(c => counts[c] > 0);
+    if (survivors.length <= 1) {
+        const winner = survivors[0] || currentPlayer;
         gameState = 'GAME_OVER';
         showGameOverModal(`${winner.charAt(0).toUpperCase() + winner.slice(1)} Wins!`, `All opposing stones have been removed!`);
         return;
     }
 
-    if (gameState !== 'GAME_OVER' && isVsComputer && currentPlayer === 'black') {
+    if (gameState !== 'GAME_OVER' && isAITurn()) {
         setTimeout(makeAIMove, 600);
     }
+}
+
+function countStonesByColor() {
+    const counts = { white: 0, black: 0, red: 0, blue: 0 };
+    board.forEach(node => { if (node.piece) counts[node.piece]++; });
+    return counts;
+}
+
+function isAITurn() {
+    if (!isVsComputer || gameState === 'GAME_OVER') return false;
+    return numPlayers === 4 ? currentPlayer !== 'white' : currentPlayer === 'black';
 }
 
 // ============================================
@@ -909,7 +1022,16 @@ function endTurn() {
 
 function makeAIMove() {
     try {
-        if (gameState === 'GAME_OVER' || currentPlayer !== 'black') return;
+        if (gameState === 'GAME_OVER' || !isAITurn()) return;
+        const me = currentPlayer;
+        const myTarget = (PLAYER_CONFIG[me] && PLAYER_CONFIG[me].target) || { row: 0, col: 2 };
+        const myDir = (PLAYER_CONFIG[me] && PLAYER_CONFIG[me].dir) || 'up';
+        const forwardProgress = (fr, fc, tr, tc) => {
+            if (myDir === 'up') return fr - tr;
+            if (myDir === 'down') return tr - fr;
+            if (myDir === 'right') return tc - fc;
+            return fc - tc; // left
+        };
         
         // Safety check: ensure 3D state is synced
         if (window.is3DView && window.update3DViews) window.update3DViews();
@@ -940,7 +1062,7 @@ function makeAIMove() {
         }
     } else {
         board.forEach((node, key) => {
-            if (node.piece === 'black') {
+            if (node.piece === me) {
                 const walkMoves = calculateWalkMoves(node.row, node.col);
                 const leapMoves = calculateLeapMoves(node.row, node.col);
                 const moves = [...walkMoves, ...leapMoves];
@@ -964,9 +1086,9 @@ function makeAIMove() {
         let score = 0;
         const { stone, move } = action;
 
-        // 1. Win condition
+        // 1. Win condition: landing on my own target Artemis tip
         const targetNode = move.offBoard ? null : board.get(`${move.row},${move.col}`);
-        if (targetNode && targetNode.isArtemis && targetNode.row === 8) { // Black targets row 8
+        if (targetNode && move.row === myTarget.row && move.col === myTarget.col) {
             score += 10000;
         }
 
@@ -975,9 +1097,10 @@ function makeAIMove() {
             score += 500;
         }
 
-        // 3. Distance to target/Advancement (Black wants to go down to row 8)
-        score += (move.row - stone.row) * 10; // Positive if moving down
-        score += move.row * 5; // Absolute position ranking
+        // 3. Advancement toward my target tip
+        score += forwardProgress(stone.row, stone.col, move.row, move.col) * 10;
+        // Absolute progress ranking (closer to target tip is better)
+        score -= (Math.abs(move.row - myTarget.row) + Math.abs(move.col - myTarget.col)) * 3;
 
         // 4. Loop Prevention: Penalize moving the same stone too many times in a row
         if (!isInLeapChain && aiLastMovedStone &&
@@ -1005,14 +1128,14 @@ function makeAIMove() {
             
             // Temporarily mock the move on the board
             const originalTargetPiece = targetNode ? targetNode.piece : null;
-            if (targetNode) targetNode.piece = 'black';
+            if (targetNode) targetNode.piece = me;
             const originalStonePiece = board.get(`${stone.row},${stone.col}`).piece;
             board.get(`${stone.row},${stone.col}`).piece = null;
-            
+
             board.forEach((node, key) => {
-                if (node.piece === 'white' && !inDanger) {
-                    const whiteLeaps = calculateLeapMoves(node.row, node.col);
-                    if (whiteLeaps.some(wMove => !wMove.offBoard && wMove.over.row === move.row && wMove.over.col === move.col)) {
+                if (node.piece && node.piece !== me && !inDanger) {
+                    const enemyLeaps = calculateLeapMoves(node.row, node.col);
+                    if (enemyLeaps.some(wMove => !wMove.offBoard && wMove.over.row === move.row && wMove.over.col === move.col)) {
                         inDanger = true;
                     }
                 }
@@ -1074,6 +1197,15 @@ function makeAIMove() {
 // EVENT LISTENERS
 // ============================================
 
+// Switch player count (2 or 4) and restart with the matching board.
+function setNumPlayers(n) {
+    if (n !== 2 && n !== 4) return;
+    numPlayers = n;
+    initializeBoard();
+    if (isAITurn()) setTimeout(makeAIMove, 500);
+}
+window.setNumPlayers = setNumPlayers;
+
 resetButton.addEventListener('click', initializeBoard);
 const cancelBtn = document.getElementById('cancel-button');
 if (cancelBtn) cancelBtn.addEventListener('click', cancelMove);
@@ -1134,6 +1266,16 @@ const playersMenu = document.getElementById('players-menu');
 if (playersBtnText && playersMenu) {
     playersBtnText.addEventListener('click', () => {
         playersMenu.classList.toggle('show-menu');
+    });
+    playersMenu.querySelectorAll('button[data-players]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const n = parseInt(e.target.getAttribute('data-players'), 10);
+            playersMenu.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            if (playersBtnText) playersBtnText.textContent = `${n} Players`;
+            playersMenu.classList.remove('show-menu');
+            setNumPlayers(n);
+        });
     });
 }
 
