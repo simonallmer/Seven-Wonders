@@ -367,6 +367,8 @@ html, body {
 
 .player-indicator.white { background: #fff; box-shadow: 0 0 10px rgba(255,255,255,0.5); }
 .player-indicator.black { background: #333; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+.player-indicator.red { background: #c0392b; box-shadow: 0 0 10px rgba(192,57,43,0.6); }
+.player-indicator.blue { background: #2e6fb0; box-shadow: 0 0 10px rgba(46,111,176,0.6); }
 
 .stone-counts-display {
     display: flex;
@@ -391,6 +393,8 @@ html, body {
 
 .count-stone.white { background: #fff; box-shadow: 0 0 10px rgba(255,255,255,0.3); }
 .count-stone.black { background: #333; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+.count-stone.red { background: #c0392b; box-shadow: 0 0 10px rgba(192,57,43,0.4); }
+.count-stone.blue { background: #2e6fb0; box-shadow: 0 0 10px rgba(46,111,176,0.4); }
 
 .menu-divider {
     height: 1px;
@@ -510,6 +514,8 @@ html, body {
 
 .winner-icon.white { background: var(--ivory); }
 .winner-icon.black { background: #111; }
+.winner-icon.red { background: #c0392b; }
+.winner-icon.blue { background: #2e6fb0; }
 
 #modal-text {
     font-size: 1.1rem;
@@ -619,3 +625,45 @@ html, body {
     opacity: 0;
     pointer-events: none !important;
 }
+
+/* ===== 4-player diminish target picker ===== */
+.diminish-target-modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 1000;
+}
+.diminish-target-modal.hidden { display: none; }
+.diminish-target-panel {
+    background: rgba(20, 24, 40, 0.96);
+    border: 2px solid var(--gold);
+    border-radius: 14px;
+    padding: 24px 28px;
+    text-align: center;
+    font-family: 'Cinzel', serif;
+    color: #f5f0e8;
+    max-width: 90vw;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+.diminish-target-panel h3 { margin: 0 0 6px; color: var(--gold); }
+.diminish-target-panel p { margin: 0 0 16px; font-size: 0.85rem; opacity: 0.8; }
+.diminish-target-options { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.diminish-target-btn {
+    min-width: 84px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 2px solid var(--gold);
+    font-family: 'Cinzel', serif;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.diminish-target-btn.white { background: #e8e8e8; color: #222; text-shadow: none; }
+.diminish-target-btn.black { background: #333; }
+.diminish-target-btn.red { background: #c0392b; }
+.diminish-target-btn.blue { background: #2e6fb0; }
+.diminish-target-btn:hover { filter: brightness(1.15); }

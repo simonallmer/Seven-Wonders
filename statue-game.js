@@ -2,22 +2,93 @@
 // Game Design: Simon Allmer
 
 // ============================================
-// CONSTANTS
+// CONSTANTS / BOARD CONFIG
 // ============================================
-const BOARD_SIZE = 11;
+// 2-player: a single 11x11 board.
+// 4-player: two 11x11 boards stacked into one 11-wide x 22-tall arena (board A = rows 0-10,
+// board B = rows 11-21). Each board keeps its throne + four 2x2 feet, so the open "+" cross
+// shows up twice and a contested 6x11 band (rows 8-13) emerges naturally between the thrones.
+let numPlayers = 2;
+let BOARD_ROWS = 11;
+let BOARD_COLS = 11;
+let BOARD_SIZE = 11; // legacy alias (== BOARD_COLS); kept for older references
 
-// Removed squares (4 holes - 2x2 each at corners of center area)
-// 9x9 inner board with holes, plus outer ring
-// 11x11 inner board with holes, plus outer ring
-// UPDATED: Throne footprint (3x3 at center) and the 4 feet (2x2 holes)
-// Throne feet at corners of center area
-const removedSquares = new Set([
+// Throne footprint of one 11x11 board: four 2x2 feet around the open central cross.
+const THRONE_HOLES_A = [
     '3,3', '3,4', '4,3', '4,4',
     '3,6', '3,7', '4,6', '4,7',
     '6,3', '6,4', '7,3', '7,4',
     '6,6', '6,7', '7,6', '7,7'
-]);
+];
+let removedSquares = new Set(THRONE_HOLES_A);
 window.removedSquares = removedSquares;
+
+// Canonical Seven Wonders colours. Player ids stay 1=white, 2=black so all existing 2-player
+// 3D code (stoneColors, reserve plates, clouds) keeps working; red=3, blue=4 are added for
+// 4-player. Clockwise turn order matches Pyramid/Colossus/Temple: white -> red -> black -> blue.
+const COLOR_OF = { 1: 'white', 2: 'black', 3: 'red', 4: 'blue' };
+let turnOrder = [1, 2];
+let turnIndex = 0;
+let eliminated = {};      // playerId -> true once they drop below 4 dice (4-player)
+let forcedPlayer = null;  // playerId the diminisher called out for a forced value-1 move (4p)
+
+window.COLOR_OF = COLOR_OF;
+
+// Recompute board geometry + turn order for the current player count.
+function rebuildBoardConfig() {
+    if (numPlayers === 4) {
+        // Two 11x11 boards overlapped by their shared seam row (row 10), giving a 21-row arena.
+        // Board A = rows 0-10, board B = rows 10-20; row 10 is the central divider. The throne-to-
+        // throne gap is then rows 8-12 (5 rows) centred on the inaccessible divider row 10.
+        BOARD_ROWS = 21;
+        BOARD_COLS = 11;
+        const holes = [];
+        THRONE_HOLES_A.forEach(k => {
+            const [r, c] = k.split(',').map(Number);
+            holes.push(`${r},${c}`);        // board A
+            holes.push(`${r + 10},${c}`);   // board B (shares row 10 with board A)
+        });
+        removedSquares = new Set(holes);
+        turnOrder = [1, 3, 2, 4]; // white, red, black, blue (clockwise)
+    } else {
+        BOARD_ROWS = 11;
+        BOARD_COLS = 11;
+        removedSquares = new Set(THRONE_HOLES_A);
+        turnOrder = [1, 2];
+    }
+    BOARD_SIZE = BOARD_COLS;
+    window.removedSquares = removedSquares;
+    window.BOARD_ROWS = BOARD_ROWS;
+    window.BOARD_COLS = BOARD_COLS;
+    window.numPlayers = numPlayers;
+}
+
+// Home zones (4-player only): you may PLACE only inside your own quadrant, but you may MOVE
+// and capture anywhere (Gardens-style "run over to the other board").
+// Seats run CLOCKWISE white -> red -> black -> blue with white on the near board (where the
+// camera opens), so the corners read bottom-left -> top-left -> top-right -> bottom-right:
+//   White(1): board B (rows 11-20), left  (cols 0-4)   near-left  -> starts here, camera faces it
+//   Red(3):   board A (rows 0-9),   left  (cols 0-4)   far-left
+//   Black(2): board A (rows 0-9),   right (cols 6-10)  far-right
+//   Blue(4):  board B (rows 11-20), right (cols 6-10)  near-right
+// White & black sit diagonally opposite (as do red & blue), preserving the classic axis.
+// Column 5 (throne cross), row 10 (central divider) and removed squares are unplaceable.
+function isHomeCell(player, r, c) {
+    if (numPlayers !== 4) return true;
+    if (r === 10) return false;          // central divider: traversable but no placement
+    const boardA = r < 10;               // far board, rows 0-9
+    const boardB = r > 10;               // near board, rows 11-20
+    const left = c <= 4;
+    const right = c >= 6;
+    switch (player) {
+        case 1: return boardB && left;   // white (near-left)
+        case 3: return boardA && left;   // red   (far-left)
+        case 2: return boardA && right;  // black (far-right)
+        case 4: return boardB && right;  // blue  (near-right)
+    }
+    return false;
+}
+window.isHomeCell = isHomeCell;
 
 // Movement vectors (N, E, S, W)
 const HV_VECTORS = [
@@ -32,8 +103,8 @@ const HV_VECTORS = [
 // ============================================
 let currentDieId = 0;
 let onBoardDice = [];
-let reserveDice = { 1: 8, 2: 8 };
-let currentPlayer = 1; // 1 (White) or 2 (Black)
+let reserveDice = { 1: 8, 2: 8, 3: 8, 4: 8 };
+let currentPlayer = 1; // player id (1=white, 2=black, 3=red, 4=blue)
 let gamePhase = 'ACTION_SELECT'; // 'ACTION_SELECT', 'PLACE', 'STRIDE_MOVE', 'DIMINISH_SELECT', 'FORCED_MOVE_SELECT', 'GAME_OVER'
 let isAIGame = true; // Start with AI enabled
 
@@ -79,7 +150,7 @@ const newGameBtn = document.getElementById('new-game-btn');
  * Checks if a coordinate is within bounds and playable
  */
 function isWithinBounds(r, c) {
-    const isBoardBound = r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE;
+    const isBoardBound = r >= 0 && r < BOARD_ROWS && c >= 0 && c < BOARD_COLS;
     const isRemovedSquare = removedSquares.has(`${r},${c}`);
     return isBoardBound && !isRemovedSquare;
 }
@@ -118,7 +189,7 @@ function calculateAdjacentTargets(r, c, player) {
 function updateStatusDisplay() {
     const playerIndicator = document.getElementById('player-indicator');
     if (playerIndicator) {
-        playerIndicator.className = 'player-indicator ' + (currentPlayer === 1 ? 'white' : 'black');
+        playerIndicator.className = 'player-indicator ' + (COLOR_OF[currentPlayer] || 'white');
     }
 
     let phaseDisplay = gamePhase.replace('_', ' ');
@@ -132,7 +203,7 @@ function updateStatusDisplay() {
     // In-game text removed as requested. Turn status is visible in the side menu.
 
     if (document.getElementById('player-name')) {
-        document.getElementById('player-name').textContent = (currentPlayer === 1 ? "White's" : "Black's") + " Turn";
+        document.getElementById('player-name').textContent = colorName(currentPlayer) + "'s Turn";
     }
     
     // Status message for 3D bar
@@ -149,6 +220,12 @@ function updateStatusDisplay() {
     if (p2ReserveDisplay) p2ReserveDisplay.textContent = reserveDice[2];
     if (p1BoardCountDisplay) p1BoardCountDisplay.textContent = onBoardDice.filter(d => d.player === 1).length;
     if (p2BoardCountDisplay) p2BoardCountDisplay.textContent = onBoardDice.filter(d => d.player === 2).length;
+
+    // 4-player extra reserve counters (red/blue), shown only in 4-player mode.
+    const p3r = document.getElementById('p3-reserve');
+    const p4r = document.getElementById('p4-reserve');
+    if (p3r) p3r.textContent = reserveDice[3];
+    if (p4r) p4r.textContent = reserveDice[4];
     
     if (window.updateBoardReserve3D) window.updateBoardReserve3D();
     
@@ -158,26 +235,25 @@ function updateStatusDisplay() {
     // Diminishing ends the turn and triggers a "FORCED MOVE" for the opponent: they MUST move a value-1 stone next.
     // This is useful for clearing paths or forcing opponents to move critical low-value stones.
     
-    const p1BoardCount = onBoardDice.filter(d => d.player === 1).length;
-    const p2BoardCount = onBoardDice.filter(d => d.player === 2).length;
-    
-    // Total dice available to player
-    const p1TotalDice = p1BoardCount + reserveDice[1];
-    const p2TotalDice = p2BoardCount + reserveDice[2];
+    if (numPlayers === 4) {
+        checkElimination4();
+    } else {
+        const p1TotalDice = onBoardDice.filter(d => d.player === 1).length + reserveDice[1];
+        const p2TotalDice = onBoardDice.filter(d => d.player === 2).length + reserveDice[2];
 
-    if (p1TotalDice < 4 || p2TotalDice < 4) {
-        const loser = p1TotalDice < 4 ? 1 : 2;
-        const winner = 3 - loser;
-        const losingDiceCount = p1TotalDice < 4 ? p1TotalDice : p2TotalDice;
-        gamePhase = 'GAME_OVER';
+        if (p1TotalDice < 4 || p2TotalDice < 4) {
+            const loser = p1TotalDice < 4 ? 1 : 2;
+            const winner = 3 - loser;
+            gamePhase = 'GAME_OVER';
 
-        if (messageBox) messageBox.textContent = `GAME OVER! Player ${winner} wins!`;
-        toggleActionButtons(false, false);
-        showGameOverModal(
-            `Player ${winner} Wins!`,
-            `Player ${winner} wins! Player ${loser} has fewer than four dice left!`,
-            winner
-        );
+            if (messageBox) messageBox.textContent = `GAME OVER! Player ${winner} wins!`;
+            toggleActionButtons(false, false);
+            showGameOverModal(
+                `Player ${winner} Wins!`,
+                `Player ${winner} wins! Player ${loser} has fewer than four dice left!`,
+                winner
+            );
+        }
     }
 
     // Sync 3D if available
@@ -186,12 +262,43 @@ function updateStatusDisplay() {
     }
 }
 
+// 4-player: eliminate any player who has dropped below 4 total dice (board + reserve),
+// removing their remaining stones from the board. Last player standing wins.
+function checkElimination4() {
+    turnOrder.forEach(p => {
+        if (eliminated[p]) return;
+        const total = onBoardDice.filter(d => d.player === p).length + reserveDice[p];
+        if (total < 4) {
+            eliminated[p] = true;
+            reserveDice[p] = 0;
+            onBoardDice = onBoardDice.filter(d => d.player !== p);
+        }
+    });
+
+    const alive = turnOrder.filter(p => !eliminated[p]);
+    if (alive.length <= 1 && gamePhase !== 'GAME_OVER') {
+        const winner = alive[0] || currentPlayer;
+        gamePhase = 'GAME_OVER';
+        const winName = colorName(winner);
+        if (messageBox) messageBox.textContent = `GAME OVER! ${winName} wins!`;
+        toggleActionButtons(false, false);
+        showGameOverModal(`${winName} Wins!`, `${winName} is the last player standing!`, winner);
+    }
+}
+
+function colorName(player) {
+    const c = COLOR_OF[player] || 'white';
+    return c.charAt(0).toUpperCase() + c.slice(1);
+}
+
 function showGameOverModal(title, text, winner) {
     const winnerIcon = document.getElementById('modal-winner-icon');
     if (winnerIcon) {
-        winnerIcon.classList.remove('white', 'black');
-        winnerIcon.classList.add(winner === 1 ? 'white' : 'black');
+        winnerIcon.classList.remove('white', 'black', 'red', 'blue');
+        winnerIcon.classList.add(COLOR_OF[winner] || 'white');
     }
+    const modalTitle = document.getElementById('modal-title');
+    if (modalTitle && title) modalTitle.textContent = title;
     modalText.textContent = text;
     gameOverModal.classList.remove('hidden');
 }
@@ -238,16 +345,23 @@ function canAnyOwnStoneDiminish() {
     return onBoardDice.some(d => d.player === currentPlayer && d.value > 1) && canAnyMovableOpponentOne();
 }
 
+// A single opponent has a value-1 stone that can move (so a forced move would be legal).
+function opponentHasMovableOne(opponent) {
+    if (eliminated[opponent]) return false;
+    return onBoardDice.some(d =>
+        d.player === opponent &&
+        d.value === 1 &&
+        calculateStrideTargets(d.r, d.c, 1, opponent).length > 0
+    );
+}
+
+// All opponents who could legally be forced to move a value-1 stone (4-player diminish picker).
+function eligibleForcedTargets() {
+    return turnOrder.filter(p => p !== currentPlayer && opponentHasMovableOne(p));
+}
+
 function canAnyMovableOpponentOne() {
-    const opponent = 3 - currentPlayer;
-    const opponentOneStones = onBoardDice.filter(d => d.player === opponent && d.value === 1);
-    const movable = opponentOneStones.filter(stone => {
-        const tgts = calculateStrideTargets(stone.r, stone.c, 1, opponent);
-        return tgts.length > 0;
-    });
-    const movableCandidates = movable.map(d => `${d.r},${d.c}`);
-    console.log(`Diminish Rule Check: Opponent ${opponent} has ${opponentOneStones.length} value-1 stones. Movable: [${movableCandidates.join(' | ')}] Result: ${movable.length > 0}`);
-    return movable.length > 0;
+    return eligibleForcedTargets().length > 0;
 }
 
 /**
@@ -261,8 +375,8 @@ function renderBoard(highlightSquares = [], highlightType = 'move-target') {
     boardContainer.innerHTML = '';
     selectedDie = onBoardDice.find(d => selectedDie && d.id === selectedDie.id) || null;
 
-    for (let r = 0; r < BOARD_SIZE; r++) {
-        for (let c = 0; c < BOARD_SIZE; c++) {
+    for (let r = 0; r < BOARD_ROWS; r++) {
+        for (let c = 0; c < BOARD_COLS; c++) {
             const cell = document.createElement('div');
             cell.className = 'board-square';
             cell.dataset.r = r;
@@ -372,8 +486,8 @@ window.handle3DClick = function(r, c) {
     const die = onBoardDice.find(d => d.r === r && d.c === c);
 
     if (gamePhase === 'ACTION_SELECT') {
-        // Place stone on empty field
-        if (!die && reserveDice[currentPlayer] > 0) {
+        // Place stone on empty field (4-player: only inside your own home quadrant)
+        if (!die && reserveDice[currentPlayer] > 0 && isHomeCell(currentPlayer, r, c)) {
             reserveDice[currentPlayer]--;
             currentDieId++;
             const newDie = {
@@ -638,18 +752,33 @@ window.calculateStrideTargets = calculateStrideTargets;
 // TURN MANAGEMENT
 // ============================================
 
+// White (player 1) is always the human; everyone else is AI-controlled when enabled.
+function isAITurn() {
+    return numPlayers === 4 ? currentPlayer !== 1 : currentPlayer === 2;
+}
+window.isAITurn = isAITurn;
+
+// Advance currentPlayer to the next non-eliminated player in clockwise turn order.
+function advancePlayer() {
+    for (let i = 0; i < turnOrder.length; i++) {
+        turnIndex = (turnIndex + 1) % turnOrder.length;
+        if (!eliminated[turnOrder[turnIndex]]) break;
+    }
+    currentPlayer = turnOrder[turnIndex];
+}
+
 /**
  * Switches to the next player's turn
  */
 function switchTurn() {
     console.log('switchTurn: START, currentPlayer=', currentPlayer, 'forcedTurnActive=', forcedTurnActive);
-    
+
     // Clear any STRIDE targets when switching turns
     if (window.clearStrideTargets3D) {
         window.clearStrideTargets3D();
     }
     // Track AI consecutive moves to prevent loops
-    if (currentPlayer === 2 && selectedDie) {
+    if (isAITurn() && selectedDie) {
         if (aiLastMovedStoneId === selectedDie.id) {
             aiConsecutiveMoveCount++;
         } else {
@@ -661,7 +790,16 @@ function switchTurn() {
         aiConsecutiveMoveCount = 0;
     }
 
-    currentPlayer = currentPlayer === 1 ? 2 : 1;
+    // 4-player diminish calls out a specific opponent for the forced move; otherwise advance
+    // normally through the clockwise turn order (skipping eliminated players).
+    if (forcedTurnActive && numPlayers === 4 && forcedPlayer && !eliminated[forcedPlayer]) {
+        turnIndex = turnOrder.indexOf(forcedPlayer);
+        currentPlayer = forcedPlayer;
+        forcedPlayer = null;
+    } else {
+        forcedPlayer = null;
+        advancePlayer();
+    }
     console.log('switchTurn: after switch, currentPlayer=', currentPlayer, 'forcedTurnActive=', forcedTurnActive);
 
     if (forcedTurnActive) {
@@ -693,7 +831,7 @@ function switchTurn() {
         if (window.greyOutStones3D) window.greyOutStones3D(greyedIds);
 
         // Trigger AI move if it's the AI's turn during a forced move
-        if (isAIGame && currentPlayer === 2 && gamePhase !== 'GAME_OVER') {
+        if (isAIGame && isAITurn() && gamePhase !== 'GAME_OVER') {
             setTimeout(makeAIMove, 800);
         }
     } else {
@@ -708,7 +846,7 @@ function switchTurn() {
         // Clear any grey stones from previous forced turn
         if (window.clearGreyStones3D) window.clearGreyStones3D();
 
-        if (isAIGame && currentPlayer === 2 && gamePhase !== 'GAME_OVER') {
+        if (isAIGame && isAITurn() && gamePhase !== 'GAME_OVER') {
             setTimeout(makeAIMove, 800);
         }
     }
@@ -744,7 +882,7 @@ function handlePlaceClick(event) {
     const r = parseInt(event.currentTarget.dataset.r, 10);
     const c = parseInt(event.currentTarget.dataset.c, 10);
 
-    if (!isWithinBounds(r, c) || onBoardDice.some(d => d.r === r && d.c === c)) {
+    if (!isWithinBounds(r, c) || onBoardDice.some(d => d.r === r && d.c === c) || !isHomeCell(currentPlayer, r, c)) {
         return;
     }
 
@@ -945,8 +1083,8 @@ if (opponentButton) opponentButton.addEventListener('click', () => {
     isAIGame = !isAIGame;
     opponentButton.textContent = isAIGame ? 'Opponent: Computer' : 'Opponent: Human';
     
-    // If it's black's turn and we just switched to computer, start AI immediately
-    if (isAIGame && currentPlayer === 2 && gamePhase !== 'GAME_OVER') {
+    // If it's an AI player's turn and we just switched to computer, start AI immediately
+    if (isAIGame && isAITurn() && gamePhase !== 'GAME_OVER') {
         setTimeout(makeAIMove, 600);
     }
 });
@@ -957,7 +1095,9 @@ if (opponentButton) opponentButton.addEventListener('click', () => {
 // ============================================
 
 function makeAIMove() {
-    if (gamePhase === 'GAME_OVER' || currentPlayer !== 2) return;
+    if (gamePhase === 'GAME_OVER') return;
+    if (numPlayers === 4) { makeAIMove4(); return; }
+    if (currentPlayer !== 2) return;
 
     // FORCED MOVE HANDLING FOR AI
     if (gamePhase === 'FORCED_MOVE_SELECT') {
@@ -1208,16 +1348,132 @@ function makeAIMove() {
     }
 }
 
+// ---- 4-PLAYER AI ----------------------------------------------------------
+// Controls every non-white player. Reuses the same click-driven execution as the
+// 2-player AI but is player-relative (any other player counts as an opponent).
+function makeAIMove4() {
+    const me = currentPlayer;
+    if (gamePhase === 'GAME_OVER' || me === 1 || eliminated[me]) return;
+
+    // Forced value-1 move (called out by a diminish).
+    if (gamePhase === 'FORCED_MOVE_SELECT') {
+        const ones = onBoardDice.filter(d => d.player === me && d.value === 1 && calculateStrideTargets(d.r, d.c, 1, me).length > 0);
+        if (ones.length > 0) {
+            const die = ones[Math.floor(Math.random() * ones.length)];
+            const tgts = calculateStrideTargets(die.r, die.c, 1, me);
+            const target = tgts[Math.floor(Math.random() * tgts.length)];
+            window.handle3DClick(die.r, die.c);
+            setTimeout(() => { if (window.handle3DClick) window.handle3DClick(target.r, target.c); }, 600);
+        } else {
+            endTurn();
+        }
+        return;
+    }
+
+    const seamRow = 10; // contested central divider: pull stones toward it
+    const colCenter = 5;
+    const actions = [];
+
+    // PLACE candidates (own home quadrant only)
+    if (reserveDice[me] > 0) {
+        const empties = [];
+        for (let r = 0; r < BOARD_ROWS; r++) {
+            for (let c = 0; c < BOARD_COLS; c++) {
+                if (isWithinBounds(r, c) && isHomeCell(me, r, c) && !onBoardDice.some(d => d.r === r && d.c === c)) {
+                    empties.push({ r, c });
+                }
+            }
+        }
+        const sample = empties.sort(() => Math.random() - 0.5).slice(0, 12);
+        sample.forEach(sq => {
+            let score = 20 + reserveDice[me] * 6;
+            score += (6 - Math.abs(seamRow - sq.r)) * 2;           // push toward the front line
+            score -= Math.abs(colCenter - sq.c);                    // keep off the very edge a bit
+            score += Math.random() * 20;
+            actions.push({ type: 'PLACE', target: sq, score });
+        });
+    }
+
+    // STRIDE candidates: BFS exactly `value` steps, capturing opponents (value>1) en route.
+    const reachable = (sr, sc, maxSteps) => {
+        const queue = [{ r: sr, c: sc, steps: 0, path: [] }];
+        const visited = new Map([[`${sr},${sc}`, 0]]);
+        const ends = [];
+        while (queue.length) {
+            const cur = queue.shift();
+            if (cur.steps === maxSteps) { ends.push(cur); continue; }
+            let advanced = false;
+            HV_VECTORS.forEach(v => {
+                const nr = cur.r + v.dr, nc = cur.c + v.dc;
+                if (!isWithinBounds(nr, nc)) return;
+                const occ = onBoardDice.find(d => d.r === nr && d.c === nc);
+                if (occ && !(occ.player !== me && occ.value > 1)) return; // own stone or indestructible 1
+                const key = `${nr},${nc}`, ns = cur.steps + 1;
+                if (!visited.has(key) || visited.get(key) > ns) {
+                    visited.set(key, ns);
+                    advanced = true;
+                    const next = { r: nr, c: nc, steps: ns, path: [...cur.path, { r: nr, c: nc }] };
+                    queue.push(next);
+                    if (ns === maxSteps) ends.push(next);
+                }
+            });
+            if (!advanced && cur.steps > 0) ends.push(cur);
+        }
+        return ends;
+    };
+
+    onBoardDice.filter(d => d.player === me).forEach(die => {
+        reachable(die.r, die.c, die.value).forEach(ep => {
+            let captures = 0;
+            ep.path.forEach(s => {
+                const occ = onBoardDice.find(d => d.r === s.r && d.c === s.c);
+                if (occ && occ.player !== me) captures++;
+            });
+            let score = captures * 250;
+            score += (6 - Math.abs(seamRow - ep.r)) * 4;
+            if (aiLastMovedStoneId === die.id) score -= aiConsecutiveMoveCount * 80;
+            score += Math.random() * 50;
+            actions.push({ type: 'STRIDE', die, path: ep.path, score });
+        });
+    });
+
+    if (actions.length === 0) { endTurn(); return; }
+
+    actions.sort((a, b) => b.score - a.score);
+    const top = actions[0].score;
+    const pool = actions.filter(a => a.score >= top - 60);
+    const choice = pool[Math.floor(Math.random() * pool.length)];
+
+    if (choice.type === 'PLACE') {
+        window.handle3DClick(choice.target.r, choice.target.c);
+    } else {
+        window.handle3DClick(choice.die.r, choice.die.c);
+        let idx = 0;
+        const step = () => {
+            if (idx < choice.path.length) {
+                window.handle3DClick(choice.path[idx].r, choice.path[idx].c);
+                idx++;
+                if (idx < choice.path.length && currentPlayer === me) setTimeout(step, 400);
+            }
+        };
+        setTimeout(step, 600);
+    }
+}
+
 
 // ============================================
 // INITIALIZATION
 // ============================================
 
 function startNewGame() {
+    rebuildBoardConfig();
     currentDieId = 0;
     onBoardDice = [];
-    reserveDice = { 1: 8, 2: 8 };
-    currentPlayer = 1;
+    reserveDice = { 1: 8, 2: 8, 3: 8, 4: 8 };
+    eliminated = {};
+    turnIndex = 0;
+    forcedPlayer = null;
+    currentPlayer = turnOrder[0];
     gamePhase = 'ACTION_SELECT';
     forcedTurnActive = false;
     selectedDie = null;
@@ -1243,6 +1499,18 @@ function startNewGame() {
 
 newGameBtn.addEventListener('click', startNewGame);
 if (resetBtnMain) resetBtnMain.addEventListener('click', startNewGame);
+
+// Switch player count (2 or 4): reconfigure board + restart, then rebuild the 3D scene.
+function setNumPlayers(n) {
+    if (n !== 2 && n !== 4) return;
+    numPlayers = n;
+    startNewGame();
+    if (window.rebuild3DBoard) window.rebuild3DBoard();
+    if (window.syncBoard3D) window.syncBoard3D();
+    if (isAIGame && isAITurn() && gamePhase !== 'GAME_OVER') setTimeout(makeAIMove, 600);
+}
+window.setNumPlayers = setNumPlayers;
+window.getNumPlayers = () => numPlayers;
 
 const menuBtnModal = document.getElementById('menu-btn-modal');
 if (menuBtnModal) {
@@ -1352,27 +1620,70 @@ window.diminishSelectedStone = function() {
         return;
     }
 
-    const opponent = 3 - currentPlayer;
-    if (!canAnyMovableOpponentOne()) {
-        console.log('DIMINISH: Rule failure - opponent has no movable 1-dice');
-        messageBox.textContent = `Diminish failed: Player ${opponent} has no movable value-1 dice.`;
+    const targets = eligibleForcedTargets();
+    if (targets.length === 0) {
+        console.log('DIMINISH: Rule failure - no opponent has movable 1-dice');
+        messageBox.textContent = `Diminish failed: no opponent has a movable value-1 die.`;
         return;
     }
-    
+
     console.log('DIMINISH: SUCCESS, reducing value for stone', selectedDie.id);
     selectedDie.value -= 1;
-    
+    if (window.updateStoneStrength3D) window.updateStoneStrength3D(selectedDie.id, selectedDie.value);
+
+    // 4-player: the diminisher decides which opponent owes the forced move.
+    if (numPlayers === 4 && targets.length > 1) {
+        gamePhase = 'DIMINISH_PICK';
+        if (window.clearStrideTargets3D) window.clearStrideTargets3D();
+        if (window.hideDiminishButton) window.hideDiminishButton();
+        if (window.syncBoard3D) window.syncBoard3D();
+        showForcedTargetPicker(targets);
+        return;
+    }
+
+    commitDiminish(targets[0]);
+};
+
+// Finalise a diminish: flag the forced move (and, in 4-player, who owes it) and end the turn.
+function commitDiminish(targetPlayer) {
+    forcedPlayer = (numPlayers === 4) ? targetPlayer : null;
     forcedTurnActive = true;
-    const diminishingId = selectedDie.id;
-    selectedDie = null; 
+    selectedDie = null;
     gamePhase = 'ACTION_SELECT';
-    
+
     if (window.clearStrideTargets3D) window.clearStrideTargets3D();
     if (window.hideDiminishButton) window.hideDiminishButton();
     if (window.syncBoard3D) window.syncBoard3D();
-    
+
     endTurn();
-};
+}
+
+// Lightweight in-game overlay letting the diminisher pick the forced-move target (4-player).
+function showForcedTargetPicker(targets) {
+    let modal = document.getElementById('diminish-target-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'diminish-target-modal';
+        modal.className = 'diminish-target-modal hidden';
+        modal.innerHTML = '<div class="diminish-target-panel"><h3>Force which player?</h3>' +
+            '<p>They must move a value-1 stone next turn.</p>' +
+            '<div id="diminish-target-options" class="diminish-target-options"></div></div>';
+        document.body.appendChild(modal);
+    }
+    const opts = modal.querySelector('#diminish-target-options');
+    opts.innerHTML = '';
+    targets.forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = 'diminish-target-btn ' + (COLOR_OF[p] || 'white');
+        btn.textContent = colorName(p);
+        btn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            commitDiminish(p);
+        });
+        opts.appendChild(btn);
+    });
+    modal.classList.remove('hidden');
+}
 
 function toggleView() {
     const body = document.body;

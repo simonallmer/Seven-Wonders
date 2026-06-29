@@ -34,7 +34,9 @@ const holePositions = [
 ];
 
 function tileTo3D(r, c) {
-    return { x: (c - 5) * tileSize, z: (r - 5) * tileSize };
+    const rows = window.BOARD_ROWS || 11;
+    const cols = window.BOARD_COLS || 11;
+    return { x: (c - (cols - 1) / 2) * tileSize, z: (r - (rows - 1) / 2) * tileSize };
 }
 
 // Materials
@@ -42,7 +44,9 @@ const matMarble = new THREE.MeshStandardMaterial({ color: 0xf5f0e8, roughness: 0
 const matGold = new THREE.MeshStandardMaterial({ color: 0xD4AF37, roughness: 0.2, metalness: 0.9 });
 const matPlaceHighlight = new THREE.MeshBasicMaterial({ color: 0xD4AF37, transparent: true, opacity: 0.7 });
 
-const stoneColors = { 1: 0xf8f8f8, 2: 0x2a2a2a };
+const stoneColors = { 1: 0xf8f8f8, 2: 0x2a2a2a, 3: 0xc0392b, 4: 0x2e6fb0 };
+// Cloud display colours per player (brighter than stone colours so they read at distance).
+const cloudColors = { 1: 0xffffff, 2: 0x2a2a2a, 3: 0xd9534f, 4: 0x4a90d9 };
 
 let selectedPlayer = null;
 let selectedStoneMesh = null;
@@ -410,12 +414,15 @@ function buildCloudCluster(x, y, z, count) {
 }
 
 function buildBoard() {
-    const boardWidth = 11 * tileSize;
+    const rows = window.BOARD_ROWS || 11;
+    const cols = window.BOARD_COLS || 11;
+    const boardWidth = cols * tileSize;
+    const boardDepth = rows * tileSize;
     const tileHeight = 8;
-    
-    // 11x11 tiles with 4 holes (2x2 each) in corners of center
-    for (let r = 0; r < 11; r++) {
-        for (let c = 0; c < 11; c++) {
+
+    // Tiles with the throne holes (2x2 feet) per 11x11 board removed.
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
             const key = `${r},${c}`;
             if (removedSquares.has(key)) continue;
 
@@ -430,7 +437,8 @@ function buildBoard() {
                 new THREE.BoxGeometry(tileSize - 1, tileHeight, tileSize - 1),
                 tileMat
             );
-            tile.position.set((c - 5) * tileSize, -tileHeight/2, (r - 5) * tileSize);
+            const p = tileTo3D(r, c);
+            tile.position.set(p.x, -tileHeight/2, p.z);
             tile.receiveShadow = true;
             tile.castShadow = true;
             tile.userData = { isField: true, r, c };
@@ -440,12 +448,12 @@ function buildBoard() {
     }
 
     // Transparent click plane for easier raycasting
-    const clickPlaneMat = new THREE.MeshBasicMaterial({ 
-        visible: false, 
-        side: THREE.DoubleSide 
+    const clickPlaneMat = new THREE.MeshBasicMaterial({
+        visible: false,
+        side: THREE.DoubleSide
     });
     clickPlane = new THREE.Mesh(
-        new THREE.PlaneGeometry(boardWidth + 20, boardWidth + 20),
+        new THREE.PlaneGeometry(boardWidth + 20, boardDepth + 20),
         clickPlaneMat
     );
     clickPlane.rotation.x = -Math.PI / 2;
@@ -455,14 +463,14 @@ function buildBoard() {
 
     // Pedestal base
     const base = new THREE.Mesh(
-        new THREE.BoxGeometry(boardWidth + 40, 20, boardWidth + 40),
+        new THREE.BoxGeometry(boardWidth + 40, 20, boardDepth + 40),
         new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3, metalness: 0.5 })
     );
     base.position.y = -tileHeight - 10;
     groupBoard.add(base);
 
     const trim = new THREE.Mesh(
-        new THREE.BoxGeometry(boardWidth + 5, 8, boardWidth + 5),
+        new THREE.BoxGeometry(boardWidth + 5, 8, boardDepth + 5),
         matGold
     );
     trim.position.y = -tileHeight/2 - 4;
@@ -471,6 +479,29 @@ function buildBoard() {
 
 let zeusStaff = null;
 let zeusStaffLight = null;
+let groupThroneB = null; // 4-player: cloned throne for the second board
+
+// Active player ids for the current mode (matches game-side turn order colours).
+function activePlayers() {
+    return (window.getNumPlayers && window.getNumPlayers() === 4) ? [1, 2, 3, 4] : [1, 2];
+}
+
+// Per-player anchor for reserve plates/clouds. Seats run clockwise with white on the near
+// board (board B, +z) so the camera opens on the starting player. Left players sit at -x.
+//   white = near-left, red = far-left, black = far-right, blue = near-right.
+function sideLayout() {
+    if (window.getNumPlayers && window.getNumPlayers() === 4) {
+        const za = tileTo3D(5, 5).z;   // board A (far) centre
+        const zb = tileTo3D(15, 5).z;  // board B (near) centre
+        return {
+            1: { x: -205, z: zb }, // white (near-left)
+            3: { x: -205, z: za }, // red   (far-left)
+            2: { x: 205, z: za },  // black (far-right)
+            4: { x: 205, z: zb }   // blue  (near-right)
+        };
+    }
+    return { 1: { x: -155, z: 0 }, 2: { x: 155, z: 0 } };
+}
 
 function buildThrone() {
     const throneMat = matGold.clone();
@@ -483,10 +514,12 @@ function buildThrone() {
         metalness: 0.8
     });
     
-    // Chair legs - gold
+    // Chair legs - gold. Built in a board-local frame centred on a single 11x11 board
+    // (origin = board centre, row/col 5) so the whole throne can be positioned/cloned per board.
     holePositions.forEach(hole => {
-        const { x, z } = tileTo3D(hole.r, hole.c);
-        
+        const x = (hole.c - 5) * tileSize;
+        const z = (hole.r - 5) * tileSize;
+
         // Main leg - gold
         const leg = new THREE.Mesh(
             new THREE.CylinderGeometry(5, 7, legHeight, 12),
@@ -810,8 +843,69 @@ window.updateTurnIndicator3D = function(player) {
     // Scepter lighting now reflects OVERALL advantage (stones on board + reserve)
     // instead of current turn, as requested.
     updateZeusStaffColor();
-    
+
     updateCloudHighlight(player);
+};
+
+function clearGroup(g) {
+    while (g && g.children.length > 0) g.remove(g.children[0]);
+}
+
+// Throne is built self-contained around the origin; place it at each board's centre.
+// 4-player clones it for board B (clone shares materials, so the scepter glow stays in sync).
+function positionThrones() {
+    if (groupThroneB) { scene.remove(groupThroneB); groupThroneB = null; }
+    if (window.getNumPlayers && window.getNumPlayers() === 4) {
+        // Board A throne keeps its default facing (+z, toward the centre); board B's clone is
+        // spun 180 degrees so the two statues look at each other across the divider.
+        groupThrone.position.z = tileTo3D(5, 5).z;    // board A (far) centre
+        groupThrone.rotation.y = 0;
+        groupThroneB = groupThrone.clone(true);
+        groupThroneB.position.z = tileTo3D(15, 5).z;  // board B (near) centre
+        groupThroneB.rotation.y = Math.PI;
+        scene.add(groupThroneB);
+    } else {
+        groupThrone.position.z = 0;
+        groupThrone.rotation.y = 0;
+    }
+}
+
+// Pull the camera back for the taller 4-player arena.
+function setupCamera() {
+    if (!camera || !controls) return;
+    if (window.getNumPlayers && window.getNumPlayers() === 4) {
+        camera.position.set(0, 380, 640);
+        controls.target.set(0, 20, 0);
+        controls.maxDistance = 1200;
+    } else {
+        camera.position.set(0, 180, 400);
+        controls.target.set(0, 30, 0);
+        controls.maxDistance = 800;
+    }
+    controls.update();
+    needsRender = true;
+}
+
+// Rebuild board geometry, thrones, reserves and camera after a player-count change.
+window.rebuild3DBoard = function() {
+    if (!scene) return; // 3D not initialised yet
+    if (groupThroneB) { scene.remove(groupThroneB); groupThroneB = null; }
+    clearGroup(groupBoard);
+    clearGroup(groupReserve);
+    clearGroup(groupThrone);
+    clearGroup(groupPieces);
+    clearGroup(groupPlacementHints);
+    fieldMeshes.clear();
+    dieMeshes.clear();
+    window.statuePermanentlyHidden = false;
+
+    buildBoard();
+    cacheBoardMeshes();
+    buildThrone();       // rebuilds groupThrone at origin (self-contained)
+    positionThrones();   // position / clone per board
+    buildReserveStones();
+    setupCamera();
+    syncBoard3D();
 };
 
 function createCloud(color, player) {
@@ -849,59 +943,55 @@ function createCloud(color, player) {
 }
 
 function buildClouds() {
-    // White cloud (left)
-    cloudGroups[1] = createCloud(0xffffff, 1);
-    cloudGroups[1].position.set(-280, 40, 0);
-    cloudGroups[1].userData.baseY = 40;
-    groupClouds.add(cloudGroups[1]);
-    
-    // Black cloud (right)
-    cloudGroups[2] = createCloud(0x2a2a2a, 2);
-    cloudGroups[2].position.set(280, 40, 0);
-    cloudGroups[2].userData.baseY = 40;
-    groupClouds.add(cloudGroups[2]);
-    
-    // Big clickable areas for each cloud
-    const cloud1Click = new THREE.Mesh(
-        new THREE.BoxGeometry(120, 80, 100),
-        new THREE.MeshBasicMaterial({ visible: false })
-    );
-    cloud1Click.position.set(-280, 40, 0);
-    cloud1Click.userData = { isCloudArea: true, player: 1 };
-    groupCloudClickables.add(cloud1Click);
-    
-    const cloud2Click = new THREE.Mesh(
-        new THREE.BoxGeometry(120, 80, 100),
-        new THREE.MeshBasicMaterial({ visible: false })
-    );
-    cloud2Click.position.set(280, 40, 0);
-    cloud2Click.userData = { isCloudArea: true, player: 2 };
-    groupCloudClickables.add(cloud2Click);
-    
+    // Clear any existing clouds (rebuild on player-count change)
+    while (groupClouds.children.length > 0) groupClouds.remove(groupClouds.children[0]);
+    while (groupCloudClickables.children.length > 0) groupCloudClickables.remove(groupCloudClickables.children[0]);
+    for (const k in cloudGroups) delete cloudGroups[k];
+
+    const layout = sideLayout();
+    const reserveOuter = (window.getNumPlayers && window.getNumPlayers() === 4) ? 75 : 125;
+
+    activePlayers().forEach(p => {
+        const anchor = layout[p];
+        const cx = anchor.x + Math.sign(anchor.x) * reserveOuter; // push the cloud past the reserve plate
+        const cz = anchor.z;
+
+        const cloud = createCloud(cloudColors[p], p);
+        cloud.position.set(cx, 40, cz);
+        cloud.userData.baseY = 40;
+        cloudGroups[p] = cloud;
+        groupClouds.add(cloud);
+
+        const click = new THREE.Mesh(
+            new THREE.BoxGeometry(120, 80, 100),
+            new THREE.MeshBasicMaterial({ visible: false })
+        );
+        click.position.set(cx, 40, cz);
+        click.userData = { isCloudArea: true, player: p };
+        groupCloudClickables.add(click);
+    });
+
     scene.add(groupClouds);
     scene.add(groupCloudClickables);
-    
-    // Initial turn indicator
+
     updateCloudHighlight(1);
 }
 
 function updateCloudHighlight(player) {
-    [1, 2].forEach(p => {
+    activePlayers().forEach(p => {
         const cloud = cloudGroups[p];
         if (!cloud) return;
-        
-        cloud.children.forEach(child => {
-            if (child.material) {
-                if (p === player) {
-                    cloud.children[0].material.emissive.setHex(p === 1 ? 0xCCCCCC : 0x444444);
-                    cloud.children[0].material.emissiveIntensity = 0.3;
-                } else {
-                    cloud.children[0].material.emissive.setHex(0x000000);
-                    cloud.children[0].material.emissiveIntensity = 0;
-                }
+
+        if (cloud.children[0] && cloud.children[0].material) {
+            if (p === player) {
+                cloud.children[0].material.emissive.setHex(p === 1 ? 0xCCCCCC : 0x444444);
+                cloud.children[0].material.emissiveIntensity = 0.3;
+            } else {
+                cloud.children[0].material.emissive.setHex(0x000000);
+                cloud.children[0].material.emissiveIntensity = 0;
             }
-        });
-        
+        }
+
         // Move active cloud up
         cloud.userData.baseY = p === player ? 50 : 40;
     });
@@ -1004,37 +1094,28 @@ function buildReserveStones() {
     while (groupReserve.children.length > 0) {
         groupReserve.remove(groupReserve.children[0]);
     }
-    
+
     // Build golden plates first
     buildReservePlates();
-    
-    // White stones on LEFT side - centered vertically relative to board
-    const leftX = -155;
-    const centerZ = 0; // Center of board
-    const spacing = 28;
-    const startZ = centerZ - (reserveDice[1] - 1) * spacing / 2;
-    
-    for (let i = 0; i < reserveDice[1]; i++) {
-        const mesh = createStoneMesh(1, 1);
-        mesh.position.set(leftX, 8, startZ + i * spacing);
-        mesh.scale.set(0.85, 0.85, 0.85);
-        mesh.userData.isReserveStone = true;
-        mesh.userData.player = 1;
-        groupReserve.add(mesh);
-    }
-    
-    // Black stones on RIGHT side - centered vertically relative to board
-    const rightX = 155;
-    const startZ2 = centerZ - (reserveDice[2] - 1) * spacing / 2;
-    
-    for (let i = 0; i < reserveDice[2]; i++) {
-        const mesh = createStoneMesh(2, 1);
-        mesh.position.set(rightX, 8, startZ2 + i * spacing);
-        mesh.scale.set(0.85, 0.85, 0.85);
-        mesh.userData.isReserveStone = true;
-        mesh.userData.player = 2;
-        groupReserve.add(mesh);
-    }
+
+    // Stack each active player's reserve stones along their side plate.
+    const layout = sideLayout();
+    const four = window.getNumPlayers && window.getNumPlayers() === 4;
+    const spacing = four ? 18 : 28;
+
+    activePlayers().forEach(p => {
+        const a = layout[p];
+        const count = reserveDice[p] || 0;
+        const startZ = a.z - (count - 1) * spacing / 2;
+        for (let i = 0; i < count; i++) {
+            const mesh = createStoneMesh(p, 1);
+            mesh.position.set(a.x, 8, startZ + i * spacing);
+            mesh.scale.set(0.85, 0.85, 0.85);
+            mesh.userData.isReserveStone = true;
+            mesh.userData.player = p;
+            groupReserve.add(mesh);
+        }
+    });
 }
 
 function buildReservePlates() {
@@ -1077,51 +1158,34 @@ function buildReservePlates() {
         return geometry;
     }
     
+    const four = window.getNumPlayers && window.getNumPlayers() === 4;
     const plateWidth = 25;
-    const plateDepth = 250;
+    const plateDepth = four ? 170 : 250;
     const plateHeight = 6;
     const radius = 4;
-    
-    // Left plate
-    const leftGeom = createRoundedPlate(plateWidth, plateHeight, plateDepth, radius);
-    const leftPlate = new THREE.Mesh(leftGeom, plateMat);
-    leftPlate.position.set(-155, plateY, 0);
-    leftPlate.castShadow = true;
-    leftPlate.receiveShadow = true;
-    leftPlate.userData = { isReservePlate: true, player: 1 };
-    groupReserve.add(leftPlate);
-    
-    // Right plate
-    const rightGeom = createRoundedPlate(plateWidth, plateHeight, plateDepth, radius);
-    const rightPlate = new THREE.Mesh(rightGeom, plateMat);
-    rightPlate.position.set(155, plateY, 0);
-    rightPlate.castShadow = true;
-    rightPlate.receiveShadow = true;
-    rightPlate.userData = { isReservePlate: true, player: 2 };
-    groupReserve.add(rightPlate);
-    
-    // Add large invisible click planes for easier reserve selection
     const clickPlaneMat = new THREE.MeshBasicMaterial({ visible: false });
-    
-    // Left click plane
-    const leftClickPlane = new THREE.Mesh(
-        new THREE.PlaneGeometry(60, 280),
-        clickPlaneMat
-    );
-    leftClickPlane.rotation.x = -Math.PI / 2;
-    leftClickPlane.position.set(-155, 5, 0);
-    leftClickPlane.userData = { isReserveClickPlane: true, player: 1 };
-    groupReserve.add(leftClickPlane);
-    
-    // Right click plane
-    const rightClickPlane = new THREE.Mesh(
-        new THREE.PlaneGeometry(60, 280),
-        clickPlaneMat
-    );
-    rightClickPlane.rotation.x = -Math.PI / 2;
-    rightClickPlane.position.set(155, 5, 0);
-    rightClickPlane.userData = { isReserveClickPlane: true, player: 2 };
-    groupReserve.add(rightClickPlane);
+    const layout = sideLayout();
+
+    activePlayers().forEach(p => {
+        const a = layout[p];
+
+        const geom = createRoundedPlate(plateWidth, plateHeight, plateDepth, radius);
+        const plate = new THREE.Mesh(geom, plateMat);
+        plate.position.set(a.x, plateY, a.z);
+        plate.castShadow = true;
+        plate.receiveShadow = true;
+        plate.userData = { isReservePlate: true, player: p };
+        groupReserve.add(plate);
+
+        const clickPlane = new THREE.Mesh(
+            new THREE.PlaneGeometry(60, plateDepth + 30),
+            clickPlaneMat
+        );
+        clickPlane.rotation.x = -Math.PI / 2;
+        clickPlane.position.set(a.x, 5, a.z);
+        clickPlane.userData = { isReserveClickPlane: true, player: p };
+        groupReserve.add(clickPlane);
+    });
 }
 
 function syncBoard3D() {
@@ -1247,8 +1311,10 @@ function updateHoverEffect() {
         const planeIntersects = raycaster.intersectObject(clickPlane);
         if (planeIntersects.length > 0) {
             const point = planeIntersects[0].point;
-            c = Math.round(point.x / tileSize + 5);
-            r = Math.round(point.z / tileSize + 5);
+            const rows = window.BOARD_ROWS || 11;
+            const cols = window.BOARD_COLS || 11;
+            c = Math.round(point.x / tileSize + (cols - 1) / 2);
+            r = Math.round(point.z / tileSize + (rows - 1) / 2);
         }
     }
     
@@ -1269,7 +1335,7 @@ function updateHoverEffect() {
     }
     
     // Get grid position from click plane
-    if (r !== null && c !== null && r >= 0 && r < 11 && c >= 0 && c < 11) {
+    if (r !== null && c !== null && r >= 0 && r < (window.BOARD_ROWS || 11) && c >= 0 && c < (window.BOARD_COLS || 11)) {
         const key = `${r},${c}`;
         
         if (removedSquares.has(key)) {
@@ -1342,7 +1408,7 @@ function updateHoverEffect() {
                 for (const dir of directions) {
                     const checkR = die.r + dir.dr;
                     const checkC = die.c + dir.dc;
-                    if (typeof window.isWithinBounds === 'function' ? window.isWithinBounds(checkR, checkC) : (checkR >= 0 && checkR < 11 && checkC >= 0 && checkC < 11)) {
+                    if (typeof window.isWithinBounds === 'function' ? window.isWithinBounds(checkR, checkC) : (checkR >= 0 && checkR < (window.BOARD_ROWS || 11) && checkC >= 0 && checkC < (window.BOARD_COLS || 11))) {
                         const occupant = diceOnBoard.find(d => d.r === checkR && d.c === checkC);
                         if (!occupant || (occupant.player !== player && occupant.value > 1)) {
                             canInteract = true;
@@ -1431,7 +1497,7 @@ function onMouseDown(event) {
 }
 function onCanvasClick(event) {
     // If it's AI's turn, block human input
-    if (window.isAIGame && window.isAIGame() && window.getCurrentPlayer && window.getCurrentPlayer() === 2) {
+    if (window.isAIGame && window.isAIGame() && window.isAITurn && window.isAITurn()) {
         console.log('Interaction blocked: Computer is thinking...');
         return;
     }
@@ -1502,7 +1568,7 @@ function onCanvasClick(event) {
             const c = hitObj.userData.c;
             const key = `${r},${c}`;
             
-            if (r >= 0 && r < 11 && c >= 0 && c < 11 && !removedSquares.has(key)) {
+            if (r >= 0 && r < (window.BOARD_ROWS || 11) && c >= 0 && c < (window.BOARD_COLS || 11) && !removedSquares.has(key)) {
                 if (typeof window.handle3DClick === 'function') {
                     window.handle3DClick(r, c);
                 }

@@ -53,6 +53,14 @@
                     <div class="count-stone black"></div>
                     <span id="p2-reserve">8</span>
                 </div>
+                <div class="count-item" id="p3-count-item" style="display: none;">
+                    <div class="count-stone red"></div>
+                    <span id="p3-reserve">8</span>
+                </div>
+                <div class="count-item" id="p4-count-item" style="display: none;">
+                    <div class="count-stone blue"></div>
+                    <span id="p4-reserve">8</span>
+                </div>
                 <div class="count-item">
                     <span style="font-size: 0.7rem; opacity: 0.6; margin-right: 4px;">Board</span>
                     <span id="p1-board-count">0</span>
@@ -70,6 +78,7 @@
             <div class="menu-divider"></div>
 
             <button id="opponent-btn" class="menu-btn">Opponent: Computer</button>
+            <button id="players-btn-menu" class="menu-btn">Players: 2</button>
             <button id="view-toggle-btn" class="menu-btn">View: 3D</button>
             <button id="rules-btn" class="menu-btn rules-btn">Rules</button>
             <button id="reset-button-main" class="menu-btn">New Game</button>
@@ -137,6 +146,15 @@
                 <p><strong>WINNING</strong>
                     The game ends immediately when a player is reduced to fewer than 4 dice on the board. That player
                     loses.</p>
+
+                <p><strong>4 PLAYERS</strong>
+                    Two boards are joined into one arena, each player holding a quarter: White (near) and Black sit
+                    diagonally opposite, as do Red and Blue, with the twin thrones facing each other across a narrow
+                    5-row no-man's-land. Its central divider row cannot be built on by anyone, but stones may pass
+                    through it. Turn order runs clockwise: White → Red → Black → Blue. You may only PLACE dice in your
+                    own home quarter, but you may STRIDE and capture anywhere — run your stones across to the far board.
+                    Drop below 4 dice and you are eliminated; the last player standing wins. When you DIMINISH, you
+                    choose which opponent is forced to move a value-1 die.</p>
             </div>
             <button class="menu-btn close-rules-btn" id="rules-close-btn">Close</button>
         </div>
@@ -204,6 +222,21 @@
 
         rulesOverlay.addEventListener('click', () => {
             rulesModal.classList.add('hidden');
+        });
+
+        // Players toggle (2 <-> 4). 4-player adds a second board (red/blue).
+        const playersBtnMenu = document.getElementById('players-btn-menu');
+        if (playersBtnMenu) playersBtnMenu.addEventListener('click', () => {
+            const cur = (typeof window.getNumPlayers === 'function') ? window.getNumPlayers() : 2;
+            const next = cur === 2 ? 4 : 2;
+            playersBtnMenu.textContent = `Players: ${next}`;
+            const show = next === 4 ? 'flex' : 'none';
+            const p3 = document.getElementById('p3-count-item');
+            const p4 = document.getElementById('p4-count-item');
+            if (p3) p3.style.display = show;
+            if (p4) p4.style.display = show;
+            if (typeof window.setNumPlayers === 'function') window.setNumPlayers(next);
+            if (sideMenu.classList.contains('open')) toggleSideMenu();
         });
 
         // View Toggle (Disabled - 2D Coming Soon)
