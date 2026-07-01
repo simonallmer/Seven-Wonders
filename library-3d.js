@@ -12,11 +12,11 @@ const playerColorBox = document.getElementById('player-color');
 
 // --- Three.js Setup ---
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x2a1f14);
-scene.fog = new THREE.FogExp2(0x2a1f14, 0.012);
+scene.background = new THREE.Color(0xf3d9a4);
+scene.fog = new THREE.FogExp2(0xf3d9a4, 0.01);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 20, 25);
+camera.position.set(0, 32, 34);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -35,48 +35,58 @@ controls.minDistance = 10;
 controls.maxDistance = 50;
 
 // --- Lighting ---
-const ambientLight = new THREE.AmbientLight(0xffeedd, 0.25);
+const ambientLight = new THREE.AmbientLight(0xfff2da, 0.55);
 scene.add(ambientLight);
 
-const fillLight = new THREE.DirectionalLight(0xffcc88, 0.4);
-fillLight.position.set(-10, 20, 10);
-scene.add(fillLight);
+const skyFill = new THREE.HemisphereLight(0xbfe3ff, 0xcaa96a, 0.55);
+scene.add(skyFill);
 
-const moonLight = new THREE.DirectionalLight(0xffeecc, 1.0);
-moonLight.position.set(20, 40, -20);
-moonLight.castShadow = true;
-moonLight.shadow.mapSize.width = 2048;
-moonLight.shadow.mapSize.height = 2048;
-moonLight.shadow.camera.near = 0.5;
-moonLight.shadow.camera.far = 100;
-moonLight.shadow.camera.left = -20;
-moonLight.shadow.camera.right = 20;
-moonLight.shadow.camera.top = 20;
-moonLight.shadow.camera.bottom = -20;
-moonLight.shadow.bias = -0.0005;
-scene.add(moonLight);
+const sunLight = new THREE.DirectionalLight(0xfff2d0, 1.25);
+sunLight.position.set(24, 42, 18);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 0.5;
+sunLight.shadow.camera.far = 100;
+sunLight.shadow.camera.left = -24;
+sunLight.shadow.camera.right = 24;
+sunLight.shadow.camera.top = 24;
+sunLight.shadow.camera.bottom = -24;
+sunLight.shadow.bias = -0.0005;
+scene.add(sunLight);
 
-const addTorch = (x, z) => {
-    const light = new THREE.PointLight(0xffaa55, 1.5, 20);
-    light.position.set(x, 3, z);
-    light.castShadow = true;
+const addLamp = (x, z) => {
+    const light = new THREE.PointLight(0xffcc88, 0.5, 10);
+    light.position.set(x, 3.2, z);
     scene.add(light);
-    const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(0.2, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0xffaa55 })
+    const post = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.06, 2.6, 8),
+        new THREE.MeshStandardMaterial({ color: 0x6b4a28, roughness: 0.6, metalness: 0.4 })
     );
-    mesh.position.set(x, 3, z);
-    scene.add(mesh);
+    post.position.set(x, 1.6, z);
+    post.castShadow = true;
+    scene.add(post);
+    const lantern = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.22, 0),
+        new THREE.MeshStandardMaterial({ color: 0xffcc66, emissive: 0xffaa33, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.6 })
+    );
+    lantern.position.set(x, 3.05, z);
+    scene.add(lantern);
 };
 
 // --- Materials ---
-const floorTileMat1 = new THREE.MeshStandardMaterial({ color: 0x8a7a64, roughness: 0.85, metalness: 0.05 });
-const floorTileMat2 = new THREE.MeshStandardMaterial({ color: 0x9a8a72, roughness: 0.85, metalness: 0.05 });
-const cellMat = new THREE.MeshStandardMaterial({ color: 0x6b5a48, roughness: 0.9 });
-const roomMat = new THREE.MeshStandardMaterial({ color: 0x7a6a58, roughness: 0.8 });
+const floorTileMat1 = new THREE.MeshStandardMaterial({ color: 0xc3a878, roughness: 0.85, metalness: 0.05 });
+const floorTileMat2 = new THREE.MeshStandardMaterial({ color: 0xb39764, roughness: 0.85, metalness: 0.05 });
+const cellMat = new THREE.MeshStandardMaterial({ color: 0xa38a5c, roughness: 0.9 });
 const activeCellMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.3 });
 const directionMat = new THREE.MeshStandardMaterial({ color: 0xffaa44, transparent: true, opacity: 0.3 });
 const wallSelectedMat = new THREE.MeshStandardMaterial({ color: 0xff6600, transparent: true, opacity: 0.4 });
+const tileTrimMat = new THREE.MeshStandardMaterial({ color: 0x2f7a8c, roughness: 0.4, metalness: 0.15 });
+const domeMat = new THREE.MeshStandardMaterial({ color: 0x2f7a8c, roughness: 0.3, metalness: 0.2 });
+const brassMat = new THREE.MeshStandardMaterial({ color: 0xd8b25a, roughness: 0.35, metalness: 0.75 });
+const wallBrickMat = new THREE.MeshStandardMaterial({ color: 0xc9ac7c, roughness: 0.88 });
+const plinthMat = new THREE.MeshStandardMaterial({ color: 0xa38a5c, roughness: 0.9 });
+const archDarkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.9 });
 
 // --- Environment ---
 const courtyardGroup = new THREE.Group();
@@ -98,30 +108,99 @@ for (let tr = 0; tr < TILE_COUNT; tr++) {
     }
 }
 
-const createStudyRoom = (x, z, rot) => {
+const createLibraryPavilion = (x, z, rot) => {
     const roomGroup = new THREE.Group();
     roomGroup.position.set(x, 0, z);
     roomGroup.rotation.y = rot;
-    const base = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 6), roomMat);
-    base.position.y = 0.25;
-    base.receiveShadow = true;
-    roomGroup.add(base);
-    const pillarGeo = new THREE.CylinderGeometry(0.4, 0.4, 4, 12);
-    const pillarMat = new THREE.MeshStandardMaterial({ color: 0x8a7a64, roughness: 0.7 });
-    [-3, 3].forEach(offX => {
-        const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-        pillar.position.set(offX, 2.2, 2.8);
-        pillar.castShadow = true;
-        roomGroup.add(pillar);
+
+    // Raised plinth
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.5, 6.4), plinthMat);
+    plinth.position.y = 0.25;
+    plinth.receiveShadow = true;
+    roomGroup.add(plinth);
+
+    // Main sandstone hall
+    const hall = new THREE.Mesh(new THREE.BoxGeometry(7.4, 3.4, 5.4), wallBrickMat);
+    hall.position.y = 0.5 + 1.7;
+    hall.castShadow = true;
+    hall.receiveShadow = true;
+    roomGroup.add(hall);
+
+    // Teal tile trim band just below the roofline (kept clear of the hall's top face to avoid z-fighting)
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.3, 5.5), tileTrimMat);
+    trim.position.y = 0.5 + 3.15;
+    roomGroup.add(trim);
+
+    // Crenellations (merlons) along the front and back roof edges
+    for (let side = -1; side <= 1; side += 2) {
+        for (let i = -2; i <= 2; i++) {
+            const merlon = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.4), wallBrickMat);
+            merlon.position.set(i * 1.3, 0.5 + 3.65, side * 2.6);
+            merlon.castShadow = true;
+            roomGroup.add(merlon);
+        }
+    }
+
+    // Central drum + onion dome facing the courtyard
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.6, 1.1, 16), wallBrickMat);
+    drum.position.set(0, 0.5 + 3.95, 0);
+    drum.castShadow = true;
+    roomGroup.add(drum);
+
+    const domeRing = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.1, 8, 24), brassMat);
+    domeRing.rotation.x = Math.PI / 2;
+    domeRing.position.set(0, 0.5 + 4.5, 0);
+    roomGroup.add(domeRing);
+
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(1.55, 20, 14, 0, Math.PI * 2, 0, Math.PI / 1.7), domeMat);
+    dome.position.set(0, 0.5 + 4.5, 0);
+    dome.castShadow = true;
+    roomGroup.add(dome);
+
+    const finial = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.6, 8), brassMat);
+    finial.position.set(0, 0.5 + 6.05, 0);
+    roomGroup.add(finial);
+
+    // Small corner turrets with matching mini-domes
+    [[-3.2, -2.2], [3.2, -2.2], [-3.2, 2.2], [3.2, 2.2]].forEach(([tx, tz]) => {
+        const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 3.6, 10), wallBrickMat);
+        turret.position.set(tx, 0.5 + 1.8, tz);
+        turret.castShadow = true;
+        roomGroup.add(turret);
+        const turretDome = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 8, 0, Math.PI * 2, 0, Math.PI / 1.7), domeMat);
+        turretDome.position.set(tx, 0.5 + 3.7, tz);
+        turretDome.castShadow = true;
+        roomGroup.add(turretDome);
     });
-    addTorch(x, z);
+
+    // Horseshoe-arch entrance recessed into the courtyard-facing wall
+    const archRecess = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.6, 0.3), archDarkMat);
+    archRecess.position.set(0, 0.5 + 1.3, 2.75);
+    roomGroup.add(archRecess);
+
+    const archTop = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.28, 8, 16, Math.PI), archDarkMat);
+    archTop.position.set(0, 0.5 + 2.6, 2.75);
+    roomGroup.add(archTop);
+
+    const archTrim = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.08, 8, 16, Math.PI), brassMat);
+    archTrim.position.set(0, 0.5 + 2.6, 2.9);
+    roomGroup.add(archTrim);
+
+    [-1.1, 1.1].forEach(offX => {
+        const jamb = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 2.6, 10), wallBrickMat);
+        jamb.position.set(offX, 0.5 + 1.3, 2.75);
+        jamb.castShadow = true;
+        roomGroup.add(jamb);
+    });
+
+    addLamp(x, z);
     return roomGroup;
 };
 
-courtyardGroup.add(createStudyRoom(0, -12, 0));
-courtyardGroup.add(createStudyRoom(0, 12, Math.PI));
-courtyardGroup.add(createStudyRoom(12, 0, -Math.PI/2));
-courtyardGroup.add(createStudyRoom(-12, 0, Math.PI/2));
+courtyardGroup.add(createLibraryPavilion(0, -12, 0));
+courtyardGroup.add(createLibraryPavilion(0, 12, Math.PI));
+courtyardGroup.add(createLibraryPavilion(12, 0, -Math.PI/2));
+courtyardGroup.add(createLibraryPavilion(-12, 0, Math.PI/2));
 
 // --- Board ---
 const TILE_SIZE = 1.6;
@@ -491,14 +570,74 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+// --- Fountain (courtyard center cell) ---
+const fountainDroplets = [];
+function createFountain(r, c) {
+    const { x, z } = getPos(r, c);
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+
+    const basin = new THREE.Mesh(
+        new THREE.CylinderGeometry(TILE_SIZE / 2 - 0.05, TILE_SIZE / 2, 0.28, 8),
+        plinthMat
+    );
+    basin.position.y = 0.14;
+    basin.castShadow = true;
+    basin.receiveShadow = true;
+    group.add(basin);
+
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(TILE_SIZE / 2 - 0.05, 0.06, 8, 8), tileTrimMat);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = 0.28;
+    group.add(rim);
+
+    const water = new THREE.Mesh(
+        new THREE.CylinderGeometry(TILE_SIZE / 2 - 0.18, TILE_SIZE / 2 - 0.18, 0.05, 20),
+        new THREE.MeshStandardMaterial({ color: 0x4fb0d8, roughness: 0.15, metalness: 0.2, transparent: true, opacity: 0.85 })
+    );
+    water.position.y = 0.26;
+    group.add(water);
+
+    const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.5, 10), tileTrimMat);
+    pedestal.position.y = 0.28 + 0.25;
+    group.add(pedestal);
+
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.24, 0.14, 12), brassMat);
+    bowl.position.y = 0.28 + 0.55;
+    group.add(bowl);
+
+    const spoutTip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), brassMat);
+    spoutTip.position.y = 0.28 + 0.68;
+    group.add(spoutTip);
+
+    boardGroup.add(group);
+    plateMeshes[`${r}_${c}`] = group;
+
+    // Spray droplets — small emissive spheres bobbing up out of the spout, animated per-frame
+    const dropletMat = new THREE.MeshStandardMaterial({ color: 0xbfe8f7, emissive: 0x2a8fb8, emissiveIntensity: 0.4, transparent: true, opacity: 0.85 });
+    for (let i = 0; i < 6; i++) {
+        const droplet = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), dropletMat);
+        const angle = (i / 6) * Math.PI * 2;
+        group.add(droplet);
+        fountainDroplets.push({ mesh: droplet, angle, phase: Math.random() * Math.PI * 2, baseY: 0.28 + 0.68 });
+    }
+
+    group.scale.set(0.1, 0.1, 0.1);
+    new TWEEN.Tween(group.scale)
+        .to({ x: 1, y: 1, z: 1 }, 400)
+        .easing(TWEEN.Easing.Back.Out)
+        .start();
+}
+
 // --- Visual Helpers ---
 function createPlate(r, c, owner) {
+    if (owner === FOUNTAIN) { createFountain(r, c); return; }
     const { x, z } = getPos(r, c);
     const bookGroup = new THREE.Group();
     bookGroup.position.set(x, 0, z);
 
     const ownerColors = [0xf8f8f8, 0x2a2a2a, 0xcc3333, 0x3366cc];
-    const col = owner === FOUNTAIN ? 0x4488ff : ownerColors[owner % ownerColors.length];
+    const col = ownerColors[owner % ownerColors.length];
 
     const cover = new THREE.Mesh(
         new THREE.BoxGeometry(TILE_SIZE - 0.15, 0.08, TILE_SIZE - 0.1),
@@ -567,26 +706,44 @@ function createWall(type, r, c, owner) {
         .start();
 }
 
-// --- Shared Sphere ---
+// --- Shared Sphere (an armillary knowledge-orb — the ring pattern makes rolling visible) ---
 let sharedSphereMesh = null;
+const SPHERE_RADIUS = 0.55;
 
 function createSharedSphere() {
     if (sharedSphereMesh) scene.remove(sharedSphereMesh);
 
-    const mat = new THREE.MeshStandardMaterial({
+    const group = new THREE.Group();
+
+    const coreMat = new THREE.MeshStandardMaterial({
         color: 0x88ccff,
-        roughness: 0.1,
-        metalness: 0.4,
+        roughness: 0.15,
+        metalness: 0.2,
         emissive: 0x4488ff,
-        emissiveIntensity: 0.15,
+        emissiveIntensity: 0.2,
+        transparent: true,
+        opacity: 0.75,
     });
-    const geo = new THREE.SphereGeometry(0.55, 24, 24);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.castShadow = true;
+    const core = new THREE.Mesh(new THREE.SphereGeometry(SPHERE_RADIUS * 0.82, 20, 20), coreMat);
+    core.castShadow = true;
+    group.add(core);
+
+    // Three perpendicular brass meridian rings, like an astrolabe
+    const ringGeo = new THREE.TorusGeometry(SPHERE_RADIUS, 0.05, 8, 28);
+    const ringA = new THREE.Mesh(ringGeo, brassMat);
+    group.add(ringA);
+    const ringB = new THREE.Mesh(ringGeo, brassMat);
+    ringB.rotation.x = Math.PI / 2;
+    group.add(ringB);
+    const ringC = new THREE.Mesh(ringGeo, brassMat);
+    ringC.rotation.y = Math.PI / 2;
+    group.add(ringC);
+
+    group.castShadow = true;
     const { x, z } = getPos(CENTER, CENTER);
-    mesh.position.set(x, 0.55, z);
-    scene.add(mesh);
-    sharedSphereMesh = mesh;
+    group.position.set(x, SPHERE_RADIUS, z);
+    scene.add(group);
+    sharedSphereMesh = group;
 }
 
 function createEntranceMarkers() {
@@ -633,6 +790,7 @@ function startNewGame(pCount, btnElem) {
     Object.values(vWallMeshes).forEach(m => boardGroup.remove(m));
     Object.values(goalMarkers).forEach(m => boardGroup.remove(m));
     if (sharedSphereMesh) { scene.remove(sharedSphereMesh); sharedSphereMesh = null; }
+    fountainDroplets.length = 0;
 
     for (let key in plateMeshes) delete plateMeshes[key];
     for (let key in hWallMeshes) delete hWallMeshes[key];
@@ -696,10 +854,37 @@ game.on('onSphereDeselected', () => {
 });
 
 game.on('onSphereMoved', (data) => {
-    if (sharedSphereMesh) {
-        const { x, z } = getPos(data.r, data.c);
-        sharedSphereMesh.position.set(x, 0.55, z);
+    if (!sharedSphereMesh) return;
+    const start = sharedSphereMesh.position.clone();
+    const { x, z } = getPos(data.r, data.c);
+    const end = new THREE.Vector3(x, SPHERE_RADIUS, z);
+    const delta = new THREE.Vector3().subVectors(end, start);
+    const dist = delta.length();
+
+    if (dist < 0.001) {
+        sharedSphereMesh.position.copy(end);
+        return;
     }
+
+    const dir = delta.clone().normalize();
+    const rollAxis = new THREE.Vector3(-dir.z, 0, dir.x); // perpendicular to travel direction
+    const totalAngle = dist / SPHERE_RADIUS;
+    const baseQuat = sharedSphereMesh.quaternion.clone();
+    const duration = Math.min(1200, Math.max(280, dist * 220));
+
+    const o = { t: 0 };
+    new TWEEN.Tween(o)
+        .to({ t: 1 }, duration)
+        .easing(TWEEN.Easing.Quadratic.InOut)
+        .onUpdate(() => {
+            sharedSphereMesh.position.lerpVectors(start, end, o.t);
+            const rollQuat = new THREE.Quaternion().setFromAxisAngle(rollAxis, o.t * totalAngle);
+            sharedSphereMesh.quaternion.copy(rollQuat).multiply(baseQuat);
+        })
+        .onComplete(() => {
+            sharedSphereMesh.position.copy(end);
+        })
+        .start();
 });
 
 game.on('onControlSchemeChanged', (scheme) => {
@@ -796,10 +981,20 @@ game.on('onMessage', (msg) => {
 });
 
 // --- Render Loop ---
+const clock = new THREE.Clock();
 function animate() {
     requestAnimationFrame(animate);
     TWEEN.update();
     controls.update();
+
+    const t = clock.getElapsedTime();
+    fountainDroplets.forEach(d => {
+        const rise = (t * 1.4 + d.phase) % 1; // 0 = at spout, 1 = fallen back
+        const arc = Math.sin(rise * Math.PI);
+        d.mesh.position.set(Math.cos(d.angle) * 0.08 * rise, d.baseY + arc * 0.5, Math.sin(d.angle) * 0.08 * rise);
+        d.mesh.material.opacity = 0.85 * (1 - rise * 0.6);
+    });
+
     renderer.render(scene, camera);
 }
 

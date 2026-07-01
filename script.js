@@ -77,7 +77,7 @@ const games = {
     library: {
         name: 'Library',
         description: 'The Library of Alexandria',
-        status: 'playtest',
+        status: 'available',
         url: 'library.html'
     },
     cathedral: {
