@@ -121,8 +121,7 @@ function initializeUI() {
     });
 
     playerCountBtn.addEventListener('click', () => {
-        playerCount = playerCount % 4 + 1;
-        if (playerCount < 2) playerCount = 2;
+        playerCount = playerCount === 2 ? 4 : 2;
         playerCountBtn.textContent = `Players: ${playerCount}`;
         localStorage.setItem('pyramidPlayerCount', playerCount);
         location.reload();

@@ -213,6 +213,23 @@ body::before {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4), inset 0 0 10px rgba(0,0,0,0.5);
 }
 
+.piece.red {
+    background-color: var(--player2-color);
+    border: 2px solid rgba(107, 114, 128, 0.5);
+}
+
+.piece.blue {
+    background-color: #3b82f6;
+    border: 2px solid rgba(107, 114, 128, 0.5);
+}
+
+/* 4-player mode: 'black' is a true black (2-player mode shows it as red instead) */
+.board-container.four-player .piece.black {
+    background-color: #1a1a1a;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5), inset 0 0 8px rgba(255, 255, 255, 0.05);
+}
+
 /* Piece States */
 .selected-piece {
     transform: scale(1.15);
@@ -282,6 +299,17 @@ body::before {
 .beacon-lit-red {
     background-color: #FF4D4D;
     box-shadow: 0 0 15px #FF4D4D;
+}
+
+.beacon-lit-blue {
+    background-color: #3b82f6;
+    box-shadow: 0 0 15px #3b82f6;
+}
+
+/* 4-player mode: 'black' beacon glow is a true black (2-player mode maps it to red) */
+.board-container.four-player .beacon-lit-black {
+    background-color: #1a1a1a;
+    box-shadow: 0 0 15px #555555, 0 0 4px #ffffff;
 }
 
 /* Action Buttons */

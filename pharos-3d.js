@@ -24,15 +24,23 @@ const beaconMeshes = new Map(); // Key: "r,c", Value: { group, lamp, light }
 
 // Constants
 const TILE_SIZE = 25;
-const BOARD_SIZE_3D = 9;
-const BOARD_OFFSET = (BOARD_SIZE_3D - 1) * TILE_SIZE / 2;
+// BOARD_SIZE is the shared board dimension from pharos-game.js (9 for 2p, 11 for 4p).
+let BOARD_OFFSET = (BOARD_SIZE - 1) * TILE_SIZE / 2;
+
+function isCenterBeacon(r, c) {
+    const center = Math.floor(BOARD_SIZE / 2);
+    return r === center && c === center;
+}
 
 // Materials
 const matStone = new THREE.MeshStandardMaterial({ color: 0xd4cfc4, roughness: 0.8, metalness: 0.1 });
 const matWall = new THREE.MeshStandardMaterial({ color: 0xb4af94, roughness: 0.7, metalness: 0.2 });
 const matWater = new THREE.MeshStandardMaterial({ color: 0x1e90ff, roughness: 0.1, metalness: 0.5, transparent: true, opacity: 0.8 });
 const matWhiteStone = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1, metalness: 0.3 });
-const matBlackStone = new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.1, metalness: 0.3 }); // Red for Skyscraper theme
+const matBlackStone = new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.1, metalness: 0.3 }); // Red-as-black for the 2-player theme
+const matTrueBlackStone = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.1, metalness: 0.3 });
+const matRedStone = new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.1, metalness: 0.3 });
+const matBlueStone = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.1, metalness: 0.3 });
 const matGold = new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.1, metalness: 0.9, emissive: 0xffd700, emissiveIntensity: 0.2 });
 const matHighlight = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.5 }); // Target highlight
 const matSelection = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 }); // Selection highlight
@@ -261,18 +269,31 @@ function createBeaconTower(r, c, isCenter = false) {
     return { group, lamp, light, shell };
 }
 
+/**
+ * Rebuilds the 3D board from scratch (tiles, beacons, and stones) after BOARD_SIZE changes,
+ * e.g. when switching between 2-player (9x9) and 4-player (11x11) mode.
+ */
+function rebuild3DBoard() {
+    if (!scene) return;
+    BOARD_OFFSET = (BOARD_SIZE - 1) * TILE_SIZE / 2;
+    stoneMeshes.forEach(mesh => groupPieces.remove(mesh));
+    stoneMeshes.clear();
+    build3DBoard();
+    sync3D();
+}
+
 function build3DBoard() {
     fieldMeshes.clear();
     beaconMeshes.clear();
     while (groupTiles.children.length > 0) groupTiles.remove(groupTiles.children[0]);
     while (groupBeacons.children.length > 0) groupBeacons.remove(groupBeacons.children[0]);
 
-    for (let r = 0; r < BOARD_SIZE_3D; r++) {
-        for (let c = 0; c < BOARD_SIZE_3D; c++) {
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
             const x = (c * TILE_SIZE) - BOARD_OFFSET;
             const z = (r * TILE_SIZE) - BOARD_OFFSET;
 
-            const isWall = (r === 0 || r === BOARD_SIZE_3D - 1 || c === 0 || c === BOARD_SIZE_3D - 1);
+            const isWall = (r === 0 || r === BOARD_SIZE - 1 || c === 0 || c === BOARD_SIZE - 1);
             const isBeacon = isBeaconField(r, c);
 
             // Tile/Field
@@ -296,7 +317,7 @@ function build3DBoard() {
 
             // Beacon Tower
             if (isBeacon) {
-                const isCenter = (r === 4 && c === 4);
+                const isCenter = isCenterBeacon(r, c);
                 const beacon = createBeaconTower(r, c, isCenter);
                 const surfaceY = isWall ? 8 : 0;
                 beacon.group.position.y = surfaceY;
@@ -307,9 +328,47 @@ function build3DBoard() {
     }
 }
 
+function getStoneBaseHex(color) {
+    const isFour = typeof playerCount !== 'undefined' && playerCount === 4;
+    if (color === 'white') return 0xffffff;
+    if (color === 'red') return 0xcc2222;
+    if (color === 'blue') return 0x3b82f6;
+    if (color === 'black') return isFour ? 0x1a1a1a : 0x8b0000;
+    return 0xffffff;
+}
+
+function getStoneDarkenedHex(color) {
+    const isFour = typeof playerCount !== 'undefined' && playerCount === 4;
+    if (color === 'white') return 0x888888;
+    if (color === 'red') return 0x551111;
+    if (color === 'blue') return 0x1e3a5f;
+    if (color === 'black') return isFour ? 0x333333 : 0x440000;
+    return 0x888888;
+}
+
+// Achromatic (colorless) players get a pale light; colored players get their own hue.
+function getLightColorHex(color) {
+    if (color === 'white') return 0xffffff;
+    if (color === 'black') return 0xcccccc;
+    if (color === 'red') return 0xff3333;
+    if (color === 'blue') return 0x3b82f6;
+    return 0xffffff;
+}
+
+function getStoneMaterial(color) {
+    if (color === 'white') return matWhiteStone;
+    if (color === 'red') return matRedStone;
+    if (color === 'blue') return matBlueStone;
+    if (color === 'black') {
+        // 2-player theme shows 'black' as red; 4-player mode uses a true black.
+        return (typeof playerCount !== 'undefined' && playerCount === 4) ? matTrueBlackStone : matBlackStone;
+    }
+    return matWhiteStone;
+}
+
 function createStoneMesh(color) {
     const group = new THREE.Group();
-    const material = (color === 'white' ? matWhiteStone : matBlackStone).clone();
+    const material = getStoneMaterial(color).clone();
     
     // Body (Temple Style)
     const bodyGeo = new THREE.CylinderGeometry(8, 9, 11, 24);
@@ -341,8 +400,8 @@ function sync3D() {
     if (typeof board === 'undefined') return;
 
     const currentKeys = new Set();
-    for (let r = 0; r < BOARD_SIZE_3D; r++) {
-        for (let c = 0; c < BOARD_SIZE_3D; c++) {
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
             if (board[r][c].piece) {
                 const key = `${r},${c}`;
                 currentKeys.add(key);
@@ -353,7 +412,7 @@ function sync3D() {
                     const x = (c * TILE_SIZE) - BOARD_OFFSET;
                     const z = (r * TILE_SIZE) - BOARD_OFFSET;
                     
-                    const isWall = (r === 0 || r === BOARD_SIZE_3D - 1 || c === 0 || c === BOARD_SIZE_3D - 1);
+                    const isWall = (r === 0 || r === BOARD_SIZE - 1 || c === 0 || c === BOARD_SIZE - 1);
                     stone.position.set(x, (isWall ? 8 : 0) + 0.1, z);
                     
                     stone.userData = { r, c, color };
@@ -370,9 +429,9 @@ function sync3D() {
                 // Fully darkened check (cannot move/be selected)
                 const isFullyDarkened = !hasAvailableLight(r, c, currentPlayer);
                 
-                const origColorHex = mesh.userData.color === 'white' ? 0xffffff : 0x8b0000;
-                const greyColorHex = mesh.userData.color === 'white' ? 0x888888 : 0x440000;
-                
+                const origColorHex = getStoneBaseHex(mesh.userData.color);
+                const greyColorHex = getStoneDarkenedHex(mesh.userData.color);
+
                 // Apply visual states to the body and top
                 [mesh.children[0], mesh.children[1]].forEach(part => {
                     if (hasGivenLight) {
@@ -380,9 +439,9 @@ function sync3D() {
                     } else {
                         part.material.color.setHex(origColorHex);
                     }
-                    
+
                     // Opacity for fully darkened
-                    part.material.opacity = isFullyDarkened && board[r][c].piece === currentPlayer ? 0.4 : 1.0;
+                    part.material.opacity = isFullyDarkened && isAlly(board[r][c].piece, currentPlayer) ? 0.4 : 1.0;
                     part.material.transparent = isFullyDarkened;
                 });
             }
@@ -401,11 +460,13 @@ function sync3D() {
     beaconMeshes.forEach((beacon, key) => {
         const [r, c] = key.split(',').map(Number);
         const owner = litBeacons[key];
-        const isCenter = (r === 4 && c === 4);
+        const isCenter = isCenterBeacon(r, c);
         const brightnessFactor = isCenter ? 0.8 : 1.0;
 
         if (owner) {
-            const lightColor = owner === 'white' ? 0xffffff : 0xff0000; // Red light
+            const lightColor = (typeof playerCount !== 'undefined' && playerCount === 4)
+                ? getLightColorHex(owner)
+                : (owner === 'white' ? 0xffffff : 0xff0000); // 2p theme: Red light
             beacon.light.color.set(lightColor);
             beacon.light.intensity = 3.5 * brightnessFactor;
             beacon.lamp.material.emissive.set(lightColor);
@@ -445,7 +506,7 @@ async function animate3DMove(fromR, fromC, toR, toC) {
     const tx = (toC * TILE_SIZE) - BOARD_OFFSET;
     const tz = (toR * TILE_SIZE) - BOARD_OFFSET;
 
-    const isToWall = (toR === 0 || toR === BOARD_SIZE_3D - 1 || toC === 0 || toC === BOARD_SIZE_3D - 1);
+    const isToWall = (toR === 0 || toR === BOARD_SIZE - 1 || toC === 0 || toC === BOARD_SIZE - 1);
     const ty = (isToWall ? 8 : 0) + 0.1;
 
     return new Promise(resolve => {
@@ -532,7 +593,7 @@ function update3DViews() {
     if (moveSource) {
         const x = (moveSource.c * TILE_SIZE) - BOARD_OFFSET;
         const z = (moveSource.r * TILE_SIZE) - BOARD_OFFSET;
-        const isWall = (moveSource.r === 0 || moveSource.r === BOARD_SIZE_3D - 1 || moveSource.c === 0 || moveSource.c === BOARD_SIZE_3D - 1);
+        const isWall = (moveSource.r === 0 || moveSource.r === BOARD_SIZE - 1 || moveSource.c === 0 || moveSource.c === BOARD_SIZE - 1);
         const tileScale = isWall ? 1.1 : 1.0;
         const elevation = isWall ? 8.2 : 0.2; // Adjusted for groupBoard.y = 10, relative to parent
         
@@ -556,7 +617,7 @@ function update3DViews() {
         potentialLightSources.forEach(s => {
             const x = (s.c * TILE_SIZE) - BOARD_OFFSET;
             const z = (s.r * TILE_SIZE) - BOARD_OFFSET;
-            const isWall = (s.r === 0 || s.r === BOARD_SIZE_3D - 1 || s.c === 0 || s.c === BOARD_SIZE_3D - 1);
+            const isWall = (s.r === 0 || s.r === BOARD_SIZE - 1 || s.c === 0 || s.c === BOARD_SIZE - 1);
             const tileScale = isWall ? 1.1 : 1.0;
             const elevation = isWall ? 8.3 : 0.3;
             
@@ -572,7 +633,7 @@ function update3DViews() {
             const isBeaconAtSource = isBeaconField(s.r, s.c);
             let ringHeight = elevation + 12.5;
             if (isBeaconAtSource) {
-                const towerHeight = (s.r === 4 && s.c === 4 ? 120 : 60);
+                const towerHeight = (isCenterBeacon(s.r, s.c) ? 120 : 60);
                 ringHeight = towerHeight * 0.8;
             }
 
@@ -588,7 +649,7 @@ function update3DViews() {
         potentialMoveTargets.forEach(t => {
             const x = (t.c * TILE_SIZE) - BOARD_OFFSET;
             const z = (t.r * TILE_SIZE) - BOARD_OFFSET;
-            const isWall = (t.r === 0 || t.r === BOARD_SIZE_3D - 1 || t.c === 0 || t.c === BOARD_SIZE_3D - 1);
+            const isWall = (t.r === 0 || t.r === BOARD_SIZE - 1 || t.c === 0 || t.c === BOARD_SIZE - 1);
             const tileScale = isWall ? 1.1 : 1.0;
             const elevation = isWall ? 8.1 : 0.1;
             
@@ -606,16 +667,16 @@ function update3DViews() {
 function drawConnectionBeam(source, target, player) {
     const x1 = (source.c * TILE_SIZE) - BOARD_OFFSET;
     const z1 = (source.r * TILE_SIZE) - BOARD_OFFSET;
-    const isWall1 = (source.r === 0 || source.r === BOARD_SIZE_3D - 1 || source.c === 0 || source.c === BOARD_SIZE_3D - 1);
+    const isWall1 = (source.r === 0 || source.r === BOARD_SIZE - 1 || source.c === 0 || source.c === BOARD_SIZE - 1);
     
     // Check if source is a beacon tower for height adjustment
     const isBeaconAtSource = isBeaconField(source.r, source.c);
     const surfaceY1 = isWall1 ? 8 : 0;
-    const height1 = isBeaconAtSource ? surfaceY1 + (source.r === 4 && source.c === 4 ? 120 : 60) * 0.78 : (isWall1 ? 19 : 11);
+    const height1 = isBeaconAtSource ? surfaceY1 + (isCenterBeacon(source.r, source.c) ? 120 : 60) * 0.78 : (isWall1 ? 19 : 11);
 
     const x2 = (target.c * TILE_SIZE) - BOARD_OFFSET;
     const z2 = (target.r * TILE_SIZE) - BOARD_OFFSET;
-    const isWall2 = (target.r === 0 || target.r === BOARD_SIZE_3D - 1 || target.c === 0 || target.c === BOARD_SIZE_3D - 1);
+    const isWall2 = (target.r === 0 || target.r === BOARD_SIZE - 1 || target.c === 0 || target.c === BOARD_SIZE - 1);
     const height2 = isWall2 ? 19 : 11;
 
     const v1 = new THREE.Vector3(x1, height1, z1);
@@ -623,7 +684,9 @@ function drawConnectionBeam(source, target, player) {
     
     const distance = v1.distanceTo(v2);
     const geometry = new THREE.CylinderGeometry(2, 2, distance, 8);
-    const lightColor = player === 'white' ? 0xffffff : 0xff0000;
+    const lightColor = (typeof playerCount !== 'undefined' && playerCount === 4)
+        ? getLightColorHex(player)
+        : (player === 'white' ? 0xffffff : 0xff0000); // 2p theme: Red beam
     
     const material = new THREE.MeshBasicMaterial({
         color: lightColor,
@@ -651,3 +714,4 @@ window.init3D = init3D;
 window.sync3D = sync3D;
 window.animate3DMove = animate3DMove;
 window.update3DViews = update3DViews;
+window.rebuild3DBoard = rebuild3DBoard;
