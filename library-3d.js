@@ -307,20 +307,76 @@ function createDirectionArrow() {
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
+// --- Sphere move targets (lit destination tiles instead of direction arrows) ---
+const sphereMoveMat = new THREE.MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
+const sphereMoveMarkers = [];
+function createSphereMoveMarker() {
+    const group = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.RingGeometry(TILE_SIZE * 0.3, TILE_SIZE * 0.44, 28), sphereMoveMat.clone());
+    ring.rotation.x = -Math.PI / 2;
+    group.add(ring);
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(TILE_SIZE * 0.14, 20), sphereMoveMat.clone());
+    dot.rotation.x = -Math.PI / 2;
+    group.add(dot);
+    group.visible = false;
+    boardGroup.add(group);
+    return group;
+}
+for (let i = 0; i < 4; i++) sphereMoveMarkers.push(createSphereMoveMarker());
+
+// Read-only replay of doPushSphere's slide rules — used to find where the sphere would land.
+function simulateSpherePush(dirR, dirC) {
+    let r = game.sharedSphere.r;
+    let c = game.sharedSphere.c;
+    while (true) {
+        const nr = r + dirR, nc = c + dirC;
+        if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) break;
+        if (dirR !== 0) {
+            if (game.hWalls[Math.min(r, nr)][c] !== null) break;
+        } else {
+            if (game.vWalls[r][Math.min(c, nc)] !== null) break;
+        }
+        if (game.fields[nr][nc] === null) break;
+        r = nr; c = nc;
+    }
+    if (r === game.sharedSphere.r && c === game.sharedSphere.c) return null;
+    if (game._lastPushTurn >= 0) {
+        const nextPlayer = (game._lastPushTurn + 1) % game.numPlayers;
+        if (game.currentPlayer === nextPlayer && r === game._prevSpherePos.r && c === game._prevSpherePos.c) return null;
+    }
+    return { r, c };
+}
+
+let sphereMoveOptions = [];
+function getSphereMoveOptions() {
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const options = [];
+    dirs.forEach(([dirR, dirC]) => {
+        const landing = simulateSpherePush(dirR, dirC);
+        if (landing) options.push({ dirR, dirC, r: landing.r, c: landing.c });
+    });
+    return options;
+}
+
 function updateVisuals() {
     cellMeshes.forEach(m => { m.userData.highlight.visible = false; });
     hWallTriggers.forEach(m => m.userData.highlight.visible = false);
     vWallTriggers.forEach(m => m.userData.highlight.visible = false);
     directionArrows.forEach(a => a.visible = false);
+    sphereMoveMarkers.forEach(m => m.visible = false);
+    sphereMoveOptions = [];
 
     if (game.winner) return;
 
     if (game.interactionState === 'SPHERE_SELECTED') {
-        const { x, z } = getPos(game.sharedSphere.r, game.sharedSphere.c);
-        showArrow(x - TILE_SIZE/2 - GAP_SIZE/2, 0.3, z, 0, Math.PI, 0);
-        showArrow(x + TILE_SIZE/2 + GAP_SIZE/2, 0.3, z, 0, 0, 0);
-        showArrow(x, 0.3, z - TILE_SIZE/2 - GAP_SIZE/2, Math.PI/2, 0, 0);
-        showArrow(x, 0.3, z + TILE_SIZE/2 + GAP_SIZE/2, -Math.PI/2, 0, 0);
+        sphereMoveOptions = getSphereMoveOptions();
+        sphereMoveOptions.forEach((opt, i) => {
+            const marker = sphereMoveMarkers[i];
+            if (!marker) return;
+            const { x, z } = getPos(opt.r, opt.c);
+            marker.position.set(x, 0.4, z);
+            marker.visible = true;
+        });
         return;
     }
 
@@ -391,9 +447,7 @@ function onPointerMove(event) {
         if (u.type === 'cell' || u.type === 'hWall' || u.type === 'vWall') isValid = true;
     } else if (game.interactionState === 'SPHERE_SELECTED') {
         if (u.type === 'cell') {
-            const dr = u.r - game.sharedSphere.r;
-            const dc = u.c - game.sharedSphere.c;
-            if ((dr === 0 && Math.abs(dc) === 1) || (dc === 0 && Math.abs(dr) === 1)) isValid = true;
+            isValid = sphereMoveOptions.some(opt => opt.r === u.r && opt.c === u.c);
         }
     }
 
@@ -523,18 +577,22 @@ function onPointerClick(event) {
         return;
     }
 
-    // SPHERE_SELECTED state: click adjacent cell to push
+    // SPHERE_SELECTED state: click a lit destination tile to push the sphere there
     if (game.interactionState === 'SPHERE_SELECTED') {
         const sphere = game.sharedSphere;
         if (u.type === 'cell') {
-            const dr = u.r - sphere.r;
-            const dc = u.c - sphere.c;
-            if ((dr === 0 && Math.abs(dc) === 1) || (dc === 0 && Math.abs(dr) === 1)) {
-                game.doPushSphere(Math.sign(dr), Math.sign(dc));
-            } else {
+            if (u.r === sphere.r && u.c === sphere.c) {
                 game.interactionState = 'IDLE';
                 game.trigger('onSphereDeselected', {});
-                game.log('Click a cell adjacent to the sphere to push it.');
+            } else {
+                const opt = sphereMoveOptions.find(o => o.r === u.r && o.c === u.c);
+                if (opt) {
+                    game.doPushSphere(opt.dirR, opt.dirC);
+                } else {
+                    game.interactionState = 'IDLE';
+                    game.trigger('onSphereDeselected', {});
+                    game.log('Click a lit tile to move the sphere there.');
+                }
             }
         } else {
             game.interactionState = 'IDLE';
@@ -995,6 +1053,11 @@ function animate() {
         d.mesh.material.opacity = 0.85 * (1 - rise * 0.6);
     });
 
+    if (game.interactionState === 'SPHERE_SELECTED') {
+        const pulse = 1 + Math.sin(t * 4) * 0.12;
+        sphereMoveMarkers.forEach(m => { if (m.visible) m.scale.set(pulse, 1, pulse); });
+    }
+
     renderer.render(scene, camera);
 }
 
@@ -1021,7 +1084,7 @@ function classicHandleClick(u) {
             if (u.r === game.sharedSphere.r && u.c === game.sharedSphere.c) {
                 game.interactionState = 'SPHERE_SELECTED';
                 game.trigger('onSphereSelected', {});
-                game.log('Sphere selected. Click a direction to push it.');
+                game.log('Sphere selected. Click a lit tile to roll it there.');
             } else {
                 game.log("That's not the sphere.");
             }

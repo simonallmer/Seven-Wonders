@@ -170,7 +170,7 @@ class LibraryGame {
             if (r === this.sharedSphere.r && c === this.sharedSphere.c) {
                 this.interactionState = 'SPHERE_SELECTED';
                 this.trigger('onSphereSelected', {});
-                this.log('Sphere selected. Click a direction to push it.');
+                this.log('Sphere selected. Click a lit tile to roll it there.');
                 return;
             }
 
