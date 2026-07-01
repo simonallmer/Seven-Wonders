@@ -8,6 +8,7 @@ let needsRender = true;
 
 // Groups
 const groupMausoleum = new THREE.Group();
+const groupArchitecture = new THREE.Group(); // podium + colonnade + roof (rebuilt per player count)
 const groupBoard = new THREE.Group();
 const groupPieces = new THREE.Group();
 const groupConnectors = new THREE.Group();
@@ -28,6 +29,15 @@ const matPillar = new THREE.MeshStandardMaterial({ color: 0xf5f1e8, roughness: 0
 const matField = new THREE.MeshStandardMaterial({ color: 0xd4cfc4, roughness: 0.6, metalness: 0.2 });
 const matWhitePiece = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 });
 const matBlackPiece = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3, metalness: 0.3 });
+const matRedPiece = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.3, metalness: 0.2 });
+const matBluePiece = new THREE.MeshStandardMaterial({ color: 0x2e6fb0, roughness: 0.3, metalness: 0.2 });
+// Player value (1/2/4/5) -> piece material.
+function pieceMaterialFor(val) {
+    if (val === 2) return matBlackPiece;
+    if (val === 4) return matRedPiece;
+    if (val === 5) return matBluePiece;
+    return matWhitePiece;
+}
 const matHighlight = new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.5, depthTest: false });
 const matSelection = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.6, depthTest: false });
 const matPushRing = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.8, depthTest: false }); // reposition push (blue)
@@ -78,11 +88,9 @@ function init3D() {
     
     // CENTER CAMERA ON BOARD
     buildMausoleumEnvironment();
-    
+
     if (window.boardPlatformY) {
-        controls.target.set(0, window.boardPlatformY, 0);
-        camera.position.set(0, 300, -450); 
-        controls.update();
+        setupCamera();
     }
     
     controls.addEventListener('change', () => { needsRender = true; });
@@ -195,6 +203,7 @@ function createSailboat() {
 function buildMausoleumEnvironment() {
     scene.add(groupEnvironment);
     groupEnvironment.add(groupMausoleum);
+    groupMausoleum.add(groupArchitecture);
     groupMausoleum.add(groupBoard);
     scene.add(groupPieces);
     scene.add(groupConnectors);
@@ -217,88 +226,9 @@ function buildMausoleumEnvironment() {
     sea.position.set(500, -5, 0); // Bring sea closer into view
     groupEnvironment.add(sea);
 
-    // 2. Massive Podium (Base of Mausoleum)
-    const podiumSize = 280;
-    const podiumHeight = 100;
-    const geomPodium = new THREE.BoxGeometry(podiumSize, podiumHeight, podiumSize);
-    const meshPodium = new THREE.Mesh(geomPodium, matMarbleBase);
-    meshPodium.position.y = podiumHeight / 2; 
-    meshPodium.receiveShadow = true;
-    meshPodium.castShadow = true;
-    groupMausoleum.add(meshPodium);
-
-    const friezeHeight = 8;
-    const geomFrieze = new THREE.BoxGeometry(podiumSize + 2, friezeHeight, podiumSize + 2);
-    const meshFriezeTop = new THREE.Mesh(geomFrieze, matMarbleBase);
-    meshFriezeTop.position.y = podiumHeight + friezeHeight / 2;
-    groupMausoleum.add(meshFriezeTop);
-
-    // 3. Colonnade SYMMETRICAL REBUILD
-    const pillarRadius = 4.5;
-    const pillarHeight = 70;
-    const cellaSize = 180;
-    const colBaseY = podiumHeight + friezeHeight;
-    const colOffset = 120;
-    const numPillarsPerSide = 9; // Guaranteed corner and even spacing
-    const spacing = (colOffset * 2) / (numPillarsPerSide - 1);
-    
-    const geomCella = new THREE.BoxGeometry(cellaSize, pillarHeight, cellaSize);
-    const meshCella = new THREE.Mesh(geomCella, matMarbleBase);
-    meshCella.position.y = colBaseY + pillarHeight / 2;
-    meshCella.receiveShadow = true;
-    groupMausoleum.add(meshCella);
-
-    function createColumn(x, z) {
-        const group = new THREE.Group();
-        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(pillarRadius * 0.9, pillarRadius, pillarHeight, 16), matPillar);
-        shaft.position.y = pillarHeight / 2;
-        shaft.castShadow = true;
-        shaft.receiveShadow = true;
-        group.add(shaft);
-
-        const base = new THREE.Mesh(new THREE.CylinderGeometry(pillarRadius * 1.4, pillarRadius * 1.4, 4, 16), matPillar);
-        base.position.y = 2; 
-        group.add(base);
-
-        const capital = new THREE.Mesh(new THREE.BoxGeometry(pillarRadius * 3.5, 4, pillarRadius * 3.5), matPillar);
-        capital.position.y = pillarHeight;
-        group.add(capital);
-
-        group.position.set(x, colBaseY, z);
-        groupMausoleum.add(group);
-    }
-
-    for (let i = 0; i < numPillarsPerSide; i++) {
-        const offset = -colOffset + i * spacing;
-        createColumn(offset, colOffset);      // Front
-        createColumn(offset, -colOffset);     // Back
-        if (i > 0 && i < numPillarsPerSide - 1) {
-            createColumn(colOffset, offset);  // Right
-            createColumn(-colOffset, offset); // Left
-        }
-    }
-
-    // 4. LOW STEPPED ROOF (4 Steps)
-    const roofBaseY = colBaseY + pillarHeight;
-    const roofStepHeight = 5;
-    const roofStepCount = 4; 
-    const roofStartSize = 250;
-    const roofReduction = 14; 
-
-    for (let i = 0; i < roofStepCount; i++) {
-        const s = roofStartSize - (i * roofReduction * 2);
-        const geomStep = new THREE.BoxGeometry(s, roofStepHeight, s);
-        const meshStep = new THREE.Mesh(geomStep, matRoof);
-        meshStep.position.y = roofBaseY + (i * roofStepHeight) + roofStepHeight / 2;
-        meshStep.receiveShadow = true;
-        meshStep.castShadow = true;
-        groupMausoleum.add(meshStep);
-        
-        if (i === roofStepCount - 1) {
-            window.boardPlatformY = meshStep.position.y + roofStepHeight / 2;
-            window.boardPlatformSize = { w: s - 10, l: s - 10 };
-        }
-    }
+    // 2-4. The tomb itself (podium + colonnade + stepped roof) — dimension-driven so it
+    // stretches into a long barrow for the 4-player board.
+    buildArchitecture();
 
     // 5. GREEK TOWN (Halicarnassus)
     for (let i = 0; i < 100; i++) {
@@ -316,7 +246,7 @@ function buildMausoleumEnvironment() {
 
     // 7. Distant Mountains
     for (let i = 0; i < 15; i++) {
-        const angle = Math.PI * 0.6 + (i / 15) * Math.PI * 0.8; 
+        const angle = Math.PI * 0.6 + (i / 15) * Math.PI * 0.8;
         const dist = 3500 + Math.random() * 1500;
         const h = 600 + Math.random() * 1000;
         const mountain = new THREE.Mesh(new THREE.ConeGeometry(800, h, 8), new THREE.MeshStandardMaterial({color: 0x5a626e}));
@@ -324,6 +254,121 @@ function buildMausoleumEnvironment() {
         scene.add(mountain);
     }
 }
+
+// Builds the podium, colonnade and stepped roof, sized to the current board. For 4 players the
+// whole tomb stretches along X into a "long barrow" matching the wide board; 2 players keep the
+// classic square footprint. Sets window.boardPlatformY / boardPlatformSize (the board sits on the
+// top roof step). Idempotent — clears and rebuilds groupArchitecture.
+function buildArchitecture() {
+    while (groupArchitecture.children.length > 0) groupArchitecture.remove(groupArchitecture.children[0]);
+
+    const fourP = (window.playerCount === 4);
+    const lens = (typeof ROW_LENGTHS !== 'undefined') ? ROW_LENGTHS : [4,5,6,7,8,7,6,5,4];
+    const rows = lens.length;
+    const maxLen = Math.max.apply(null, lens);
+    const ar = fourP ? (maxLen - 1) / (rows - 1) : 1; // long:short cell ratio
+
+    // Platform (the board's footprint on the top step)
+    const platShort = fourP ? 150 : 156;
+    const platLong = Math.round(platShort * ar);
+
+    // Stepped roof (top step ~= platform + margin)
+    const roofStepCount = 4, roofStepHeight = 5, roofReduction = 14;
+    const roofTopW = platLong + 10, roofTopD = platShort + 10;
+    const roofStartW = roofTopW + (roofStepCount - 1) * roofReduction * 2;
+    const roofStartD = roofTopD + (roofStepCount - 1) * roofReduction * 2;
+
+    const podiumW = roofStartW + 30, podiumD = roofStartD + 30;
+    const podiumHeight = 100, friezeHeight = 8;
+
+    // Podium + frieze
+    const meshPodium = new THREE.Mesh(new THREE.BoxGeometry(podiumW, podiumHeight, podiumD), matMarbleBase);
+    meshPodium.position.y = podiumHeight / 2;
+    meshPodium.receiveShadow = true; meshPodium.castShadow = true;
+    groupArchitecture.add(meshPodium);
+
+    const meshFrieze = new THREE.Mesh(new THREE.BoxGeometry(podiumW + 2, friezeHeight, podiumD + 2), matMarbleBase);
+    meshFrieze.position.y = podiumHeight + friezeHeight / 2;
+    groupArchitecture.add(meshFrieze);
+
+    // Colonnade
+    const pillarRadius = 4.5, pillarHeight = 70;
+    const colBaseY = podiumHeight + friezeHeight;
+    const colOffsetX = roofStartW / 2 - 5, colOffsetZ = roofStartD / 2 - 5;
+
+    const meshCella = new THREE.Mesh(new THREE.BoxGeometry(colOffsetX * 1.5, pillarHeight, colOffsetZ * 1.5), matMarbleBase);
+    meshCella.position.y = colBaseY + pillarHeight / 2;
+    meshCella.receiveShadow = true;
+    groupArchitecture.add(meshCella);
+
+    function createColumn(x, z) {
+        const group = new THREE.Group();
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(pillarRadius * 0.9, pillarRadius, pillarHeight, 16), matPillar);
+        shaft.position.y = pillarHeight / 2; shaft.castShadow = true; shaft.receiveShadow = true; group.add(shaft);
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(pillarRadius * 1.4, pillarRadius * 1.4, 4, 16), matPillar);
+        base.position.y = 2; group.add(base);
+        const capital = new THREE.Mesh(new THREE.BoxGeometry(pillarRadius * 3.5, 4, pillarRadius * 3.5), matPillar);
+        capital.position.y = pillarHeight; group.add(capital);
+        group.position.set(x, colBaseY, z);
+        groupArchitecture.add(group);
+    }
+
+    const pillarSpacing = 30;
+    const numX = Math.max(2, Math.round((colOffsetX * 2) / pillarSpacing) + 1);
+    const numZ = Math.max(2, Math.round((colOffsetZ * 2) / pillarSpacing) + 1);
+    for (let i = 0; i < numX; i++) {
+        const x = -colOffsetX + i * (colOffsetX * 2) / (numX - 1);
+        createColumn(x, colOffsetZ);   // front
+        createColumn(x, -colOffsetZ);  // back
+    }
+    for (let j = 1; j < numZ - 1; j++) {
+        const z = -colOffsetZ + j * (colOffsetZ * 2) / (numZ - 1);
+        createColumn(colOffsetX, z);   // right
+        createColumn(-colOffsetX, z);  // left
+    }
+
+    // Stepped roof
+    const roofBaseY = colBaseY + pillarHeight;
+    for (let i = 0; i < roofStepCount; i++) {
+        const w = roofStartW - i * roofReduction * 2;
+        const d = roofStartD - i * roofReduction * 2;
+        const meshStep = new THREE.Mesh(new THREE.BoxGeometry(w, roofStepHeight, d), matRoof);
+        meshStep.position.y = roofBaseY + i * roofStepHeight + roofStepHeight / 2;
+        meshStep.receiveShadow = true; meshStep.castShadow = true;
+        groupArchitecture.add(meshStep);
+        if (i === roofStepCount - 1) {
+            window.boardPlatformY = meshStep.position.y + roofStepHeight / 2;
+            window.boardPlatformSize = { w: w - 10, l: d - 10 };
+        }
+    }
+}
+
+// Frame the board; pull back/up for the wider 4-player barrow.
+function setupCamera() {
+    if (!camera || !controls) return;
+    const y = window.boardPlatformY || 200;
+    controls.target.set(0, y, 0);
+    if (window.playerCount === 4) {
+        camera.position.set(0, 380, -600);
+    } else {
+        camera.position.set(0, 300, -450);
+    }
+    controls.update();
+    needsRender = true;
+}
+
+// Rebuild architecture + board + camera after a player-count change. Clears all stones first
+// so none persist with a stale colour at a reused cell.
+function rebuild3DScene() {
+    if (!scene) return;
+    while (groupPieces.children.length > 0) groupPieces.remove(groupPieces.children[0]);
+    stoneMeshes.clear();
+    buildArchitecture();
+    build3DBoard();
+    setupCamera();
+    needsRender = true;
+}
+window.rebuild3DScene = rebuild3DScene;
 
 // Map logic
 function get3DCoord(r, c) {
@@ -384,10 +429,14 @@ function build3DBoard() {
 function sync3DPieces(animate = false) {
     if (typeof board === 'undefined' || !board.length) return;
 
+    const isStone = (typeof window.isPlayerVal === 'function')
+        ? window.isPlayerVal
+        : (v) => (v === PLAYER_1 || v === PLAYER_2 || v === 4 || v === 5);
+
     const currentKeys = new Set();
     board.forEach((row, r) => {
         row.forEach((val, c) => {
-            if (val === PLAYER_1 || val === PLAYER_2) currentKeys.add(`${r},${c}`);
+            if (isStone(val)) currentKeys.add(`${r},${c}`);
         });
     });
 
@@ -403,13 +452,13 @@ function sync3DPieces(animate = false) {
     for (let r = 0; r < TOTAL_ROWS; r++) {
         for (let c = 0; c < ROW_LENGTHS[r]; c++) {
             const val = board[r][c];
-            if (val !== PLAYER_1 && val !== PLAYER_2) continue; // skip EMPTY and HOLE
+            if (!isStone(val)) continue; // skip EMPTY and HOLE
             const key = `${r},${c}`;
             const { x, z, y } = get3DCoord(r, c);
 
             if (!stoneMeshes.has(key)) {
-                const stone = createStoneMesh(val === PLAYER_1 ? 'white' : 'black');
-                stone.position.set(x, y + 1.5, z); 
+                const stone = createStoneMesh(val);
+                stone.position.set(x, y + 1.5, z);
                 stone.userData = { r, c, key, color: val };
                 groupPieces.add(stone);
                 stoneMeshes.set(key, stone);
@@ -419,7 +468,15 @@ function sync3DPieces(animate = false) {
                     new TWEEN.Tween(stone.scale).to({x:1,y:1,z:1}, 400).easing(TWEEN.Easing.Elastic.Out).start();
                 }
             } else {
-                const stone = stoneMeshes.get(key);
+                let stone = stoneMeshes.get(key);
+                // If the colour at this cell changed, rebuild the mesh (e.g. after a board reset).
+                if (stone.userData.color !== val) {
+                    groupPieces.remove(stone);
+                    stone = createStoneMesh(val);
+                    stone.userData = { r, c, key, color: val };
+                    groupPieces.add(stone);
+                    stoneMeshes.set(key, stone);
+                }
                 if (!stone.userData.animatingRemoval) {
                     stone.position.set(x, y + 1.5, z);
                 }
@@ -429,9 +486,12 @@ function sync3DPieces(animate = false) {
     needsRender = true;
 }
 
-function createStoneMesh(color) {
+function createStoneMesh(val) {
     const group = new THREE.Group();
-    const material = color === 'white' ? matWhitePiece : matBlackPiece;
+    // Accepts a player value (1/2/4/5); legacy 'white'/'black' strings still map correctly.
+    const material = (val === 'white') ? matWhitePiece
+        : (val === 'black') ? matBlackPiece
+        : pieceMaterialFor(val);
     
     const body = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 5, 6, 24), material);
     body.position.y = 3;
@@ -687,6 +747,8 @@ function createPit(r, c) {
 
 function onPointerDown(event) {
     if (!window.is3DView || gameOver) return;
+    // When the computer is on, the human only ever controls white — ignore clicks on AI turns.
+    if (window.isAITurn && window.isAITurn()) return;
     const rect = renderer.domElement.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;

@@ -237,9 +237,9 @@ function playerLevels(color) {
 function canPlaceOn(color, L) {
     if (L === 0) return true;
     var levels = playerLevels(color);
-    if (levels.indexOf(L) !== -1) return true;
-    if (L > 0 && levels.indexOf(L - 1) !== -1) return true;
-    return false;
+    // Must have presence on the level BELOW to place here
+    // (Current presence on L itself is not enough — you climb from below)
+    return levels.indexOf(L - 1) !== -1;
 }
 function placeableSlots(color) {
     var out = [];
@@ -250,7 +250,13 @@ function placeableSlots(color) {
     return out;
 }
 function canMoveTo(from, to) {
-    if (to.slot === from.slot && to.level < from.level) return true;
+    if (to.slot === from.slot && to.level < from.level) {
+        // Gravity fall: all intermediate cells must be empty
+        for (var l = from.level - 1; l > to.level; l--) {
+            if (tileAt(l, to.slot)) return false;
+        }
+        return true; // destination may be empty or enemy (gravity attack handled by caller)
+    }
     return isAdjacent(from, to);
 }
 
@@ -286,7 +292,7 @@ function onSlotTap(l, s) {
     if (mode === 'place') {
         if (t) { showMessage('That slot is taken.'); return; }
         if (pool[turn] <= 0) { showMessage('Your pool is empty.'); return; }
-        if (!canPlaceOn(turn, l)) { showMessage('Must place on level 0 or a level you have presence on.'); return; }
+        if (!canPlaceOn(turn, l)) { showMessage('Must place on level 0, or on a level directly above your presence.'); return; }
         doPlace(l, s);
         return;
     }
@@ -296,7 +302,27 @@ function onSlotTap(l, s) {
             // tapping an enemy chain = attack
             var tgt = attackTargets.find(function (g) { return g.tiles.some(function (p) { return p.level === l && p.slot === s; }); });
             if (tgt) { doAttack(tgt); return; }
-            // empty adjacent = move (or gravity fall down the column)
+            // Gravity fall/jump (same column, going down) — can land on empty or enemy
+            if (s === selected.slot && l < selected.level) {
+                if (canMoveTo(selected, { level: l, slot: s })) {
+                    if (t) {
+                        if (t.owner !== turn) {
+                            doGravityAttack(selected, { level: l, slot: s });
+                            return;
+                        } else {
+                            showMessage('Cannot fall onto your own tile.');
+                            return;
+                        }
+                    }
+                    // Empty destination — normal gravity move
+                    doMove(selected, { level: l, slot: s }, false);
+                    return;
+                } else {
+                    showMessage('Path is blocked by another tile.');
+                    return;
+                }
+            }
+            // empty adjacent = move
             if (!t && canMoveTo(selected, { level: l, slot: s })) { doMove(selected, { level: l, slot: s }, false); return; }
             // another of your tiles = re-aim
             if (t && t.owner === turn) { selectMover(l, s); return; }
@@ -382,6 +408,30 @@ function doAttack(tgt) {
     };
     if (window.towerAnimAttack) window.towerAnimAttack(selected, captured, done); else done();
 }
+function doGravityAttack(from, to) {
+    var attacker = board[from.level][from.slot];
+    var defender = board[to.level][to.slot];
+    if (!attacker || !defender) { showMessage('Invalid attack.'); return; }
+    var atkNum = attacker.num;
+    var defNum = defender.num;
+    if (atkNum < defNum) {
+        showMessage('Your tile (' + atkNum + ') is not strong enough to crush the enemy tile (' + defNum + ').');
+        return;
+    }
+    busy = true;
+    // Crush: the falling tile replaces the defender; defender's owner gets its num back to pool
+    pool[defender.owner] += defNum;
+    board[to.level][to.slot] = attacker;
+    board[from.level][from.slot] = null;
+    selected = null;
+    attackTargets = [];
+    var done = function () {
+        busy = false;
+        showMessage('Gravity crush! ' + colorName(defender.owner) + '\'s tile (' + defNum + ') eliminated.');
+        endTurn();
+    };
+    if (window.towerAnimMove) window.towerAnimMove(from, to, done); else done();
+}
 
 // ============================================
 // TURN FLOW
@@ -451,17 +501,42 @@ function emptySlots() {
 function makeAIMove() {
     if (gameOver || turn !== 'B' || busy) return;
 
-    // 1. Best capturing attack
+    // 1. Best capturing attack (horizontal/vertical chain)
     var best = null;
     allTiles('B').forEach(function (p) {
         computeAttackTargets(p.level, p.slot).forEach(function (g) {
-            if (g.win && (!best || g.tiles.length > best.tgt.tiles.length)) best = { from: p, tgt: g };
+            if (g.win && (!best || g.tiles.length > best.tgt.tiles.length)) best = { from: p, tgt: g, type: 'chain' };
         });
     });
     if (best) {
         mode = 'move'; selected = best.from; attackTargets = computeAttackTargets(best.from.level, best.from.slot);
         drawBoard();
         setTimeout(function () { doAttack(best.tgt); }, 350);
+        return;
+    }
+
+    // 1b. Gravity attack — drop a tile onto an enemy below
+    var gravBest = null;
+    allTiles('B').forEach(function (p) {
+        for (var gl = p.level - 1; gl >= 0; gl--) {
+            var gd = tileAt(gl, p.slot);
+            if (gd) {
+                if (gd.owner === 'W' && p.num >= gd.num) {
+                    var blocked = false;
+                    for (var ck = p.level - 1; ck > gl; ck--) {
+                        if (tileAt(ck, p.slot)) { blocked = true; break; }
+                    }
+                    if (!blocked && (!gravBest || gd.num > tileAt(gravBest.to.level, gravBest.to.slot).num)) {
+                        gravBest = { from: p, to: { level: gl, slot: p.slot } };
+                    }
+                }
+                break; // first occupied cell below blocks further check
+            }
+        }
+    });
+    if (gravBest) {
+        mode = 'move'; drawBoard();
+        setTimeout(function () { doGravityAttack(gravBest.from, gravBest.to); }, 300);
         return;
     }
 
@@ -485,7 +560,6 @@ function makeAIMove() {
         mode = 'levelup'; drawBoard();
         setTimeout(function () {
             doLevelUp(lu.level, lu.slot);
-            // If a bonus move opened up, make a simple one then it resolves the turn.
             if (bonusActive) setTimeout(aiBonusMove, 300);
         }, 300);
         return;
@@ -508,9 +582,27 @@ function aiBonusMove() {
         var targets = [];
         // adjacent empty slots
         neighbors(p.level, p.slot).filter(function (n) { return !tileAt(n.level, n.slot); }).forEach(function (n) { targets.push(n); });
-        // gravity falls
+        // gravity falls to empty
         for (var l = p.level - 1; l >= 0; l--) { if (!tileAt(l, p.slot)) targets.push({ level: l, slot: p.slot }); }
-        if (targets.length) { doMove(p, targets[Math.floor(Math.random() * targets.length)], true); return; }
+        // gravity attacks on enemy below
+        for (var gl = p.level - 1; gl >= 0; gl--) {
+            var gd = tileAt(gl, p.slot);
+            if (gd && gd.owner === 'W' && p.num >= gd.num) {
+                var blocked = false;
+                for (var ck = p.level - 1; ck > gl; ck--) { if (tileAt(ck, p.slot)) { blocked = true; break; } }
+                if (!blocked) { targets.push({ level: gl, slot: p.slot, isGravityAttack: true }); }
+                break;
+            }
+        }
+        if (targets.length) {
+            var pick = targets[Math.floor(Math.random() * targets.length)];
+            if (pick.isGravityAttack) {
+                doGravityAttack(p, pick);
+            } else {
+                doMove(p, pick, true);
+            }
+            return;
+        }
     }
     // nothing movable — just end via a no-op move of the leveled tile's neighbour search failing
     bonusActive = false; endTurn();

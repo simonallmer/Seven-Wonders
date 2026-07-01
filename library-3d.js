@@ -1,23 +1,18 @@
 /**
  * Library 3D Visualization
- * Three.js rendering for the Dominoverse (Cascading Walls) logic engine.
- * PS5-quality lighting and aesthetics inspired by the Library of Baghdad (House of Wisdom).
+ * Shared Sphere mode only — push the sphere to your study room entrance.
  */
 
 const game = window.libraryGameInstance;
 
 // --- DOM Elements ---
 const canvasContainer = document.getElementById('canvas3d');
-const btnLay = document.getElementById('btn-action-lay');
-const btnMove = document.getElementById('btn-action-move');
-const btnPush = document.getElementById('btn-action-push');
-const btnTopple = document.getElementById('btn-action-topple');
 const statusText = document.getElementById('status-text');
 const playerColorBox = document.getElementById('player-color');
 
 // --- Three.js Setup ---
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x2a1f14); // Warm parchment dark
+scene.background = new THREE.Color(0x2a1f14);
 scene.fog = new THREE.FogExp2(0x2a1f14, 0.012);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -35,12 +30,12 @@ canvasContainer.appendChild(renderer.domElement);
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-controls.maxPolarAngle = Math.PI / 2 - 0.05; // Don't go below ground
+controls.maxPolarAngle = Math.PI / 2 - 0.05;
 controls.minDistance = 10;
 controls.maxDistance = 50;
 
-// --- Lighting (PS5 Quality Vibes) ---
-const ambientLight = new THREE.AmbientLight(0xffeedd, 0.25); // Warm ambient
+// --- Lighting ---
+const ambientLight = new THREE.AmbientLight(0xffeedd, 0.25);
 scene.add(ambientLight);
 
 const fillLight = new THREE.DirectionalLight(0xffcc88, 0.4);
@@ -61,14 +56,11 @@ moonLight.shadow.camera.bottom = -20;
 moonLight.shadow.bias = -0.0005;
 scene.add(moonLight);
 
-// Add warm torch/lantern lights in the study rooms
 const addTorch = (x, z) => {
     const light = new THREE.PointLight(0xffaa55, 1.5, 20);
     light.position.set(x, 3, z);
     light.castShadow = true;
     scene.add(light);
-    
-    // Tiny mesh for visual
     const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(0.2, 8, 8),
         new THREE.MeshBasicMaterial({ color: 0xffaa55 })
@@ -78,43 +70,18 @@ const addTorch = (x, z) => {
 };
 
 // --- Materials ---
+const floorTileMat1 = new THREE.MeshStandardMaterial({ color: 0x8a7a64, roughness: 0.85, metalness: 0.05 });
+const floorTileMat2 = new THREE.MeshStandardMaterial({ color: 0x9a8a72, roughness: 0.85, metalness: 0.05 });
+const cellMat = new THREE.MeshStandardMaterial({ color: 0x6b5a48, roughness: 0.9 });
+const roomMat = new THREE.MeshStandardMaterial({ color: 0x7a6a58, roughness: 0.8 });
+const activeCellMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.3 });
+const directionMat = new THREE.MeshStandardMaterial({ color: 0xffaa44, transparent: true, opacity: 0.3 });
+const wallSelectedMat = new THREE.MeshStandardMaterial({ color: 0xff6600, transparent: true, opacity: 0.4 });
 
-const floorTileMat1 = new THREE.MeshStandardMaterial({
-    color: 0x8a7a64,
-    roughness: 0.85,
-    metalness: 0.05,
-});
-const floorTileMat2 = new THREE.MeshStandardMaterial({
-    color: 0x9a8a72,
-    roughness: 0.85,
-    metalness: 0.05,
-});
-
-const cellMat = new THREE.MeshStandardMaterial({
-    color: 0x6b5a48,
-    roughness: 0.9,
-});
-
-const roomMat = new THREE.MeshStandardMaterial({
-    color: 0x7a6a58,
-    roughness: 0.8,
-});
-const shelfMat = new THREE.MeshStandardMaterial({
-    color: 0x4a3525,
-    roughness: 0.9,
-});
-
-const activeCellMat = new THREE.MeshStandardMaterial({
-    color: 0x06b6d4,
-    transparent: true,
-    opacity: 0.3,
-});
-
-// --- Environment Construction (Courtyard & Rooms) ---
+// --- Environment ---
 const courtyardGroup = new THREE.Group();
 scene.add(courtyardGroup);
 
-// Floor — geometric tile pattern
 const floorGroup = new THREE.Group();
 courtyardGroup.add(floorGroup);
 const TILE_COUNT = 8;
@@ -125,28 +92,20 @@ for (let tr = 0; tr < TILE_COUNT; tr++) {
         const mat = (tr + tc) % 2 === 0 ? floorTileMat1 : floorTileMat2;
         const tile = new THREE.Mesh(new THREE.PlaneGeometry(tileDim - 0.1, tileDim - 0.1), mat);
         tile.rotation.x = -Math.PI / 2;
-        tile.position.set(
-            -FLOOR_SIZE / 2 + tileDim / 2 + tc * tileDim,
-            0,
-            -FLOOR_SIZE / 2 + tileDim / 2 + tr * tileDim
-        );
+        tile.position.set(-FLOOR_SIZE / 2 + tileDim / 2 + tc * tileDim, 0, -FLOOR_SIZE / 2 + tileDim / 2 + tr * tileDim);
         tile.receiveShadow = true;
         floorGroup.add(tile);
     }
 }
 
-// Generate 4 Study Rooms (North, South, East, West)
 const createStudyRoom = (x, z, rot) => {
     const roomGroup = new THREE.Group();
     roomGroup.position.set(x, 0, z);
     roomGroup.rotation.y = rot;
-
     const base = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 6), roomMat);
     base.position.y = 0.25;
     base.receiveShadow = true;
     roomGroup.add(base);
-
-    // Pillars
     const pillarGeo = new THREE.CylinderGeometry(0.4, 0.4, 4, 12);
     const pillarMat = new THREE.MeshStandardMaterial({ color: 0x8a7a64, roughness: 0.7 });
     [-3, 3].forEach(offX => {
@@ -155,46 +114,28 @@ const createStudyRoom = (x, z, rot) => {
         pillar.castShadow = true;
         roomGroup.add(pillar);
     });
-
-    // Bookshelf along back wall
-    const shelfMat = new THREE.MeshStandardMaterial({ color: 0x4a3525, roughness: 0.9 });
-    const shelfColors = [0x6b3a2a, 0x8b5e3c, 0x3d2b1f, 0x7a4a2a, 0x5c3a1e];
-    for (let i = 0; i < 5; i++) {
-        const book = new THREE.Mesh(
-            new THREE.BoxGeometry(0.6 + Math.random() * 0.4, 0.8 + Math.random() * 0.6, 0.5),
-            new THREE.MeshStandardMaterial({ color: shelfColors[i % 5], roughness: 0.8 })
-        );
-        book.position.set(-3 + i * 1.4 + Math.random() * 0.2, 0.8 + Math.random() * 0.3, 3.2);
-        book.castShadow = true;
-        roomGroup.add(book);
-    }
-
     addTorch(x, z);
-
     return roomGroup;
 };
 
-// Rooms
-courtyardGroup.add(createStudyRoom(0, -12, 0)); // North (Player 2)
-courtyardGroup.add(createStudyRoom(0, 12, Math.PI)); // South (Player 1)
-courtyardGroup.add(createStudyRoom(12, 0, -Math.PI/2)); // East (Player 3)
-courtyardGroup.add(createStudyRoom(-12, 0, Math.PI/2)); // West (Player 4)
+courtyardGroup.add(createStudyRoom(0, -12, 0));
+courtyardGroup.add(createStudyRoom(0, 12, Math.PI));
+courtyardGroup.add(createStudyRoom(12, 0, -Math.PI/2));
+courtyardGroup.add(createStudyRoom(-12, 0, Math.PI/2));
 
-// --- Game Board Render Data ---
+// --- Board ---
 const TILE_SIZE = 1.6;
 const GAP_SIZE = 0.4;
 const BOARD_OFFSET = (BOARD_SIZE * TILE_SIZE + (BOARD_SIZE - 1) * GAP_SIZE) / 2;
 
-// Maps to hold mesh references
-const cellMeshes = []; // The interactive grid floor 
-const plateMeshes = {}; // The physical plates laid down
+const cellMeshes = [];
+const plateMeshes = {};
 const hWallTriggers = [];
 const vWallTriggers = [];
-const hWallMeshes = {}; // Placed hWalls
-const vWallMeshes = {}; // Placed vWalls
-const playerMeshes = {}; // Player figures
+const hWallMeshes = {};
+const vWallMeshes = {};
+const goalMarkers = {};
 
-// Board Group
 const boardGroup = new THREE.Group();
 scene.add(boardGroup);
 
@@ -204,35 +145,21 @@ const getPos = (r, c) => {
     return { x, z };
 };
 
-// 1. Grid Cells
 for (let r = 0; r < BOARD_SIZE; r++) {
     for (let c = 0; c < BOARD_SIZE; c++) {
         const { x, z } = getPos(r, c);
-        
-        // Base grid visual (darker indentation)
-        const cellBase = new THREE.Mesh(
-            new THREE.BoxGeometry(TILE_SIZE, 0.1, TILE_SIZE),
-            cellMat
-        );
+        const cellBase = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE, 0.1, TILE_SIZE), cellMat);
         cellBase.position.set(x, 0.05, z);
         cellBase.receiveShadow = true;
         boardGroup.add(cellBase);
 
-        // Interactive trigger box (invisible)
-        const trigger = new THREE.Mesh(
-            new THREE.BoxGeometry(TILE_SIZE, 0.5, TILE_SIZE),
-            new THREE.MeshBasicMaterial({ visible: false })
-        );
+        const trigger = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE, 0.5, TILE_SIZE), new THREE.MeshBasicMaterial({ visible: false }));
         trigger.position.set(x, 0.25, z);
         trigger.userData = { type: 'cell', r, c };
         cellMeshes.push(trigger);
         boardGroup.add(trigger);
-        
-        // Hover highlight
-        const highlight = new THREE.Mesh(
-            new THREE.BoxGeometry(TILE_SIZE, 0.2, TILE_SIZE),
-            activeCellMat
-        );
+
+        const highlight = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE, 0.2, TILE_SIZE), activeCellMat);
         highlight.position.set(x, 0.2, z);
         highlight.visible = false;
         trigger.userData.highlight = highlight;
@@ -240,25 +167,17 @@ for (let r = 0; r < BOARD_SIZE; r++) {
     }
 }
 
-// 2. Horizontal Wall Triggers (Gaps between rows)
 for (let r = 0; r < BOARD_SIZE - 1; r++) {
     for (let c = 0; c < BOARD_SIZE; c++) {
         const { x, z } = getPos(r, c);
         const zOff = z + TILE_SIZE/2 + GAP_SIZE/2;
-        
-        const trigger = new THREE.Mesh(
-            new THREE.BoxGeometry(TILE_SIZE, 1, GAP_SIZE),
-            new THREE.MeshBasicMaterial({ visible: false })
-        );
+        const trigger = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE, 1, GAP_SIZE), new THREE.MeshBasicMaterial({ visible: false }));
         trigger.position.set(x, 0.5, zOff);
         trigger.userData = { type: 'hWall', r, c };
         hWallTriggers.push(trigger);
         boardGroup.add(trigger);
 
-        const highlight = new THREE.Mesh(
-            new THREE.BoxGeometry(TILE_SIZE, 0.2, GAP_SIZE),
-            activeCellMat
-        );
+        const highlight = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE, 0.2, GAP_SIZE), activeCellMat);
         highlight.position.set(x, 0.2, zOff);
         highlight.visible = false;
         trigger.userData.highlight = highlight;
@@ -266,25 +185,17 @@ for (let r = 0; r < BOARD_SIZE - 1; r++) {
     }
 }
 
-// 3. Vertical Wall Triggers (Gaps between columns)
 for (let r = 0; r < BOARD_SIZE; r++) {
     for (let c = 0; c < BOARD_SIZE - 1; c++) {
         const { x, z } = getPos(r, c);
         const xOff = x + TILE_SIZE/2 + GAP_SIZE/2;
-        
-        const trigger = new THREE.Mesh(
-            new THREE.BoxGeometry(GAP_SIZE, 1, TILE_SIZE),
-            new THREE.MeshBasicMaterial({ visible: false })
-        );
+        const trigger = new THREE.Mesh(new THREE.BoxGeometry(GAP_SIZE, 1, TILE_SIZE), new THREE.MeshBasicMaterial({ visible: false }));
         trigger.position.set(xOff, 0.5, z);
         trigger.userData = { type: 'vWall', r, c };
         vWallTriggers.push(trigger);
         boardGroup.add(trigger);
 
-        const highlight = new THREE.Mesh(
-            new THREE.BoxGeometry(GAP_SIZE, 0.2, TILE_SIZE),
-            activeCellMat
-        );
+        const highlight = new THREE.Mesh(new THREE.BoxGeometry(GAP_SIZE, 0.2, TILE_SIZE), activeCellMat);
         highlight.position.set(xOff, 0.2, z);
         highlight.visible = false;
         trigger.userData.highlight = highlight;
@@ -292,111 +203,127 @@ for (let r = 0; r < BOARD_SIZE; r++) {
     }
 }
 
-// Raycaster setup
+// Direction indicator meshes for wall actions
+const directionArrows = [];
+function createDirectionArrow() {
+    const group = new THREE.Group();
+    const shaft = new THREE.Mesh(
+        new THREE.BoxGeometry(0.6, 0.1, 0.15),
+        new THREE.MeshBasicMaterial({ color: 0xffaa44, transparent: true, opacity: 0.7 })
+    );
+    shaft.position.x = 0.3;
+    group.add(shaft);
+    const head = new THREE.Mesh(
+        new THREE.ConeGeometry(0.15, 0.2, 6),
+        new THREE.MeshBasicMaterial({ color: 0xffaa44, transparent: true, opacity: 0.7 })
+    );
+    head.position.x = 0.65;
+    head.rotation.z = -Math.PI / 2;
+    group.add(head);
+    group.visible = false;
+    return group;
+}
+
+// --- Raycaster ---
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
+function updateVisuals() {
+    cellMeshes.forEach(m => { m.userData.highlight.visible = false; });
+    hWallTriggers.forEach(m => m.userData.highlight.visible = false);
+    vWallTriggers.forEach(m => m.userData.highlight.visible = false);
+    directionArrows.forEach(a => a.visible = false);
+
+    if (game.winner) return;
+
+    if (game.interactionState === 'SPHERE_SELECTED') {
+        const { x, z } = getPos(game.sharedSphere.r, game.sharedSphere.c);
+        showArrow(x - TILE_SIZE/2 - GAP_SIZE/2, 0.3, z, 0, Math.PI, 0);
+        showArrow(x + TILE_SIZE/2 + GAP_SIZE/2, 0.3, z, 0, 0, 0);
+        showArrow(x, 0.3, z - TILE_SIZE/2 - GAP_SIZE/2, Math.PI/2, 0, 0);
+        showArrow(x, 0.3, z + TILE_SIZE/2 + GAP_SIZE/2, -Math.PI/2, 0, 0);
+        return;
+    }
+
+    if (game.interactionState === 'WALL_SELECTED' && game.selectedWall) {
+        const sw = game.selectedWall;
+        const { x, z } = getPos(sw.r, sw.c);
+        if (sw.type === 'h') {
+            const cz = z + TILE_SIZE/2 + GAP_SIZE/2;
+            showArrow(x - TILE_SIZE/2 - GAP_SIZE/2, 0.3, cz, 0, 0, 0);
+            showArrow(x + TILE_SIZE/2 + GAP_SIZE/2, 0.3, cz, Math.PI, 0, 0);
+            showArrow(x, 0.3, z, Math.PI/2, 0, 0);
+            showArrow(x, 0.3, z + TILE_SIZE + GAP_SIZE, -Math.PI/2, 0, 0);
+        } else {
+            const cx = x + TILE_SIZE/2 + GAP_SIZE/2;
+            showArrow(cx, 0.3, z - TILE_SIZE/2 - GAP_SIZE/2, 0, 0, 0);
+            showArrow(cx, 0.3, z + TILE_SIZE/2 + GAP_SIZE/2, 0, 0, Math.PI);
+            showArrow(x, 0.3, z, 0, 0, -Math.PI/2);
+            showArrow(x + TILE_SIZE + GAP_SIZE, 0.3, z, 0, 0, Math.PI/2);
+        }
+        return;
+    }
+}
+
+function showArrow(x, y, z, rx, ry, rz) {
+    const arrow = directionArrows.find(a => !a.visible);
+    if (!arrow) return;
+    arrow.position.set(x, y, z);
+    arrow.rotation.set(rx, ry, rz);
+    arrow.visible = true;
+}
+
+// --- Pointer Move (Hover) ---
 function onPointerMove(event) {
     if (game.winner || isAiTurn) return;
-    
+
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-    // Reset highlights
     cellMeshes.forEach(m => m.userData.highlight.visible = false);
     hWallTriggers.forEach(m => m.userData.highlight.visible = false);
     vWallTriggers.forEach(m => m.userData.highlight.visible = false);
 
     raycaster.setFromCamera(mouse, camera);
-    
+
     let interactables = [];
-    if (game.selectedAction === 'LAY') {
+    if (game.interactionState === 'WALL_SELECTED' || game.interactionState === 'SPHERE_SELECTED') {
         interactables = [...cellMeshes, ...hWallTriggers, ...vWallTriggers];
-    } else if (game.selectedAction === 'MOVE') {
-        interactables = cellMeshes;
-    } else if (game.selectedAction === 'PUSH' || game.selectedAction === 'TOPPLE') {
-        interactables = [...hWallTriggers, ...vWallTriggers];
+    } else {
+        interactables = [...cellMeshes, ...hWallTriggers, ...vWallTriggers];
     }
 
     const intersects = raycaster.intersectObjects(interactables);
-    if (intersects.length > 0) {
-        const obj = intersects[0].object;
-        const u = obj.userData;
-        
-        // Validation logic for hover
-        let isValid = false;
-        if (game.selectedAction === 'LAY') {
-            if (u.type === 'cell' && !game.fields[u.r][u.c]) isValid = true;
-            if (u.type === 'hWall' && !game.hWalls[u.r][u.c]) isValid = true;
-            if (u.type === 'vWall' && !game.vWalls[u.r][u.c]) isValid = true;
-        } else if (game.selectedAction === 'MOVE') {
-            if (u.type === 'cell' && game.isValidMoveTarget(game.players[game.currentPlayer], u.r, u.c)) isValid = true;
-        } else if (game.selectedAction === 'PUSH' || game.selectedAction === 'TOPPLE') {
-            if (u.type === 'hWall' && game.hWalls[u.r][u.c]) isValid = true;
-            if (u.type === 'vWall' && game.vWalls[u.r][u.c]) isValid = true;
-        }
+    if (intersects.length === 0) return;
 
-        if (isValid) {
-            const hl = obj.userData.highlight;
-            hl.visible = true;
-            
-            // Default reset scale/pos
-            const { x, z } = getPos(u.r, u.c);
-            if (u.type === 'cell') {
-                hl.scale.set(1, 1, 1);
-                hl.position.set(x, 0.2, z);
-            } else if (u.type === 'hWall') {
-                const cx = x;
-                const cz = z + TILE_SIZE/2 + GAP_SIZE/2;
-                hl.scale.set(1, 1, 1);
-                hl.position.set(cx, 0.2, cz);
-                
-                if (game.selectedAction === 'PUSH') {
-                    // highlight half of the wall vertically/horizontally
-                    hl.scale.set(0.5, 10, 1); // 10 * 0.2 = 2 (height of wall)
-                    if (intersects[0].point.x < cx) {
-                        hl.position.set(cx - TILE_SIZE/4, 1, cz);
-                    } else {
-                        hl.position.set(cx + TILE_SIZE/4, 1, cz);
-                    }
-                } else if (game.selectedAction === 'TOPPLE') {
-                    hl.scale.set(1, 10, 0.5);
-                    if (intersects[0].point.z < cz) {
-                        hl.position.set(cx, 1, cz - GAP_SIZE/4);
-                    } else {
-                        hl.position.set(cx, 1, cz + GAP_SIZE/4);
-                    }
-                } else {
-                    hl.scale.set(1, 1, 1);
-                    hl.position.set(cx, 0.2, cz);
-                }
-            } else if (u.type === 'vWall') {
-                const cx = x + TILE_SIZE/2 + GAP_SIZE/2;
-                const cz = z;
-                
-                if (game.selectedAction === 'PUSH') {
-                    hl.scale.set(1, 10, 0.5);
-                    if (intersects[0].point.z < cz) {
-                        hl.position.set(cx, 1, cz - TILE_SIZE/4);
-                    } else {
-                        hl.position.set(cx, 1, cz + TILE_SIZE/4);
-                    }
-                } else if (game.selectedAction === 'TOPPLE') {
-                    hl.scale.set(0.5, 10, 1);
-                    if (intersects[0].point.x < cx) {
-                        hl.position.set(cx - GAP_SIZE/4, 1, cz);
-                    } else {
-                        hl.position.set(cx + GAP_SIZE/4, 1, cz);
-                    }
-                } else {
-                    hl.scale.set(1, 1, 1);
-                    hl.position.set(cx, 0.2, cz);
-                }
-            }
+    const obj = intersects[0].object;
+    const u = obj.userData;
+
+    let isValid = false;
+
+    if (game.interactionState === 'IDLE') {
+        if (u.type === 'cell' && !game.fields[u.r][u.c]) isValid = true;
+        if (u.type === 'cell' && u.r === game.sharedSphere.r && u.c === game.sharedSphere.c) isValid = true;
+        if (u.type === 'hWall' && !game.hWalls[u.r][u.c]) isValid = true;
+        if (u.type === 'vWall' && !game.vWalls[u.r][u.c]) isValid = true;
+        if (u.type === 'hWall' && game.hWalls[u.r][u.c] === game.currentPlayer) isValid = true;
+        if (u.type === 'vWall' && game.vWalls[u.r][u.c] === game.currentPlayer) isValid = true;
+    } else if (game.interactionState === 'WALL_SELECTED') {
+        if (u.type === 'cell' || u.type === 'hWall' || u.type === 'vWall') isValid = true;
+    } else if (game.interactionState === 'SPHERE_SELECTED') {
+        if (u.type === 'cell') {
+            const dr = u.r - game.sharedSphere.r;
+            const dc = u.c - game.sharedSphere.c;
+            if ((dr === 0 && Math.abs(dc) === 1) || (dc === 0 && Math.abs(dr) === 1)) isValid = true;
         }
+    }
+
+    if (isValid && u.highlight) {
+        u.highlight.visible = true;
     }
 }
 
+// --- Pointer Click ---
 let pointerDownPos = { x: 0, y: 0 };
 window.addEventListener('pointerdown', (e) => {
     pointerDownPos.x = e.clientX;
@@ -417,61 +344,142 @@ function onPointerClick(event) {
     if (game.winner) return;
 
     raycaster.setFromCamera(mouse, camera);
-    
-    let interactables = [];
-    if (game.selectedAction === 'MOVE') interactables = cellMeshes;
-    else if (game.selectedAction === 'PUSH' || game.selectedAction === 'TOPPLE') interactables = [...hWallTriggers, ...vWallTriggers];
-    else interactables = [...cellMeshes, ...hWallTriggers, ...vWallTriggers];
-    
-    const intersects = raycaster.intersectObjects(interactables);
 
-    if (intersects.length > 0) {
-        const u = intersects[0].object.userData;
-        
-        if (u.type === 'cell') {
-            game.handleCellClick(u.r, u.c);
-        } else if (u.type === 'hWall') {
-            if (game.selectedAction === 'PUSH' || game.selectedAction === 'TOPPLE') {
-                const wallInfo = game.handleWallClick('h', u.r, u.c);
-                if (wallInfo) {
-                    const { x, z } = getPos(u.r, u.c);
-                    const cx = x;
-                    const cz = z + TILE_SIZE/2 + GAP_SIZE/2;
-                    const clickX = intersects[0].point.x;
-                    const clickZ = intersects[0].point.z;
-                    if (game.selectedAction === 'PUSH') {
-                        if (clickX < cx) game.executePush('right');
-                        else game.executePush('left');
-                    } else { // TOPPLE — falls toward where you click
-                        if (clickZ < cz) game.executeTopple('up');
-                        else game.executeTopple('down');
-                    }
-                }
-            } else {
-                game.handleWallClick('h', u.r, u.c);
-            }
-        } else if (u.type === 'vWall') {
-            if (game.selectedAction === 'PUSH' || game.selectedAction === 'TOPPLE') {
-                const wallInfo = game.handleWallClick('v', u.r, u.c);
-                if (wallInfo) {
-                    const { x, z } = getPos(u.r, u.c);
-                    const cx = x + TILE_SIZE/2 + GAP_SIZE/2;
-                    const cz = z;
-                    const clickX = intersects[0].point.x;
-                    const clickZ = intersects[0].point.z;
-                    if (game.selectedAction === 'PUSH') {
-                        if (clickZ < cz) game.executePush('down');
-                        else game.executePush('up');
-                    } else { // TOPPLE — falls toward where you click
-                        if (clickX < cx) game.executeTopple('left');
-                        else game.executeTopple('right');
-                    }
-                }
-            } else {
-                game.handleWallClick('v', u.r, u.c);
-            }
+    let allInteractables = [...cellMeshes, ...hWallTriggers, ...vWallTriggers];
+    const intersects = raycaster.intersectObjects(allInteractables);
+
+    if (intersects.length === 0) {
+        if (game.interactionState === 'WALL_SELECTED') {
+            game.interactionState = 'IDLE';
+            game.selectedWall = null;
+            game.trigger('onWallDeselected', {});
+            updateVisuals();
+        } else if (game.interactionState === 'SPHERE_SELECTED') {
+            game.interactionState = 'IDLE';
+            game.trigger('onSphereDeselected', {});
+            updateVisuals();
         }
+        return;
     }
+
+    const u = intersects[0].object.userData;
+
+    if (game.interactionState === 'WALL_SELECTED' && game.selectedWall) {
+        const sw = game.selectedWall;
+
+        if (u.type === 'cell') {
+            let direction = null;
+            if (sw.type === 'h') {
+                if (u.r === sw.r && u.c === sw.c) direction = 'up';
+                else if (u.r === sw.r + 1 && u.c === sw.c) direction = 'down';
+            } else {
+                if (u.r === sw.r && u.c === sw.c) direction = 'left';
+                else if (u.r === sw.r && u.c === sw.c + 1) direction = 'right';
+            }
+            if (direction) {
+                game.handleWallDirection(direction);
+            } else {
+                game.log('Click a cell adjacent to the wall to topple it.');
+            }
+            updateVisuals();
+            return;
+        }
+
+        if ((u.type === 'hWall' || u.type === 'vWall') && !(u.r === sw.r && u.c === sw.c && ((u.type === 'hWall' && sw.type === 'h') || (u.type === 'vWall' && sw.type === 'v')))) {
+            const wt = u.type === 'hWall' ? 'h' : 'v';
+            let direction = null;
+            if (sw.type === 'h' && wt === 'h' && sw.r === u.r) {
+                if (u.c === sw.c - 1) direction = 'left';
+                else if (u.c === sw.c + 1) direction = 'right';
+            } else if (sw.type === 'v' && wt === 'v' && sw.c === u.c) {
+                if (u.r === sw.r - 1) direction = 'up';
+                else if (u.r === sw.r + 1) direction = 'down';
+            }
+            if (direction) {
+                game.handleWallDirection(direction);
+            } else {
+                game.log('Click an adjacent gap to push the wall.');
+            }
+            updateVisuals();
+            return;
+        }
+
+        if ((u.type === 'hWall' && u.r === sw.r && u.c === sw.c && sw.type === 'h') ||
+            (u.type === 'vWall' && u.r === sw.r && u.c === sw.c && sw.type === 'v')) {
+            const { x, z } = getPos(u.r, u.c);
+            let cx, cz;
+            if (u.type === 'hWall') {
+                cx = x;
+                cz = z + TILE_SIZE/2 + GAP_SIZE/2;
+            } else {
+                cx = x + TILE_SIZE/2 + GAP_SIZE/2;
+                cz = z;
+            }
+            const clickX = intersects[0].point.x;
+            const clickZ = intersects[0].point.z;
+
+            let direction;
+            if (u.type === 'hWall') {
+                if (Math.abs(clickX - cx) > Math.abs(clickZ - cz)) {
+                    direction = clickX < cx ? 'left' : 'right';
+                } else {
+                    direction = clickZ < cz ? 'up' : 'down';
+                }
+            } else {
+                if (Math.abs(clickZ - cz) > Math.abs(clickX - cx)) {
+                    direction = clickZ < cz ? 'up' : 'down';
+                } else {
+                    direction = clickX < cx ? 'left' : 'right';
+                }
+            }
+            game.handleWallDirection(direction);
+            updateVisuals();
+            return;
+        }
+
+        game.interactionState = 'IDLE';
+        game.selectedWall = null;
+        game.trigger('onWallDeselected', {});
+        updateVisuals();
+        return;
+    }
+
+    // SPHERE_SELECTED state: click adjacent cell to push
+    if (game.interactionState === 'SPHERE_SELECTED') {
+        const sphere = game.sharedSphere;
+        if (u.type === 'cell') {
+            const dr = u.r - sphere.r;
+            const dc = u.c - sphere.c;
+            if ((dr === 0 && Math.abs(dc) === 1) || (dc === 0 && Math.abs(dr) === 1)) {
+                game.doPushSphere(Math.sign(dr), Math.sign(dc));
+            } else {
+                game.interactionState = 'IDLE';
+                game.trigger('onSphereDeselected', {});
+                game.log('Click a cell adjacent to the sphere to push it.');
+            }
+        } else {
+            game.interactionState = 'IDLE';
+            game.trigger('onSphereDeselected', {});
+        }
+        updateVisuals();
+        return;
+    }
+
+    // Normal dispatch
+    if (game.controlScheme === 'classic') {
+        classicHandleClick(u);
+        updateVisuals();
+        return;
+    }
+
+    if (u.type === 'cell') {
+        game.handleCellClick(u.r, u.c);
+    } else if (u.type === 'hWall') {
+        game.handleWallClick('h', u.r, u.c);
+    } else if (u.type === 'vWall') {
+        game.handleWallClick('v', u.r, u.c);
+    }
+    updateVisuals();
 }
 
 window.addEventListener('pointermove', onPointerMove);
@@ -484,47 +492,34 @@ function onWindowResize() {
 }
 
 // --- Visual Helpers ---
-
 function createPlate(r, c, owner) {
     const { x, z } = getPos(r, c);
     const bookGroup = new THREE.Group();
     bookGroup.position.set(x, 0, z);
 
     const ownerColors = [0xf8f8f8, 0x2a2a2a, 0xcc3333, 0x3366cc];
-    const col = ownerColors[owner % ownerColors.length];
+    const col = owner === FOUNTAIN ? 0x4488ff : ownerColors[owner % ownerColors.length];
 
-    // Cover — neutral brown
     const cover = new THREE.Mesh(
         new THREE.BoxGeometry(TILE_SIZE - 0.15, 0.08, TILE_SIZE - 0.1),
-        new THREE.MeshStandardMaterial({
-            color: 0x5c3a1e,
-            roughness: 0.8,
-        })
+        new THREE.MeshStandardMaterial({ color: 0x5c3a1e, roughness: 0.8 })
     );
     cover.position.y = 0.04;
     cover.castShadow = true;
     cover.receiveShadow = true;
     bookGroup.add(cover);
 
-    // Pages — owner color (most visible from above)
     const pages = new THREE.Mesh(
         new THREE.BoxGeometry(TILE_SIZE - 0.3, 0.12, TILE_SIZE - 0.2),
-        new THREE.MeshStandardMaterial({
-            color: col,
-            roughness: 0.85,
-        })
+        new THREE.MeshStandardMaterial({ color: col, roughness: 0.85 })
     );
     pages.position.y = 0.14;
     pages.castShadow = true;
     bookGroup.add(pages);
 
-    // Spine accent
     const spine = new THREE.Mesh(
         new THREE.BoxGeometry(0.08, 0.18, TILE_SIZE - 0.2),
-        new THREE.MeshStandardMaterial({
-            color: 0x3d2010,
-            roughness: 0.9,
-        })
+        new THREE.MeshStandardMaterial({ color: 0x3d2010, roughness: 0.9 })
     );
     spine.position.set(-(TILE_SIZE / 2 - 0.15), 0.15, 0);
     bookGroup.add(spine);
@@ -532,7 +527,6 @@ function createPlate(r, c, owner) {
     boardGroup.add(bookGroup);
     plateMeshes[`${r}_${c}`] = bookGroup;
 
-    // Animate in
     bookGroup.scale.set(0.1, 0.1, 0.1);
     new TWEEN.Tween(bookGroup.scale)
         .to({ x: 1, y: 1, z: 1 }, 400)
@@ -556,22 +550,16 @@ function createWall(type, r, c, owner) {
         meshZ = z;
     }
 
-    const wallMat = new THREE.MeshStandardMaterial({
-        color: col,
-        roughness: 0.65,
-        metalness: 0.1,
-    });
-
+    const wallMat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.65, metalness: 0.1 });
     const wall = new THREE.Mesh(geo, wallMat);
     wall.position.set(meshX, 1, meshZ);
     wall.castShadow = true;
     wall.receiveShadow = true;
     boardGroup.add(wall);
-    
+
     if (type === 'h') hWallMeshes[`${r}_${c}`] = wall;
     else vWallMeshes[`${r}_${c}`] = wall;
 
-    // Animate in
     wall.position.y = 5;
     new TWEEN.Tween(wall.position)
         .to({ y: 1 }, 500)
@@ -579,72 +567,53 @@ function createWall(type, r, c, owner) {
         .start();
 }
 
-function createPlayerFigure(player) {
-    const group = new THREE.Group();
+// --- Shared Sphere ---
+let sharedSphereMesh = null;
 
-    const stoneMat = new THREE.MeshStandardMaterial({
-        color: player.colorHex,
-        roughness: 0.25,
-        metalness: 0.3,
+function createSharedSphere() {
+    if (sharedSphereMesh) scene.remove(sharedSphereMesh);
+
+    const mat = new THREE.MeshStandardMaterial({
+        color: 0x88ccff,
+        roughness: 0.1,
+        metalness: 0.4,
+        emissive: 0x4488ff,
+        emissiveIntensity: 0.15,
     });
-
-    // Body — tapered cylinder
-    const body = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.48, 0.54, 0.65, 24),
-        stoneMat
-    );
-    body.position.y = 0.325;
-    body.castShadow = true;
-    body.receiveShadow = true;
-    group.add(body);
-
-    // Top — dome (half sphere)
-    const top = new THREE.Mesh(
-        new THREE.SphereGeometry(0.48, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2),
-        stoneMat
-    );
-    top.position.y = 0.65;
-    top.castShadow = true;
-    group.add(top);
-
-    // Bevel — gold ring
-    const bevel = new THREE.Mesh(
-        new THREE.TorusGeometry(0.48, 0.035, 12, 32),
-        new THREE.MeshStandardMaterial({
-            color: 0xD4AF37,
-            roughness: 0.2,
-            metalness: 0.8,
-            emissive: 0x332200,
-            emissiveIntensity: 0.1,
-        })
-    );
-    bevel.rotation.x = Math.PI / 2;
-    bevel.position.y = 0.64;
-    bevel.castShadow = true;
-    group.add(bevel);
-    
-    // Position in study room based on ID
-    if (player.id === 0) group.position.set(0, 0, 12);
-    else if (player.id === 1) group.position.set(0, 0, -12);
-    else if (player.id === 2) group.position.set(-12, 0, 0);
-    else if (player.id === 3) group.position.set(12, 0, 0);
-    
-    scene.add(group);
-    playerMeshes[player.id] = group;
+    const geo = new THREE.SphereGeometry(0.55, 24, 24);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = true;
+    const { x, z } = getPos(CENTER, CENTER);
+    mesh.position.set(x, 0.55, z);
+    scene.add(mesh);
+    sharedSphereMesh = mesh;
 }
 
-// --- UI Interaction ---
+function createEntranceMarkers() {
+    Object.values(goalMarkers).forEach(m => boardGroup.remove(m));
+    for (let key in goalMarkers) delete goalMarkers[key];
 
-function setUIAction(action) {
-    game.setAction(action);
+    const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xffd700,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.6
+    });
+    const ringGeo = new THREE.RingGeometry(0.3, 0.6, 24);
+
+    game.players.forEach(p => {
+        const e = p.entrance;
+        const key = `${e.r}_${e.c}`;
+        if (goalMarkers[key]) return;
+        const { x, z } = getPos(e.r, e.c);
+        const marker = new THREE.Mesh(ringGeo, ringMat.clone());
+        marker.rotation.x = -Math.PI / 2;
+        marker.position.set(x, 0.15, z);
+        boardGroup.add(marker);
+        goalMarkers[key] = marker;
+    });
 }
 
-btnLay.onclick = () => setUIAction('LAY');
-btnMove.onclick = () => setUIAction('MOVE');
-btnPush.onclick = () => setUIAction('PUSH');
-btnTopple.onclick = () => setUIAction('TOPPLE');
-
-// HUD logic
 document.getElementById('btn-p2').onclick = (e) => startNewGame(2, e.target);
 document.getElementById('btn-p3').onclick = (e) => startNewGame(3, e.target);
 document.getElementById('btn-p4').onclick = (e) => startNewGame(4, e.target);
@@ -658,54 +627,105 @@ function startNewGame(pCount, btnElem) {
         btnElem.classList.add('active');
         document.getElementById('players-btn').innerText = `${pCount} Players`;
     }
-    
-    // Clear old meshes
+
     Object.values(plateMeshes).forEach(m => boardGroup.remove(m));
     Object.values(hWallMeshes).forEach(m => boardGroup.remove(m));
     Object.values(vWallMeshes).forEach(m => boardGroup.remove(m));
-    Object.values(playerMeshes).forEach(m => scene.remove(m));
-    
-    // Reset keys
+    Object.values(goalMarkers).forEach(m => boardGroup.remove(m));
+    if (sharedSphereMesh) { scene.remove(sharedSphereMesh); sharedSphereMesh = null; }
+
     for (let key in plateMeshes) delete plateMeshes[key];
     for (let key in hWallMeshes) delete hWallMeshes[key];
     for (let key in vWallMeshes) delete vWallMeshes[key];
-    for (let key in playerMeshes) delete playerMeshes[key];
+    for (let key in goalMarkers) delete goalMarkers[key];
 
     game.initGame(pCount);
 }
 
-// --- Game Logic Listeners ---
-
+// --- Game Event Listeners ---
 game.on('onInit', (data) => {
-    data.players.forEach(p => {
-        createPlayerFigure(p);
-        if (p.row !== null) {
-            const { x, z } = getPos(p.row, p.col);
-            playerMeshes[p.id].position.set(x, 0, z);
-        } else {
-            // Place in study room
-            const roomPositions = [
-                { x: 0, z: 12 },  // player 0
-                { x: 0, z: -12 }, // player 1
-                { x: -12, z: 0 }, // player 2
-                { x: 12, z: 0 },  // player 3
-            ];
-            const pos = roomPositions[p.id] || { x: 0, z: 0 };
-            playerMeshes[p.id].position.set(pos.x, 0, pos.z);
-        }
-    });
-    
-    for (let r = 0; r < BOARD_SIZE; r++) {
-        for (let c = 0; c < BOARD_SIZE; c++) {
+    createSharedSphere();
+    createEntranceMarkers();
+
+    for (let r = 0; r < BOARD_SIZE; r++)
+        for (let c = 0; c < BOARD_SIZE; c++)
             if (data.fields[r][c] !== null) createPlate(r, c, data.fields[r][c]);
-        }
+
+    const modeLabel = document.getElementById('mode-label');
+    if (modeLabel) modeLabel.textContent = 'Shared Sphere';
+    updateVisuals();
+
+    const panel = document.getElementById('action-panel');
+    if (panel) {
+        panel.style.display = game.controlScheme === 'classic' ? 'flex' : 'none';
     }
-    setUIAction('MOVE');
+    const schemeBtn = document.getElementById('scheme-btn');
+    if (schemeBtn) {
+        schemeBtn.textContent = 'Controls: ' + (game.controlScheme === 'adaptive' ? 'Adaptive' : 'Classic');
+    }
+    document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('active'));
+    const actionMap = { LAY: 'btn-action-lay', MOVE: 'btn-action-move', PUSH: 'btn-action-push', TOPPLE: 'btn-action-topple', PUSH_SPHERE: 'btn-action-push-sphere' };
+    const actionEl = document.getElementById(actionMap[game.selectedAction]);
+    if (actionEl) actionEl.classList.add('active');
 });
 
 game.on('onTurnStart', (data) => {
     statusText.innerText = `${data.player.name} to move`;
     playerColorBox.style.backgroundColor = '#' + data.player.colorHex.toString(16).padStart(6, '0');
+
+    directionArrows.forEach(a => { a.visible = false; a.userData = {}; });
+    updateVisuals();
+});
+
+game.on('onWallSelected', () => {
+    updateVisuals();
+});
+
+game.on('onWallDeselected', () => {
+    directionArrows.forEach(a => { a.visible = false; a.userData = {}; });
+    updateVisuals();
+});
+
+game.on('onSphereSelected', () => {
+    updateVisuals();
+});
+
+game.on('onSphereDeselected', () => {
+    directionArrows.forEach(a => { a.visible = false; a.userData = {}; });
+    updateVisuals();
+});
+
+game.on('onSphereMoved', (data) => {
+    if (sharedSphereMesh) {
+        const { x, z } = getPos(data.r, data.c);
+        sharedSphereMesh.position.set(x, 0.55, z);
+    }
+});
+
+game.on('onControlSchemeChanged', (scheme) => {
+    const panel = document.getElementById('action-panel');
+    if (panel) {
+        panel.style.display = scheme === 'classic' ? 'flex' : 'none';
+    }
+    const schemeBtn = document.getElementById('scheme-btn');
+    if (schemeBtn) {
+        schemeBtn.textContent = 'Controls: ' + (scheme === 'adaptive' ? 'Adaptive' : 'Classic');
+    }
+    game.interactionState = 'IDLE';
+    game.selectedWall = null;
+    directionArrows.forEach(a => a.visible = false);
+    updateVisuals();
+});
+
+game.on('onActionChanged', (action) => {
+    document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('active'));
+    const map = { LAY: 'btn-action-lay', MOVE: 'btn-action-move', PUSH: 'btn-action-push', TOPPLE: 'btn-action-topple', PUSH_SPHERE: 'btn-action-push-sphere' };
+    const el = document.getElementById(map[action]);
+    if (el) el.classList.add('active');
+    game.interactionState = 'IDLE';
+    game.selectedWall = null;
+    directionArrows.forEach(a => a.visible = false);
+    updateVisuals();
 });
 
 game.on('onPlateLaid', (data) => {
@@ -722,53 +742,10 @@ game.on('onWallLaid', (data) => {
     createWall(data.type, data.r, data.c, data.owner);
 });
 
-game.on('onActionChanged', (action) => {
-    document.querySelectorAll('.action-btn-custom').forEach(b => b.classList.remove('active'));
-    
-    if (action === 'LAY') btnLay.classList.add('active');
-    else if (action === 'MOVE') btnMove.classList.add('active');
-    else if (action === 'PUSH') btnPush.classList.add('active');
-    else if (action === 'TOPPLE') btnTopple.classList.add('active');
-});
-
-game.on('onFigureMoved', (data) => {
-    const mesh = playerMeshes[data.player.id];
-    const { x, z } = getPos(data.r, data.c);
-    
-    // Jump animation
-    new TWEEN.Tween(mesh.position)
-        .to({ x: x, z: z }, 500)
-        .easing(TWEEN.Easing.Quadratic.InOut)
-        .start();
-        
-    new TWEEN.Tween(mesh.position)
-        .to({ y: 1 }, 250)
-        .easing(TWEEN.Easing.Quadratic.Out)
-        .yoyo(true)
-        .repeat(1)
-        .start();
-});
-
-game.on('onFigureCrushed', (data) => {
-    const mesh = playerMeshes[data.player.id];
-    
-    // Send back to study room
-    let targetX, targetZ;
-    if (data.player.id === 0) { targetX = 0; targetZ = 12; }
-    else if (data.player.id === 1) { targetX = 0; targetZ = -12; }
-    else if (data.player.id === 2) { targetX = -12; targetZ = 0; }
-    else if (data.player.id === 3) { targetX = 12; targetZ = 0; }
-    
-    new TWEEN.Tween(mesh.position)
-        .to({ x: targetX, y: 0, z: targetZ }, 1000)
-        .easing(TWEEN.Easing.Bounce.Out)
-        .start();
-});
-
 game.on('onWallMoved', (data) => {
     const keyOld = data.type === 'h' ? `${data.r}_${data.oldC}` : `${data.oldR}_${data.c}`;
     const keyNew = data.type === 'h' ? `${data.r}_${data.newC}` : `${data.newR}_${data.c}`;
-    
+
     let mesh;
     if (data.type === 'h') {
         mesh = hWallMeshes[keyOld];
@@ -779,7 +756,7 @@ game.on('onWallMoved', (data) => {
         delete vWallMeshes[keyOld];
         vWallMeshes[keyNew] = mesh;
     }
-    
+
     const { x, z } = getPos(data.type === 'h' ? data.r : data.newR, data.type === 'h' ? data.newC : data.c);
     let targetX = data.type === 'h' ? x : x + TILE_SIZE/2 + GAP_SIZE/2;
     let targetZ = data.type === 'h' ? z + TILE_SIZE/2 + GAP_SIZE/2 : z;
@@ -794,14 +771,13 @@ game.on('onWallToppled', (data) => {
     const key = `${data.r}_${data.c}`;
     let mesh = data.type === 'h' ? hWallMeshes[key] : vWallMeshes[key];
     if (!mesh) return;
-    
+
     if (data.type === 'h') delete hWallMeshes[key];
     else delete vWallMeshes[key];
-    
-    // Topple animation then remove
+
     let rotAxis = data.type === 'h' ? 'x' : 'z';
     let rotDir = (data.dir === 'up' || data.dir === 'right') ? -1 : 1;
-    
+
     new TWEEN.Tween(mesh.rotation)
         .to({ [rotAxis]: (Math.PI / 2) * rotDir }, 400)
         .easing(TWEEN.Easing.Quadratic.In)
@@ -811,12 +787,12 @@ game.on('onWallToppled', (data) => {
 
 game.on('onGameOver', (data) => {
     document.getElementById('modal-title').innerText = "Game Over!";
-    document.getElementById('modal-text').innerText = `${data.winner.name} reached the goal!`;
+    document.getElementById('modal-text').innerText = `${data.winner.name} guided the sphere to their study room!`;
     document.getElementById('game-over-modal').classList.remove('hidden');
 });
 
 game.on('onMessage', (msg) => {
-    // Messages suppressed for clean UI
+    // Suppressed for clean UI
 });
 
 // --- Render Loop ---
@@ -824,155 +800,76 @@ function animate() {
     requestAnimationFrame(animate);
     TWEEN.update();
     controls.update();
-    
-    // Slow camera auto-rotation if no interaction
-    if (!controls.state && !game.winner) {
-        // scene.rotation.y += 0.0005; 
-    }
-    
     renderer.render(scene, camera);
 }
 
-// --- Move Target Cycling ---
-let moveTargets = [];
-let moveTargetIdx = -1;
-let targetRing = null;
+// --- Classic Mode ---
+function classicHandleClick(u) {
+    const action = game.selectedAction;
 
-function updateTargetRing() {
-    if (!targetRing) {
-        const ringGeo = new THREE.RingGeometry(0.35, 0.5, 32);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
-        targetRing = new THREE.Mesh(ringGeo, ringMat);
-        targetRing.rotation.x = -Math.PI / 2;
-        boardGroup.add(targetRing);
-    }
-    if (moveTargetIdx >= 0 && moveTargetIdx < moveTargets.length) {
-        const { r, c } = moveTargets[moveTargetIdx];
-        const { x, z } = getPos(r, c);
-        targetRing.position.set(x, 0.25, z);
-        targetRing.visible = true;
-    } else {
-        targetRing.visible = false;
-    }
-}
-
-function computeMoveTargets() {
-    moveTargets = [];
-    moveTargetIdx = -1;
-    if (game.winner || !game.players) return;
-    const cp = game.players[game.currentPlayer];
-    for (let r = 0; r < BOARD_SIZE; r++) {
-        for (let c = 0; c < BOARD_SIZE; c++) {
-            if (game.isValidMoveTarget(cp, r, c)) {
-                moveTargets.push({ r, c });
-            }
-        }
-    }
-    if (moveTargets.length > 0) moveTargetIdx = 0;
-    updateTargetRing();
-}
-
-game.on('onTurnStart', () => {
-    if (game.selectedAction === 'MOVE') computeMoveTargets();
-    else {
-        moveTargets = [];
-        moveTargetIdx = -1;
-        if (targetRing) targetRing.visible = false;
-    }
-});
-
-game.on('onActionChanged', (action) => {
-    if (action === 'MOVE') computeMoveTargets();
-    else {
-        moveTargets = [];
-        moveTargetIdx = -1;
-        if (targetRing) targetRing.visible = false;
-    }
-});
-
-// --- Keyboard Movement ---
-window.addEventListener('keydown', (e) => {
-    if (game.winner) return;
-    const key = e.key.toLowerCase();
-
-    // MOVE mode: A/D cycle targets, Enter to confirm
-    if (game.selectedAction === 'MOVE') {
-        if (key === 'a') {
-            e.preventDefault();
-            if (moveTargets.length === 0) computeMoveTargets();
-            if (moveTargets.length === 0) return;
-            moveTargetIdx = (moveTargetIdx - 1 + moveTargets.length) % moveTargets.length;
-            updateTargetRing();
-            return;
-        }
-        if (key === 'd') {
-            e.preventDefault();
-            if (moveTargets.length === 0) computeMoveTargets();
-            if (moveTargets.length === 0) return;
-            moveTargetIdx = (moveTargetIdx + 1) % moveTargets.length;
-            updateTargetRing();
-            return;
-        }
-        if (key === 'enter') {
-            e.preventDefault();
-            if (moveTargets.length === 0) return;
-            if (moveTargetIdx >= 0 && moveTargetIdx < moveTargets.length) {
-                const { r, c } = moveTargets[moveTargetIdx];
-                game.handleCellClick(r, c);
-                moveTargets = [];
-                moveTargetIdx = -1;
-                if (targetRing) targetRing.visible = false;
+    if (u.type === 'cell') {
+        if (action === 'LAY') {
+            if (game.fields[u.r][u.c] === null) {
+                game.doPlace(u.r, u.c);
+            } else {
+                game.log("Can't place a plate there.");
             }
             return;
         }
-    }
 
-    // WASD directional movement
-    const keys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Numpad8', 'Numpad4', 'Numpad2', 'Numpad6'];
-    if (!keys.includes(e.code)) return;
-
-    let dirX = 0, dirZ = 0;
-    if (e.code === 'KeyW' || e.code === 'ArrowUp' || e.code === 'Numpad8') dirZ = -1;
-    if (e.code === 'KeyS' || e.code === 'ArrowDown' || e.code === 'Numpad2') dirZ = 1;
-    if (e.code === 'KeyA' || e.code === 'ArrowLeft' || e.code === 'Numpad4') dirX = -1;
-    if (e.code === 'KeyD' || e.code === 'ArrowRight' || e.code === 'Numpad6') dirX = 1;
-    
-    const forward = new THREE.Vector3();
-    camera.getWorldDirection(forward);
-    forward.y = 0;
-    forward.normalize();
-    
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-    
-    const moveVec = new THREE.Vector3();
-    moveVec.addScaledVector(right, dirX);
-    moveVec.addScaledVector(forward, -dirZ);
-    
-    let targetR = 0, targetC = 0;
-    if (Math.abs(moveVec.x) > Math.abs(moveVec.z)) {
-        targetC = moveVec.x > 0 ? 1 : -1;
-    } else {
-        targetR = moveVec.z > 0 ? 1 : -1;
-    }
-    
-    const cp = game.players[game.currentPlayer];
-    if (cp.row === null) return;
-    
-    const newR = cp.row + targetR;
-    const newC = cp.col + targetC;
-    
-    if (newR >= 0 && newR < BOARD_SIZE && newC >= 0 && newC < BOARD_SIZE) {
-        const oldAction = game.selectedAction;
-        game.setAction('MOVE');
-        
-        if (game.isValidMoveTarget(cp, newR, newC)) {
-            game.handleCellClick(newR, newC);
-        } else {
-            game.setAction(oldAction);
-            game.log("Invalid move in that direction.");
+        if (action === 'MOVE') {
+            game.log("There are no figures to move in Shared Sphere mode.");
+            return;
         }
+
+        if (action === 'PUSH_SPHERE') {
+            if (u.r === game.sharedSphere.r && u.c === game.sharedSphere.c) {
+                game.interactionState = 'SPHERE_SELECTED';
+                game.trigger('onSphereSelected', {});
+                game.log('Sphere selected. Click a direction to push it.');
+            } else {
+                game.log("That's not the sphere.");
+            }
+            return;
+        }
+
+        game.log("Select a wall for this action.");
+        return;
     }
-});
+
+    if (u.type === 'hWall' || u.type === 'vWall') {
+        const type = u.type === 'hWall' ? 'h' : 'v';
+        const wall = (type === 'h') ? game.hWalls[u.r][u.c] : game.vWalls[u.r][u.c];
+
+        if (action === 'LAY') {
+            if (wall === null) {
+                game.doLayWall(type, u.r, u.c);
+            } else {
+                game.log("Can't place a wall there.");
+            }
+            return;
+        }
+
+        if (action === 'MOVE' || action === 'PUSH_SPHERE') {
+            game.log("Select a figure for this action.");
+            return;
+        }
+
+        classicWallClick(u, type, wall);
+        return;
+    }
+}
+
+function classicWallClick(u, type, wall) {
+    if (wall !== game.currentPlayer) {
+        game.log("That's not your wall.");
+        return;
+    }
+
+    game.interactionState = 'WALL_SELECTED';
+    game.selectedWall = { type, r: u.r, c: u.c };
+    game.trigger('onWallSelected', { type, r: u.r, c: u.c, player: game.players[game.currentPlayer] });
+}
 
 // --- AI Opponent ---
 let opponentType = 'computer';
@@ -988,7 +885,6 @@ function setOpponentType(type) {
     const target = document.querySelector(`#opponent-menu button[data-opp="${type}"]`);
     if (target) target.classList.add('active');
 
-    // Restart game with new opponent setting
     startNewGame(game.numPlayers, null);
 }
 
@@ -1000,7 +896,6 @@ document.querySelectorAll('#opponent-menu button').forEach(btn => {
     });
 });
 
-// Override startNewGame to handle player count vs AI
 const _origStartNewGame = startNewGame;
 startNewGame = function(pCount, btnElem) {
     if (aiTimeout) clearTimeout(aiTimeout);
@@ -1030,210 +925,103 @@ class LibraryAI {
     think() {
         isAiTurn = false;
         const player = this.game.players[this.playerId];
+        this.thinkSharedSphere(player);
+    }
 
-        if (this.tryWin(player)) return;
-        if (this.tryMoveAdvance(player)) return;
-
-        if (player.row === null) {
-            if (this.tryDeploy(player)) return;
-        }
-
-        if (this.tryExtendTerritory(player)) return;
-        if (this.tryBlockOpponent(player)) return;
+    thinkSharedSphere(player) {
+        if (this.tryPushSphereTowardEntrance(player)) return;
+        if (this.tryPlaceTowardEntrance(player)) return;
+        if (this.tryBlockRolling(player)) return;
         this.layAnywhere(player);
     }
 
-    distToGoal(r, c, player) {
-        if (player.goalRow !== null) return Math.abs(r - player.goalRow);
-        if (player.goalCol !== null) return Math.abs(c - player.goalCol);
-        return Infinity;
-    }
+    tryPushSphereTowardEntrance(player) {
+        const entrance = player.entrance;
+        const sphere = this.game.sharedSphere;
 
-    tryWin(player) {
-        for (let r = 0; r < BOARD_SIZE; r++) {
-            for (let c = 0; c < BOARD_SIZE; c++) {
-                const isGoal = (player.goalRow !== null && r === player.goalRow) ||
-                              (player.goalCol !== null && c === player.goalCol);
-                if (!isGoal) continue;
-                if (this.game.isValidMoveTarget(player, r, c)) {
-                    this.game.setAction('MOVE');
-                    this.game.handleCellClick(r, c);
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
+        const dr = entrance.r - sphere.r;
+        const dc = entrance.c - sphere.c;
 
-    tryMoveAdvance(player) {
-        if (player.row === null) return false;
+        const candidates = [];
+        if (dr !== 0) candidates.push({ dirR: dr > 0 ? 1 : -1, dirC: 0 });
+        if (dc !== 0) candidates.push({ dirR: 0, dirC: dc > 0 ? 1 : -1 });
 
-        let bestTarget = null;
-        let bestDist = Infinity;
-
-        for (let r = 0; r < BOARD_SIZE; r++) {
-            for (let c = 0; c < BOARD_SIZE; c++) {
-                if (!this.game.isValidMoveTarget(player, r, c)) continue;
-                const dist = this.distToGoal(r, c, player);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    bestTarget = { r, c };
-                }
-            }
-        }
-
-        if (bestTarget) {
-            this.game.setAction('MOVE');
-            this.game.handleCellClick(bestTarget.r, bestTarget.c);
-            return true;
-        }
-        return false;
-    }
-
-    tryDeploy(player) {
-        for (let r = 0; r < BOARD_SIZE; r++) {
-            for (let c = 0; c < BOARD_SIZE; c++) {
-                const isEdge = (player.startRow !== null && r === player.startRow) ||
-                              (player.startCol !== null && c === player.startCol);
-                if (!isEdge) continue;
-                if (this.game.fields[r][c] !== player.id) continue;
-                if (this.game.isValidMoveTarget(player, r, c)) {
-                    this.game.setAction('MOVE');
-                    this.game.handleCellClick(r, c);
-                    return true;
-                }
-            }
-        }
-        return this.layOnStartingEdge(player);
-    }
-
-    layOnStartingEdge(player) {
-        const edgeCells = [];
-        for (let r = 0; r < BOARD_SIZE; r++) {
-            for (let c = 0; c < BOARD_SIZE; c++) {
-                const isEdge = (player.startRow !== null && r === player.startRow) ||
-                              (player.startCol !== null && c === player.startCol);
-                if (!isEdge) continue;
-                if (this.game.fields[r][c] !== null) continue;
-                edgeCells.push({ r, c });
-            }
-        }
-
-        edgeCells.sort((a, b) => Math.abs(a.c - 3) - Math.abs(b.c - 3));
-
-        if (edgeCells.length > 0) {
-            const cell = edgeCells[0];
-            this.game.setAction('LAY');
-            this.game.handleCellClick(cell.r, cell.c);
-            return true;
-        }
-        return false;
-    }
-
-    tryExtendTerritory(player) {
-        let bestCell = null;
-        let bestDist = Infinity;
-
-        for (let r = 0; r < BOARD_SIZE; r++) {
-            for (let c = 0; c < BOARD_SIZE; c++) {
-                if (this.game.fields[r][c] !== null) continue;
-                if (!this.isAdjacentToOwn(r, c, player)) continue;
-                const dist = this.distToGoal(r, c, player);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    bestCell = { r, c };
-                }
-            }
-        }
-
-        if (bestCell) {
-            this.game.setAction('LAY');
-            this.game.handleCellClick(bestCell.r, bestCell.c);
-            return true;
-        }
-        return false;
-    }
-
-    isAdjacentToOwn(r, c, player) {
-        const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-        for (const [dr, dc] of dirs) {
-            const nr = r + dr, nc = c + dc;
+        for (const { dirR, dirC } of candidates) {
+            const nr = sphere.r + dirR;
+            const nc = sphere.c + dirC;
             if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) continue;
-            if (this.game.fields[nr][nc] === player.id) return true;
+            if (dirR !== 0) {
+                if (this.game.hWalls[Math.min(sphere.r, nr)][sphere.c] !== null) continue;
+            } else {
+                if (this.game.vWalls[sphere.r][Math.min(sphere.c, nc)] !== null) continue;
+            }
+            if (this.game.fields[nr][nc] === null) continue;
+            this.game.doPushSphere(dirR, dirC);
+            return true;
         }
         return false;
     }
 
-    tryBlockOpponent(player) {
-        const opponent = this.game.players.find(p => p.id !== player.id);
-        if (!opponent || opponent.row === null) return false;
+    tryPlaceTowardEntrance(player) {
+        const entrance = player.entrance;
+        const sphere = this.game.sharedSphere;
+        const dr = entrance.r - sphere.r;
+        const dc = entrance.c - sphere.c;
 
-        const goalDir = opponent.goalRow !== null
-            ? (opponent.goalRow > opponent.row ? 1 : -1)
-            : (opponent.goalCol !== null ? (opponent.goalCol > opponent.col ? 1 : -1) : 0);
+        const candidates = [];
+        if (dr !== 0) candidates.push({ r: sphere.r + (dr > 0 ? 1 : -1), c: sphere.c });
+        if (dc !== 0) candidates.push({ r: sphere.r, c: sphere.c + (dc > 0 ? 1 : -1) });
 
-        if (goalDir === 0) return false;
-
-        let blockRow, blockCol, type, checkWalls;
-        if (opponent.goalRow !== null) {
-            blockRow = opponent.row + goalDir;
-            type = 'h';
-            checkWalls = (r, c) => r >= 0 && r < BOARD_SIZE - 1 && this.game.hWalls[r][c] === null;
-            for (let c = Math.max(0, opponent.col - 1); c <= Math.min(BOARD_SIZE - 1, opponent.col + 1); c++) {
-                if (checkWalls(blockRow, c)) {
-                    this.game.setAction('LAY');
-                    this.game.handleWallClick('h', blockRow, c);
-                    return true;
-                }
-            }
-        } else {
-            blockCol = opponent.col + goalDir;
-            type = 'v';
-            checkWalls = (r, c) => c >= 0 && c < BOARD_SIZE - 1 && this.game.vWalls[r][c] === null;
-            for (let r = Math.max(0, opponent.row - 1); r <= Math.min(BOARD_SIZE - 1, opponent.row + 1); r++) {
-                if (checkWalls(r, blockCol)) {
-                    this.game.setAction('LAY');
-                    this.game.handleWallClick('v', r, blockCol);
-                    return true;
-                }
+        for (const { r, c } of candidates) {
+            if (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && this.game.fields[r][c] === null) {
+                this.game.doPlace(r, c);
+                return true;
             }
         }
+        return false;
+    }
 
+    tryBlockRolling(player) {
+        const opponent = this.game.players.find(p => p.id !== player.id);
+        if (!opponent || !opponent.entrance) return false;
+
+        const sphere = this.game.sharedSphere;
+        const e = opponent.entrance;
+        const midR = Math.round((sphere.r + e.r) / 2);
+        const midC = Math.round((sphere.c + e.c) / 2);
+
+        if (midR >= 0 && midR < BOARD_SIZE - 1 && midC >= 0 && midC < BOARD_SIZE) {
+            if (this.game.hWalls[midR][midC] === null) {
+                this.game.doLayWall('h', midR, midC);
+                return true;
+            }
+        }
+        if (midR >= 0 && midR < BOARD_SIZE && midC >= 0 && midC < BOARD_SIZE - 1) {
+            if (this.game.vWalls[midR][midC] === null) {
+                this.game.doLayWall('v', midR, midC);
+                return true;
+            }
+        }
         return false;
     }
 
     layAnywhere(player) {
-        let bestCell = null;
-        let bestDist = Infinity;
-
         for (let r = 0; r < BOARD_SIZE; r++) {
             for (let c = 0; c < BOARD_SIZE; c++) {
-                if (this.game.fields[r][c] !== null) continue;
-                const dist = this.distToGoal(r, c, player);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    bestCell = { r, c };
-                }
-            }
-        }
-
-        if (bestCell) {
-            this.game.setAction('LAY');
-            this.game.handleCellClick(bestCell.r, bestCell.c);
-            return;
-        }
-
-        for (let r = 0; r < BOARD_SIZE - 1; r++) {
-            for (let c = 0; c < BOARD_SIZE; c++) {
-                if (this.game.hWalls[r][c] === null) {
-                    this.game.setAction('LAY');
-                    this.game.handleWallClick('h', r, c);
+                if (this.game.fields[r][c] === null) {
+                    this.game.doPlace(r, c);
                     return;
                 }
             }
         }
-
-        // Safety fallback — end turn if nothing possible
+        for (let r = 0; r < BOARD_SIZE - 1; r++) {
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                if (this.game.hWalls[r][c] === null) {
+                    this.game.doLayWall('h', r, c);
+                    return;
+                }
+            }
+        }
         this.game.endTurn();
     }
 }
@@ -1245,6 +1033,11 @@ game.on('onTurnStart', (data) => {
     }
 });
 
-// Start immediately
+for (let i = 0; i < 8; i++) {
+    const arrow = createDirectionArrow();
+    boardGroup.add(arrow);
+    directionArrows.push(arrow);
+}
+
 game.initGame(2);
 animate();

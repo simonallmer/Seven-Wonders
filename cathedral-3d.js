@@ -1,7 +1,8 @@
 // ============================================
-// CATHEDRAL 3D VIEW — chessboard, heights, side stairs (level reset)
+// CATHEDRAL 3D VIEW — + cross board, terrain height, wide stairs at tips
 // ============================================
 
+window.is3DView = false;
 let scene, camera, renderer, controls;
 let raycaster, mouse;
 let needsRender = true;
@@ -16,27 +17,25 @@ const groupFX = new THREE.Group();
 const cellMeshes = new Map();
 const pilMeshes = {};
 
-const CELL = 40, W = 7, H = 7;
+const CELL = 40, W = 9, H = 9;
 const LIFT = 22, BASE = -34;
 function wX(x) { return (x - (W - 1) / 2) * CELL; }
 function wZ(y) { return (y - (H - 1) / 2) * CELL; }
 function topY(h) { return h * LIFT; }
 function lvlY(L) { return L * LIFT; }
 
-const matFieldW = new THREE.MeshStandardMaterial({ color: 0xe7dcc0, roughness: 0.9 });
-const matFieldB = new THREE.MeshStandardMaterial({ color: 0x4a4334, roughness: 0.9 });
-const matFieldWdn = new THREE.MeshStandardMaterial({ color: 0xbcb195, roughness: 0.95 });
-const matFieldBdn = new THREE.MeshStandardMaterial({ color: 0x3f3a2e, roughness: 0.95 });
-const matStart = new THREE.MeshStandardMaterial({ color: 0xC5A059, roughness: 0.6, metalness: 0.4 });
-const matStair = new THREE.MeshStandardMaterial({ color: 0xB89048, roughness: 0.5, metalness: 0.5 });
-const matSide = new THREE.MeshStandardMaterial({ color: 0xa99a78, roughness: 0.9 });
-const matBevel = new THREE.MeshStandardMaterial({ color: 0xE7C24A, roughness: 0.3, metalness: 0.8, emissive: 0x3a2a00, emissiveIntensity: 0.2 });
-const matGrass = new THREE.MeshStandardMaterial({ color: 0x6f7d4a, roughness: 1.0 });
-const matHomeW = new THREE.MeshBasicMaterial({ color: 0xf3efe6, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
-const matHomeB = new THREE.MeshBasicMaterial({ color: 0x242424, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
+const matField = new THREE.MeshStandardMaterial({ color: 0xb8ab92, roughness: 0.85 });
+const matFieldLo = new THREE.MeshStandardMaterial({ color: 0x9a8d78, roughness: 0.9 });
+const matStart = new THREE.MeshStandardMaterial({ color: 0xb09060, roughness: 0.6, metalness: 0.3 });
+const matStair = new THREE.MeshStandardMaterial({ color: 0x9a8558, roughness: 0.6, metalness: 0.3 });
+const matSide = new THREE.MeshStandardMaterial({ color: 0x887d68, roughness: 0.9 });
+const matBevel = new THREE.MeshStandardMaterial({ color: 0xccaa44, roughness: 0.3, metalness: 0.8, emissive: 0x3a2a00, emissiveIntensity: 0.15 });
+const matFloor = new THREE.MeshStandardMaterial({ color: 0x5a5042, roughness: 1.0 });
+const matHomeW = new THREE.MeshBasicMaterial({ color: 0xf3efe6, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false });
+const matHomeB = new THREE.MeshBasicMaterial({ color: 0x242424, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false });
 const matMove = new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false });
-const matRaise = new THREE.MeshBasicMaterial({ color: 0xf2b441, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
-const matLower = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
+const matVault = new THREE.MeshBasicMaterial({ color: 0xf0c040, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false });
+const matStruggle = new THREE.MeshBasicMaterial({ color: 0xe05050, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false });
 const matStairRing = new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false });
 const matExit = { '-1': new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }),
                   '0': new THREE.MeshBasicMaterial({ color: 0xe7dcc0, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }),
@@ -48,8 +47,8 @@ function init3D() {
     const container = document.getElementById('canvas3d');
     if (!container) return;
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf3cf91);
-    scene.fog = new THREE.FogExp2(0xf3cf91, 0.0009);
+    scene.background = new THREE.Color(0x7a6e5a);
+    scene.fog = new THREE.FogExp2(0x7a6e5a, 0.0012);
 
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 8000);
     camera.position.set(0, 360, 320);
@@ -68,7 +67,7 @@ function init3D() {
     controls.addEventListener('change', function () { needsRender = true; });
 
     scene.add(new THREE.HemisphereLight(0xfff4e6, 0x6a6240, 0.95));
-    const dir = new THREE.DirectionalLight(0xffe6bc, 1.4);
+    const dir = new THREE.DirectionalLight(0xffe6bc, 0.9);
     dir.position.set(180, 380, 200); dir.castShadow = true;
     dir.shadow.camera.top = 280; dir.shadow.camera.bottom = -280;
     dir.shadow.camera.left = -300; dir.shadow.camera.right = 300;
@@ -83,32 +82,23 @@ function init3D() {
 
     window.addEventListener('resize', onResize);
     raycaster = new THREE.Raycaster(); mouse = new THREE.Vector2();
-    
-    let __pointerDownPos_cathedraldjs = { x: 0, y: 0 };
-    renderer.domElement.addEventListener('pointerdown', (e) => {
-        __pointerDownPos_cathedraldjs.x = e.clientX;
-        __pointerDownPos_cathedraldjs.y = e.clientY;
-    });
-
-    renderer.domElement.addEventListener('pointerup', (e) => {
-        const dx = e.clientX - __pointerDownPos_cathedraldjs.x;
-        const dy = e.clientY - __pointerDownPos_cathedraldjs.y;
-        if (Math.sqrt(dx*dx + dy*dy) < 5) {
-            onPointerDown(e);
-        }
-    });
-
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.setAnimationLoop(animate);
 
+    window.is3DView = true;
     if (window.cathReset) window.cathReset();
 }
 function onResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); needsRender = true; }
 
 function buildEnvironment() {
-    const ground = new THREE.Mesh(new THREE.CircleGeometry(4000, 48), matGrass);
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(4000, 48), matFloor);
     ground.rotation.x = -Math.PI / 2; ground.position.y = BASE - 2; ground.receiveShadow = true; groupEnv.add(ground);
+    // dim the hemisphere light for interior feel
+    scene.children.forEach(function (c) { if (c.isHemisphereLight) { c.intensity = 0.55; c.color.setHex(0xceb88a); c.groundColor.setHex(0x4a3f30); } });
 }
+
+function cCross(x, y) { return (x >= 3 && x <= 5 || y >= 3 && y <= 5); }
 
 function buildBoard() {
     while (groupCells.children.length) groupCells.remove(groupCells.children[0]);
@@ -116,57 +106,45 @@ function buildBoard() {
     cellMeshes.clear();
     const st = window.getCathState();
     st.cells.forEach(function (c) {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(CELL - 1.5, 1, CELL - 1.5), [matSide, matSide, matFieldW, matSide, matSide, matSide]);
+        if (!cCross(c.x, c.y)) return;
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(CELL - 1.5, 1, CELL - 1.5), [matSide, matSide, matField, matSide, matSide, matSide]);
         mesh.castShadow = true; mesh.receiveShadow = true;
         mesh.position.x = wX(c.x); mesh.position.z = wZ(c.y);
         mesh.userData = { x: c.x, y: c.y };
         applyCellHeight(mesh, c);
         groupCells.add(mesh); cellMeshes.set(c.x + ',' + c.y, mesh);
         if (c.start) {
-            const col = (c.y === 6) ? matHomeW : matHomeB;
+            // B = (4,0) & (4,8), W = (0,4) & (8,4)
+            const isW = c.y === 4;
+            const col = isW ? matHomeW : matHomeB;
             const band = new THREE.Mesh(new THREE.PlaneGeometry(CELL - 8, CELL - 8), col);
             band.rotation.x = -Math.PI / 2; band.position.set(wX(c.x), topY(0) + 1.4, wZ(c.y)); groupDeco.add(band);
         }
     });
-    // side stairs (off-board, attached at the middle of the left/right sides)
+    // side stairs (off-board, attached at the middle of all four sides)
     st.stairs.forEach(function (s) { buildStair(s); });
 }
 function buildStair(s) {
-    const cx = wX(s.x), cz = wZ(s.y);
+    if (!s.adjs) return;
+    // span covers the adj cells' width; platform sits at the off-board stair position
+    let loX = Infinity, loY = Infinity, hiX = -Infinity, hiY = -Infinity;
+    s.adjs.forEach(function (a) { if (a.x < loX) loX = a.x; if (a.x > hiX) hiX = a.x; if (a.y < loY) loY = a.y; if (a.y > hiY) hiY = a.y; });
     const isNS = s.side === 'N' || s.side === 'S';
-    // spine offset direction (toward the outer edge, away from board)
-    let sx = 0, sz = 0;
-    if (s.side === 'L') { sx = -1; }
-    else if (s.side === 'R') { sx = 1; }
-    else if (s.side === 'N') { sz = -1; }
-    else { sz = 1; } // S
-    // spine — rotated 90° for N/S stairs so steps face the board
-    const spine = new THREE.Mesh(
-        new THREE.BoxGeometry(isNS ? CELL - 10 : 8, 3 * LIFT + 8, isNS ? 8 : CELL - 10),
-        matStair
-    );
-    spine.position.set(cx + sx * CELL * 0.32, 0, cz + sz * CELL * 0.32);
-    spine.castShadow = true; groupDeco.add(spine);
-    // three landings: down / normal / up
+    const wide = (isNS ? (hiX - loX + 1) : (hiY - loY + 1)) * CELL - 4;
+    const narrow = CELL - 4;
+    const pw = isNS ? wide : narrow;
+    const pd = isNS ? narrow : wide;
+    const cx = wX(s.x), cz = wZ(s.y);
     [-1, 0, 1].forEach(function (L) {
-        const pad = new THREE.Mesh(new THREE.BoxGeometry(CELL - 12, 4, CELL - 12), matStair);
+        const pad = new THREE.Mesh(new THREE.BoxGeometry(pw, 4, pd), matStair);
         pad.position.set(cx, lvlY(L), cz);
         pad.castShadow = true; pad.receiveShadow = true;
         pad.userData = { stairSide: s.side }; groupDeco.add(pad);
-        // post at the outer corner of each pad
-        let px = 0, pz = 0;
-        if (s.side === 'L' || s.side === 'N') { px = -1; } else { px = 1; }
-        if (s.side === 'L' || s.side === 'R' || s.side === 'N') { pz = -1; } else { pz = 1; }
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, LIFT, 8), matStart);
-        post.position.set(cx + px * CELL * 0.28, lvlY(L) - LIFT / 2, cz + pz * CELL * 0.3);
-        groupDeco.add(post);
     });
 }
 
 function cellTopMat(c) {
-    const col = (c.color || (((c.x + c.y) % 2 === 0) ? 'W' : 'B'));
-    if (col === 'W') return c.h < 0 ? matFieldWdn : matFieldW;
-    return c.h < 0 ? matFieldBdn : matFieldB;
+    return c.h < 0 ? matFieldLo : matField;
 }
 function applyCellHeight(mesh, c) {
     const top = topY(c.h), boxH = top - BASE;
@@ -190,19 +168,31 @@ function cathSync3D() {
     const byKey = {}; st.cells.forEach(function (c) { byKey[c.x + ',' + c.y] = c; });
     cellMeshes.forEach(function (mesh, key) { const c = byKey[key]; if (c && !mesh.userData.animating) applyCellHeight(mesh, c); });
 
+    // render all 4 stones
     ['W', 'B'].forEach(function (col) {
-        const p = st.pilgrims[col];
-        let m = pilMeshes[col];
-        if (!m) { m = createStone(PCOL[col].stone, col !== 'W'); pilMeshes[col] = m; groupStones.add(m); }
-        if (!m.userData.animating) m.position.set(wX(p.x), pilY(p), wZ(p.y));
+        const arr = st.pilgrims[col];
+        if (!arr) return;
+        arr.forEach(function (p) {
+            const key = col + p.idx;
+            let m = pilMeshes[key];
+            if (!m) { m = createStone(PCOL[col].stone, col !== 'W'); pilMeshes[key] = m; groupStones.add(m); }
+            if (!m.userData.animating) m.position.set(wX(p.x), pilY(p), wZ(p.y));
+        });
     });
 
-    const lvl = st.pilgrims[st.turn].level;
+    const cellsByKey = {}; st.cells.forEach(function (c) { cellsByKey[c.x + ',' + c.y] = c; });
     while (groupTargets.children.length) groupTargets.remove(groupTargets.children[0]);
-    st.moveTargets.forEach(function (t) {
-        let mat = matMove, y = lvlY(lvl) + 1.6;
-        if (t.kind === 'stair') { mat = matStairRing; y = lvlY(0) + 5; }
-        else if (t.kind === 'exit') { mat = matExit[String(t.level)]; y = lvlY(t.level) + 5; }
+    (st.targets || []).forEach(function (t) {
+        let mat = matMove, targetLevel = 0;
+        if (t.kind === 'stair') { mat = matStairRing; targetLevel = 0; }
+        else if (t.kind === 'exit') { mat = matExit[String(t.level)]; targetLevel = t.level; }
+        else if (t.kind === 'vault') { mat = matVault; targetLevel = (cellsByKey[t.x + ',' + t.y] || {}).h || 0; }
+        else if (t.kind === 'struggle') { mat = matStruggle; targetLevel = (cellsByKey[t.x + ',' + t.y] || {}).h || 0; }
+        else {
+            const cell = cellsByKey[t.x + ',' + t.y];
+            targetLevel = cell ? cell.h : 0;
+        }
+        const y = lvlY(targetLevel) + (t.kind === 'stair' ? 5 : t.kind === 'struggle' ? 7 : 1.6);
         const ring = new THREE.Mesh(new THREE.RingGeometry(CELL * 0.26, CELL * 0.4, 26), mat);
         ring.rotation.x = -Math.PI / 2; ring.position.set(wX(t.x), y, wZ(t.y));
         ring.userData = { target: t }; groupTargets.add(ring);
@@ -216,8 +206,9 @@ function cathRebuild() {
     buildBoard(); cathSync3D();
 }
 
-function cathAnimMove(color, from, to) {
-    const m = pilMeshes[color]; if (!m) return;
+function cathAnimMove(color, idx, from, to) {
+    const key = color + idx;
+    const m = pilMeshes[key]; if (!m) return;
     const yF = (from.onStair ? lvlY(0) : lvlY(from.level || 0)) + 4;
     const yT = (to.onStair ? lvlY(0) : lvlY(to.level || 0)) + 4;
     const start = new THREE.Vector3(wX(from.x), yF, wZ(from.y));
@@ -259,48 +250,55 @@ function onPointerDown(e) {
     if (!window.is3DView) return;
     setMouse(e); raycaster.setFromCamera(mouse, camera);
     const st = window.getCathState();
-    if (st.mode === 'move') {
-        const hits = raycaster.intersectObjects([].concat(groupTargets.children, groupCells.children, groupDeco.children), true);
-        const targets = st.moveTargets;
-        // 1) a stacked exit ring needs a precise hit (three at one cell)
-        for (let i = 0; i < hits.length; i++) { const o = bubble(hits[i].object, 'target'); if (o && o.userData.target.kind === 'exit') { window.cathTapTarget(o.userData.target); return; } }
-        // 2) clicking anywhere on a target FIELD moves there
-        for (let i = 0; i < hits.length; i++) {
-            const c = bubble(hits[i].object, 'x'); if (!c) continue;
-            const t = targets.find(function (q) { return q.x === c.userData.x && q.y === c.userData.y && q.kind !== 'exit'; });
-            if (t) { window.cathTapTarget(t); return; }
-        }
-        // 3) clicking the side-stair structure enters it
-        for (let i = 0; i < hits.length; i++) {
-            const s = bubble(hits[i].object, 'stairSide'); if (!s) continue;
-            const t = targets.find(function (q) { return q.kind === 'stair' && q.side === s.userData.stairSide; });
-            if (t) { window.cathTapTarget(t); return; }
-        }
-        // 4) fall back to any target ring
-        for (let i = 0; i < hits.length; i++) { const o = bubble(hits[i].object, 'target'); if (o) { window.cathTapTarget(o.userData.target); return; } }
-    } else {
-        const hits = raycaster.intersectObjects(groupCells.children, true);
-        for (let i = 0; i < hits.length; i++) { const o = bubble(hits[i].object, 'x'); if (o) { window.cathTapLift(o.userData.x, o.userData.y); return; } }
+    if (st.winner) return;
+    const hits = raycaster.intersectObjects([].concat(groupTargets.children, groupCells.children, groupDeco.children), true);
+    const targets = st.targets || [];
+
+    // 1 — exit target rings
+    for (let i = 0; i < hits.length; i++) { const o = bubble(hits[i].object, 'target'); if (o && o.userData.target.kind === 'exit') { window.cathTapTarget(o.userData.target); return; } }
+
+    // 2 — cell hits → individual target or rally
+    let rallyCell = null;
+    for (let i = 0; i < hits.length; i++) {
+        const c = bubble(hits[i].object, 'x'); if (!c) continue;
+        rallyCell = rallyCell || { x: c.userData.x, y: c.userData.y };
+        const t = targets.find(function (q) { return q.x === c.userData.x && q.y === c.userData.y && q.kind !== 'exit' && q.kind !== 'vault'; });
+        if (t) { window.cathTapTarget(t); return; }
     }
+
+    // 3 — stair sides
+    for (let i = 0; i < hits.length; i++) {
+        const s = bubble(hits[i].object, 'stairSide'); if (!s) continue;
+        const t = targets.find(function (q) { return q.kind === 'stair' && q.side === s.userData.stairSide; });
+        if (t) { window.cathTapTarget(t); return; }
+    }
+
+    // 4 — vault / any remaining target ring
+    for (let i = 0; i < hits.length; i++) { const o = bubble(hits[i].object, 'target'); if (o) { window.cathTapTarget(o.userData.target); return; } }
+
+    // 5 — rally toward the clicked cell
+    if (rallyCell && window.cathTryRally) window.cathTryRally(rallyCell.x, rallyCell.y);
 }
 function onPointerMove(e) {
     if (!window.is3DView) return;
     setMouse(e); raycaster.setFromCamera(mouse, camera);
     const st = window.getCathState();
+    if (st.winner) { renderer.domElement.style.cursor = 'default'; return; }
+    const hits = raycaster.intersectObjects([].concat(groupTargets.children, groupCells.children, groupDeco.children), true);
+    const targets = st.targets || [];
     let over = false;
-    if (st.mode === 'move') {
-        const hits = raycaster.intersectObjects([].concat(groupTargets.children, groupCells.children, groupDeco.children), true);
-        const targets = st.moveTargets;
-        for (let i = 0; i < hits.length && !over; i++) {
-            const o = bubble(hits[i].object, 'target'); if (o) { over = true; break; }
-            const c = bubble(hits[i].object, 'x'); if (c && targets.some(function (q) { return q.x === c.userData.x && q.y === c.userData.y && q.kind !== 'exit'; })) over = true;
-            const s = bubble(hits[i].object, 'stairSide'); if (s && targets.some(function (q) { return q.kind === 'stair' && q.side === s.userData.stairSide; })) over = true;
+    for (let i = 0; i < hits.length && !over; i++) {
+        const o = bubble(hits[i].object, 'target'); if (o) { over = true; break; }
+        const c = bubble(hits[i].object, 'x');
+        if (c) {
+            if (targets.some(function (q) { return q.x === c.userData.x && q.y === c.userData.y && q.kind !== 'exit' && q.kind !== 'vault'; })) over = true;
+            else if (cInView(c.userData.x, c.userData.y)) over = true; // rally-eligible
         }
-    } else {
-        over = raycaster.intersectObjects(groupCells.children, true).length > 0;
+        const s = bubble(hits[i].object, 'stairSide'); if (s && targets.some(function (q) { return q.kind === 'stair' && q.side === s.userData.stairSide; })) over = true;
     }
     renderer.domElement.style.cursor = over ? 'pointer' : 'default';
 }
+function cInView(x, y) { return x >= 0 && x < 9 && y >= 0 && y < 9 && (x >= 3 && x <= 5 || y >= 3 && y <= 5); }
 
 function animate(t) { TWEEN.update(t); const cu = controls.update(); if (cu || needsRender) { renderer.render(scene, camera); needsRender = false; } }
 

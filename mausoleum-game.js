@@ -4,17 +4,57 @@
 // ============================================
 // CONSTANTS
 // ============================================
-var PLAYER_1 = 1;
-var PLAYER_2 = 2;
+var PLAYER_1 = 1; // white
+var PLAYER_2 = 2; // black
 var EMPTY = 0;
 var HOLE = 3; // Collapsed field: a permanent pit. Blocks movement; acts as a neutral wall for encirclement.
-var ROW_LENGTHS = [4, 5, 6, 7, 8, 7, 6, 5, 4];
-var TOTAL_ROWS = 9;
+var PLAYER_3 = 4; // red  (4-player) — note: 3 is taken by HOLE, so red/blue use 4/5
+var PLAYER_4 = 5; // blue (4-player)
+
+// Board shapes per mode.
+//  - 2 players: the classic diamond/hexagon.
+//  - 4 players: an elongated "Long Barrow" hexagon (wide & shallow). Four corner wedges hold
+//    the armies (white BL, red TL, black TR, blue BR); the middle row and the two pointed
+//    left/right tips are neutral collapse-funnels.
+var ROW_LENGTHS_2P = [4, 5, 6, 7, 8, 7, 6, 5, 4];
+var ROW_LENGTHS_4P = [8, 9, 10, 11, 10, 9, 8];
+var ROW_LENGTHS = ROW_LENGTHS_2P;
+var TOTAL_ROWS = ROW_LENGTHS.length;
+
+// Canonical Seven Wonders colours + clockwise turn order white -> red -> black -> blue.
+var COLOR_OF = { 1: 'white', 2: 'black', 4: 'red', 5: 'blue' };
+var TURN_ORDER_2P = [PLAYER_1, PLAYER_2];
+var TURN_ORDER_4P = [PLAYER_1, PLAYER_3, PLAYER_2, PLAYER_4];
+var turnOrder = TURN_ORDER_2P;
+var eliminated = {}; // playerId -> true once below 4 stones / entombed (4-player)
+
+function isPlayerVal(v) { return v === PLAYER_1 || v === PLAYER_2 || v === PLAYER_3 || v === PLAYER_4; }
+function activePlayers() { return turnOrder.filter(function (p) { return !eliminated[p]; }); }
+function colorName(p) { var c = COLOR_OF[p] || 'white'; return c.charAt(0).toUpperCase() + c.slice(1); }
+
+// Apply the board shape + turn order for the current player count.
+function configureBoard() {
+    if (playerCount === 4) {
+        ROW_LENGTHS = ROW_LENGTHS_4P;
+        turnOrder = TURN_ORDER_4P;
+    } else {
+        ROW_LENGTHS = ROW_LENGTHS_2P;
+        turnOrder = TURN_ORDER_2P;
+    }
+    TOTAL_ROWS = ROW_LENGTHS.length;
+    window.ROW_LENGTHS = ROW_LENGTHS;
+    window.TOTAL_ROWS = TOTAL_ROWS;
+    window.playerCount = playerCount;
+}
 
 window.PLAYER_1 = PLAYER_1;
 window.PLAYER_2 = PLAYER_2;
+window.PLAYER_3 = PLAYER_3;
+window.PLAYER_4 = PLAYER_4;
 window.EMPTY = EMPTY;
 window.HOLE = HOLE;
+window.COLOR_OF = COLOR_OF;
+window.isPlayerVal = isPlayerVal;
 window.ROW_LENGTHS = ROW_LENGTHS;
 window.TOTAL_ROWS = TOTAL_ROWS;
 
@@ -67,6 +107,7 @@ const gameMessage = document.getElementById('game-message');
 // ============================================
 
 function createBoard() {
+    if (playerCount === 4) { createBoard4(); return; }
     board = [];
     for (let r = 0; r < TOTAL_ROWS; r++) {
         const rowLen = ROW_LENGTHS[r];
@@ -83,6 +124,30 @@ function createBoard() {
         board.push(row);
     }
     // Shared reference to window.board
+    window.board = board;
+}
+
+// 4-player "Long Barrow": four corner wedges. Each row's outer ~third on the left and right
+// is a home band; the middle row and the two pointed tips stay empty (neutral funnels).
+//   top half -> left = RED, right = BLACK ;  bottom half -> left = WHITE, right = BLUE
+function createBoard4() {
+    board = [];
+    for (let r = 0; r < TOTAL_ROWS; r++) {
+        board.push(Array(ROW_LENGTHS[r]).fill(EMPTY));
+    }
+    const mid = Math.floor(TOTAL_ROWS / 2);
+    for (let r = 0; r < TOTAL_ROWS; r++) {
+        if (r === mid) continue; // neutral spine
+        const len = ROW_LENGTHS[r];
+        const band = Math.floor(len / 3);
+        const top = r < mid;
+        for (let c = 0; c < band; c++) {
+            board[r][c] = top ? PLAYER_3 : PLAYER_1;            // left wedge: red(top)/white(bottom)
+        }
+        for (let c = len - band; c < len; c++) {
+            board[r][c] = top ? PLAYER_2 : PLAYER_4;            // right wedge: black(top)/blue(bottom)
+        }
+    }
     window.board = board;
 }
 
@@ -106,26 +171,31 @@ function getCoords(r, c) {
 }
 
 function drawBoard() {
-    const stoneCounts = { [PLAYER_1]: 0, [PLAYER_2]: 0 };
+    const stoneCounts = { [PLAYER_1]: 0, [PLAYER_2]: 0, [PLAYER_3]: 0, [PLAYER_4]: 0 };
 
     for (let r = 0; r < TOTAL_ROWS; r++) {
         for (let c = 0; c < ROW_LENGTHS[r]; c++) {
             const stoneValue = board[r][c];
-            if (stoneValue === PLAYER_1 || stoneValue === PLAYER_2) {
+            if (isPlayerVal(stoneValue)) {
                 stoneCounts[stoneValue]++;
             }
         }
     }
 
-    // Update HUD
+    // Update HUD (red/blue counters only shown in 4-player mode)
     if (p1CountHud) p1CountHud.textContent = stoneCounts[PLAYER_1];
     if (p2CountHud) p2CountHud.textContent = stoneCounts[PLAYER_2];
-    
+    const p3Hud = document.getElementById('p3-count-hud');
+    const p4Hud = document.getElementById('p4-count-hud');
+    if (p3Hud) p3Hud.textContent = stoneCounts[PLAYER_3];
+    if (p4Hud) p4Hud.textContent = stoneCounts[PLAYER_4];
+
+    const COLOR_HEX = { 1: '#ffffff', 2: '#1a1a1a', 4: '#c0392b', 5: '#2e6fb0' };
     if (statusName) {
-        statusName.textContent = (currentPlayer === PLAYER_1 ? "White's" : "Black's") + " Turn";
+        statusName.textContent = colorName(currentPlayer) + "'s Turn";
     }
     if (statusIndicator) {
-        statusIndicator.style.backgroundColor = currentPlayer === PLAYER_1 ? '#ffffff' : '#1a1a1a';
+        statusIndicator.style.backgroundColor = COLOR_HEX[currentPlayer] || '#ffffff';
     }
 
     // Sync 3D pieces
@@ -300,7 +370,7 @@ function calculatePushMoves(r, c) {
         const adj = path[0];
         const beyond = path[1];
         const adjVal = board[adj.r][adj.c];
-        if (adjVal !== PLAYER_1 && adjVal !== PLAYER_2) continue; // must be a stone to push
+        if (!isPlayerVal(adjVal)) continue; // must be a stone to push
 
         // Don't allow shoving the just-pushed stone straight back.
         if (lastPushedStone && lastPushedStone.r === adj.r && lastPushedStone.c === adj.c) continue;
@@ -322,6 +392,7 @@ function isTrapped(r, c) {
     return emptyCount <= 1; // Trapped if only 1 or 0 directions to move
 }
 
+window.getCurrentPlayer = function () { return currentPlayer; };
 function onCellClick(r, c) {
     if (gameOver) return;
     const val = board[r][c];
@@ -409,18 +480,57 @@ function finishTurn() {
         return;
     }
 
-    currentPlayer = currentPlayer === PLAYER_1 ? PLAYER_2 : PLAYER_1;
-
-    // The new player may have been sealed in by the spreading pits.
-    if (checkStalemate(currentPlayer)) {
+    advanceToNextPlayer();
+    if (gameOver) {
         drawBoard();
         return;
     }
 
     drawBoard();
 
-    if (!gameOver && isVsComputer && currentPlayer === PLAYER_2) {
+    if (!gameOver && isAITurn()) {
         setTimeout(makeAIMove, 600);
+    }
+}
+
+// White is always the human; everyone else is AI when the computer opponent is enabled.
+function isAITurn() {
+    if (!isVsComputer || gameOver) return false;
+    return playerCount === 4 ? currentPlayer !== PLAYER_1 : currentPlayer === PLAYER_2;
+}
+window.isAITurn = isAITurn;
+
+// Advance clockwise to the next player who can move. In 4-player, a player sealed in (no
+// legal move) is eliminated — their stones collapse into pits — and we keep searching.
+function advanceToNextPlayer() {
+    const idx = turnOrder.indexOf(currentPlayer);
+    let next = idx;
+    for (let guard = 0; guard < turnOrder.length + 1; guard++) {
+        do { next = (next + 1) % turnOrder.length; } while (eliminated[turnOrder[next]] && next !== idx);
+        currentPlayer = turnOrder[next];
+
+        if (playerHasAnyMove(currentPlayer)) return;
+
+        // Entombed.
+        if (playerCount === 4) {
+            eliminatePlayer(currentPlayer);
+            if (checkWinCondition()) return;
+            // loop on to the following player
+        } else {
+            checkStalemate(currentPlayer); // 2-player: a sealed-in player loses outright
+            return;
+        }
+    }
+}
+
+// 4-player: remove a player from the game; their remaining stones collapse into pits.
+function eliminatePlayer(p) {
+    if (eliminated[p]) return;
+    eliminated[p] = true;
+    for (let r = 0; r < TOTAL_ROWS; r++) {
+        for (let c = 0; c < ROW_LENGTHS[r]; c++) {
+            if (board[r][c] === p) board[r][c] = HOLE;
+        }
     }
 }
 
@@ -431,17 +541,17 @@ function resolveEncirclements() {
     for (let r = 0; r < TOTAL_ROWS; r++) {
         for (let c = 0; c < ROW_LENGTHS[r]; c++) {
             const val = board[r][c];
-            if (val === EMPTY || val === HOLE) continue;
+            if (!isPlayerVal(val)) continue;
 
             const neighbors = getNeighbors(r, c);
             // A cell counts as "surrounding" if it is occupied by a stone OR is a pit (deadly wall).
             const occupied = neighbors.filter(n => board[n.r][n.c] !== EMPTY);
 
             if (occupied.length === neighbors.length) { // Fully encircled (stones and/or pits on every side)
-                const opponent = val === PLAYER_1 ? PLAYER_2 : PLAYER_1;
+                // Any other colour counts as an enemy, so 4-player coalitions can jointly encircle.
                 const friendlies = neighbors.filter(n => board[n.r][n.c] === val).length;
-                const enemies = neighbors.filter(n => board[n.r][n.c] === opponent).length;
-                
+                const enemies = neighbors.filter(n => { const v = board[n.r][n.c]; return isPlayerVal(v) && v !== val; }).length;
+
                 if (enemies > friendlies) {
                     toRemove.push({ r, c });
                     captured = true;
@@ -460,8 +570,20 @@ function resolveEncirclements() {
 }
 
 function checkWinCondition() {
-    const counts = { [PLAYER_1]: 0, [PLAYER_2]: 0 };
-    board.forEach(row => row.forEach(val => { if (val === PLAYER_1 || val === PLAYER_2) counts[val]++; }));
+    const counts = { [PLAYER_1]: 0, [PLAYER_2]: 0, [PLAYER_3]: 0, [PLAYER_4]: 0 };
+    board.forEach(row => row.forEach(val => { if (isPlayerVal(val)) counts[val]++; }));
+
+    if (playerCount === 4) {
+        // Any active player below 4 stones is eliminated (their stones collapse into pits).
+        activePlayers().forEach(p => { if (counts[p] < 4) eliminatePlayer(p); });
+        const alive = activePlayers();
+        if (alive.length <= 1) {
+            const winner = alive[0] || currentPlayer;
+            showEndGameMessage(colorName(winner) + " Wins!", colorName(winner) + " is the last tomb-builder standing.");
+            return true;
+        }
+        return false;
+    }
 
     if (counts[PLAYER_1] < 4) {
         showEndGameMessage("Black Wins!", "White has fewer than four stones.");
@@ -509,15 +631,19 @@ function showEndGameMessage(title, text) {
 }
 
 function initGame() {
+    configureBoard();
+    eliminated = {};
     createBoard();
     buildNeighborMaps();
-    currentPlayer = PLAYER_1;
+    currentPlayer = turnOrder[0];
     selectedStone = null;
     validMoves = [];
     gameOver = false;
     lastPushedStone = null;
-    // Rebuild the 3D fields so any pits from the previous game are sealed back up.
-    if (window.is3DView && typeof window.rebuild3DBoard === 'function') {
+    // Rebuild the 3D fields (and, for 4-player, the elongated architecture).
+    if (window.is3DView && typeof window.rebuild3DScene === 'function') {
+        window.rebuild3DScene();
+    } else if (window.is3DView && typeof window.rebuild3DBoard === 'function') {
         window.rebuild3DBoard();
     }
     drawBoard();
@@ -540,7 +666,15 @@ if (opponentButton) opponentButton.addEventListener('click', () => {
 });
 
 if (playerCountBtn) playerCountBtn.addEventListener('click', () => {
-    showMessage("3 & 4 Player Mode: Coming Soon");
+    playerCount = (playerCount === 2) ? 4 : 2;
+    playerCountBtn.textContent = "Players: " + playerCount;
+    const show = playerCount === 4 ? 'flex' : 'none';
+    const p3 = document.getElementById('p3-count-item');
+    const p4 = document.getElementById('p4-count-item');
+    if (p3) p3.style.display = show;
+    if (p4) p4.style.display = show;
+    initGame();
+    showMessage(playerCount + "-Player Mode");
 });
 
 // ============================================
@@ -548,14 +682,15 @@ if (playerCountBtn) playerCountBtn.addEventListener('click', () => {
 // ============================================
 
 function makeAIMove() {
-    if (gameOver || currentPlayer !== PLAYER_2) return;
-    
+    if (!isAITurn()) return;
+    const me = currentPlayer;
+
     let possibleActions = [];
 
-    // Find all valid moves for all black stones
+    // Find all valid moves for the current AI player's stones
     for (let r = 0; r < TOTAL_ROWS; r++) {
         for (let c = 0; c < ROW_LENGTHS[r]; c++) {
-            if (board[r][c] === PLAYER_2) {
+            if (board[r][c] === me) {
                 calculateValidMoves(r, c);
                 validMoves.forEach(move => {
                     possibleActions.push({ from: {r, c}, to: move });
@@ -580,7 +715,8 @@ function killScore(action) {
     const mv = action.to;
     if (mv.type === 'push' && mv.kill) {
         const victim = board[mv.r][mv.c];
-        return victim === PLAYER_1 ? 2 : -1; // enemy in = great; self in = avoid
+        if (victim === currentPlayer) return -1;       // self in = avoid
+        if (isPlayerVal(victim)) return 2;             // any enemy in = great
     }
     return 0;
 }

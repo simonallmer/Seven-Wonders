@@ -49,6 +49,7 @@
             </div>
 
             <button id="rules-btn" class="menu-btn">Rules</button>
+            <button id="scheme-btn" class="menu-btn">Controls: Adaptive</button>
             <button id="reset-button" class="menu-btn">New Game</button>
             <button id="close-menu-btn" class="menu-btn">Close</button>
         </div>
@@ -59,20 +60,19 @@
             <div id="canvas3d"></div>
         </div>
 
-        <button id="cancel-button" class="hidden">Cancel Move</button>
-
         <div id="status-panel-top" style="position: absolute; top: 80px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; color: #4a4a4a; font-family: 'Cinzel', serif; font-size: 0.9rem; white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; font-weight: bold; text-shadow: 0 1px 2px rgba(255,255,255,0.8); z-index: 10;">
             <div id="player-color" style="width: 16px; height: 16px; border: 1px solid #a39e93; border-radius: 50%; background-color: #fff; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2), 0 0 5px rgba(255,255,255,0.5);"></div>
             <span id="status-text">Player 1 to move</span>
+            <span id="mode-label" style="font-size: 0.7rem; opacity: 0.6;">Shared Sphere</span>
+        </div>
+        <div id="action-panel" style="position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: none; gap: 10px; z-index: 10;">
+            <button id="btn-action-lay" class="action-btn active">Lay Plate / Wall</button>
+            <button id="btn-action-move" class="action-btn">Move Figure</button>
+            <button id="btn-action-push" class="action-btn">Push Wall</button>
+            <button id="btn-action-topple" class="action-btn">Topple Wall</button>
+            <button id="btn-action-push-sphere" class="action-btn">Push Sphere</button>
         </div>
 
-        <!-- Custom action selection for Library -->
-        <div id="action-panel" style="position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 10;">
-            <button id="btn-action-move" class="action-btn-custom active">Move Figure</button>
-            <button id="btn-action-lay" class="action-btn-custom">Lay Plate / Wall</button>
-            <button id="btn-action-push" class="action-btn-custom">Push Wall</button>
-            <button id="btn-action-topple" class="action-btn-custom">Topple Wall</button>
-        </div>
     </div>
 
 
@@ -96,17 +96,18 @@
             <h2>Library Rules</h2>
             <div class="rules-body" style="text-align: left; font-size: 0.9em; max-height: 60vh; overflow-y: auto; padding-right: 15px;">
                 <p><strong>GOAL</strong><br>
-                Reach any of the 7 fields on your opposite side of the board before your opponents do.</p>
+                Guide the sphere from the central fountain into your study room entrance (gold ring on your edge).</p>
 
                 <p><strong>GAME SETUP</strong><br>
-                The 7x7 board starts empty except for exactly one starting field plate placed in the middle of each player's side. Players start in their study rooms off-board and must deploy onto their starting plate to begin.</p>
+                The sphere starts on the fountain at the board's center. The board is empty — build plates and walls to steer the sphere toward your entrance.</p>
 
-                <p><strong>YOUR ACTIONS (Choose 1 per turn)</strong></p>
+                <p><strong>YOUR TURN</strong></p>
                 <ul style="padding-left: 20px; margin-bottom: 15px;">
-                    <li><strong>Lay Plate / Wall:</strong> Click any empty cell block to lay a walkable Plate, OR click any empty grid-gap line to place a Wall. Note: No starting line boundaries can be walled to avoid trapping players.</li>
-                    <li><strong>Move Figure:</strong> Move your stone 1 cell orthogonally. You can only move onto placed Field Plates, and you cannot cross any standing walls.</li>
-                    <li><strong>Push Wall:</strong> Slide a standing wall by 1 space. If other walls are connected to it in the push direction, they slide along too (propagation), provided there is an empty gap at the end to accommodate the shift.</li>
-                    <li><strong>Topple Wall (Domino Smash):</strong> Select a wall and a fall direction. The wall collapses flat onto the adjacent fields. Any fallen wall block automatically becomes a walkable plate! Any player figure on those fields is crushed and returned to their study room. Parallel adjacent walls continue the chain reaction!</li>
+                    <li><strong>Lay Plate:</strong> Click any empty cell to place a walkable Plate. If placed adjacent (up/down/left/right) to the sphere, the sphere rolls onto it and continues sliding through any connected plates!</li>
+                    <li><strong>Lay Wall:</strong> Click any empty grid-gap line to place a Wall. Walls block the sphere's movement.</li>
+                    <li><strong>Push Wall:</strong> Click your own wall to select it, then click an adjacent gap to push it. Connected walls slide together.</li>
+                    <li><strong>Topple Wall:</strong> Click your wall to select it. Click an adjacent cell to topple it — the wall becomes a walkable plate!</li>
+                    <li><strong>Push Sphere:</strong> Select the sphere, then click a direction arrow to push it. It slides in a straight line through connected plates until blocked. If it stops on your entrance — you win!</li>
                 </ul>
             </div>
             <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
@@ -120,6 +121,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="camera-pan.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
     <script src="library-game.js"></script>
     <script src="library-3d.js"></script>
@@ -183,6 +185,30 @@
         });
         document.getElementById('rules-overlay').addEventListener('click', function () {
             document.getElementById('rules-modal').classList.add('hidden');
+        });
+
+        // Control scheme toggle
+        document.getElementById('scheme-btn').addEventListener('click', function () {
+            const newScheme = game.controlScheme === 'adaptive' ? 'classic' : 'adaptive';
+            game.setControlScheme(newScheme);
+            this.textContent = 'Controls: ' + (newScheme === 'adaptive' ? 'Adaptive' : 'Classic');
+        });
+
+        // Action buttons
+        document.getElementById('btn-action-lay').addEventListener('click', function () {
+            game.setAction('LAY');
+        });
+        document.getElementById('btn-action-move').addEventListener('click', function () {
+            game.setAction('MOVE');
+        });
+        document.getElementById('btn-action-push').addEventListener('click', function () {
+            game.setAction('PUSH');
+        });
+        document.getElementById('btn-action-topple').addEventListener('click', function () {
+            game.setAction('TOPPLE');
+        });
+        document.getElementById('btn-action-push-sphere').addEventListener('click', function () {
+            game.setAction('PUSH_SPHERE');
         });
     </script>
     <script src="global-keys.js"></script>

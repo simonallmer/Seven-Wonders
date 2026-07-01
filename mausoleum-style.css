@@ -225,6 +225,16 @@ body {
     border-color: rgba(255, 255, 255, 0.1);
 }
 
+.count-stone.red {
+    background: #c0392b;
+    box-shadow: 0 0 8px rgba(192, 57, 43, 0.4);
+}
+
+.count-stone.blue {
+    background: #2e6fb0;
+    box-shadow: 0 0 8px rgba(46, 111, 176, 0.4);
+}
+
 .menu-divider {
     height: 1px;
     background: linear-gradient(90deg, transparent, var(--gold), transparent);

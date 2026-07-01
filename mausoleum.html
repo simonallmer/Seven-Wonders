@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="mausoleum-style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="camera-pan.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
 </head>
 
@@ -47,6 +48,14 @@
                 <div class="count-item">
                     <div class="count-stone black"></div>
                     <span id="p2-count-hud">9</span>
+                </div>
+                <div class="count-item" id="p3-count-item" style="display:none;">
+                    <div class="count-stone red"></div>
+                    <span id="p3-count-hud">8</span>
+                </div>
+                <div class="count-item" id="p4-count-item" style="display:none;">
+                    <div class="count-stone blue"></div>
+                    <span id="p4-count-hud">8</span>
                 </div>
             </div>
 
@@ -92,6 +101,7 @@
                 <p><strong>ENCIRCLE</strong><br>Remove stones by encircling them with more of your stones than they have friendly neighbors.</p>
                 <p><strong>COLLAPSE</strong><br>A captured stone falls to its death and its field collapses into a permanent pit — impassable, and a deadly wall that helps encircle others.</p>
                 <p><strong>TRAPPED</strong><br>A stone with only one empty neighbor cannot move.</p>
+                <p><strong>4 PLAYERS</strong><br>The tomb stretches into a long barrow. Four armies hold the corners — White and Red on the left, Black and Blue on the right — with the two pointed tips as deadly collapse-funnels. Any other colour counts as an enemy, so coalitions can jointly encircle. Turn order is clockwise: White → Red → Black → Blue. Drop below 4 stones (or get sealed in) and your stones collapse into pits; the last builder standing wins.</p>
             </div>
             <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
         </div>

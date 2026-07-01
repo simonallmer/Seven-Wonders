@@ -125,8 +125,11 @@ function initializeBoard() {
     board.clear();
     connections.clear();
 
-    // Artemis tips are the goal nodes (2 for 2p, 4 for 4p)
+    // Artemis tips are the goal nodes (2 for 2p, 4 for 4p). Tag each tip with the colour of the
+    // player who races toward it, so it can be tinted in that colour as a direction cue.
     const tipSet = new Set(Object.values(PLAYER_CONFIG).map(p => `${p.target.row},${p.target.col}`));
+    const tipOwner = {};
+    Object.entries(PLAYER_CONFIG).forEach(([color, cfg]) => { tipOwner[`${cfg.target.row},${cfg.target.col}`] = color; });
     const rowLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'];
 
     BOARD_STRUCTURE.forEach(({ row, count, offset }) => {
@@ -137,7 +140,7 @@ function initializeBoard() {
             const isArtemis = tipSet.has(key);
             const label = `${rowLabels[row]}${i + 1}`;
 
-            board.set(key, { row, col, x, y, piece: null, isArtemis, label });
+            board.set(key, { row, col, x, y, piece: null, isArtemis, targetOf: tipOwner[key] || null, label });
         }
     });
 
@@ -473,6 +476,12 @@ function drawBoard() {
 
         if (node.isArtemis) {
             spot.classList.add('artemis');
+            // Tint each goal tip in the colour of the player racing toward it (direction cue).
+            if (node.targetOf) {
+                const TIP_HEX = { white: '#eef0f2', black: '#4a4a52', red: '#c0392b', blue: '#2a6fdb' };
+                const hex = TIP_HEX[node.targetOf];
+                if (hex) { spot.setAttribute('fill', hex); spot.setAttribute('stroke', hex); }
+            }
         }
 
         // Highlight valid moves

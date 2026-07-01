@@ -1,38 +1,5 @@
 @import url('style.css');
 
-/* Action panel specific to Library */
-.action-btn-custom {
-    background: rgba(42, 37, 32, 0.7);
-    color: #e5e5e5;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 8px 16px;
-    border-radius: 4px;
-    font-family: 'Cinzel', serif;
-    font-size: 0.8rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.action-btn-custom:hover {
-    background: rgba(255, 255, 255, 0.2);
-    color: #fff;
-    border-color: rgba(255, 255, 255, 0.5);
-}
-
-.action-btn-custom.active {
-    background: rgba(6, 182, 212, 0.4);
-    color: #fff;
-    border-color: #06b6d4;
-    box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
-}
-
-.dir-btn:hover {
-    filter: brightness(1.2);
-}
-
 /* Ensure 3D canvas fills the background */
 #canvas3d {
     position: fixed;
@@ -179,6 +146,13 @@ body.view-3d::before {
 .modal-btn:hover, .action-btn:hover {
     background: #a39e93;
     color: #2a2520;
+}
+
+.action-btn.active {
+    background: rgba(6, 182, 212, 0.4);
+    color: #fff;
+    border-color: #06b6d4;
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
 }
 
 .game-footer {

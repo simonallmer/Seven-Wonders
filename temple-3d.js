@@ -22,6 +22,14 @@ const matMarbleBase = new THREE.MeshStandardMaterial({ color: 0xeae6df, roughnes
 const matPillar = new THREE.MeshStandardMaterial({ color: 0xf5f1e8, roughness: 0.7, metalness: 0.1 });
 const matField = new THREE.MeshStandardMaterial({ color: 0xd4cfc4, roughness: 0.6, metalness: 0.2 });
 const matArtemis = new THREE.MeshStandardMaterial({ color: 0xc4b5fd, roughness: 0.4, metalness: 0.2, emissive: 0x4c1d95, emissiveIntensity: 0.5 });
+// Per-player Artemis goal-tip materials: tinted toward each colour with a soft matching glow,
+// so each player can see which tip they're racing toward.
+const ARTEMIS_MATS = {
+    white: new THREE.MeshStandardMaterial({ color: 0xeef0f2, roughness: 0.4, metalness: 0.2, emissive: 0x9aa0a8, emissiveIntensity: 0.35 }),
+    black: new THREE.MeshStandardMaterial({ color: 0x4a4a52, roughness: 0.4, metalness: 0.25, emissive: 0x15151c, emissiveIntensity: 0.45 }),
+    red:   new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.4, metalness: 0.2, emissive: 0x5a1410, emissiveIntensity: 0.55 }),
+    blue:  new THREE.MeshStandardMaterial({ color: 0x2a6fdb, roughness: 0.4, metalness: 0.2, emissive: 0x12305f, emissiveIntensity: 0.55 })
+};
 const matWhitePiece = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 });
 const matBlackPiece = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3, metalness: 0.3 });
 const matRedPiece = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.3, metalness: 0.2 });
@@ -368,14 +376,16 @@ function build3DBoard() {
         
         // Pedestal (truncated cone for "pushed out")
         const geomPedestal = new THREE.CylinderGeometry(5, 7, fieldHeight, 16);
-        const material = node.isArtemis ? matArtemis : matField;
+        const material = node.targetOf ? (ARTEMIS_MATS[node.targetOf] || matArtemis)
+            : (node.isArtemis ? matArtemis : matField);
         const mesh = new THREE.Mesh(geomPedestal, material);
         mesh.position.set(x, surfaceY + fieldHeight/2, z);
         mesh.receiveShadow = true;
         mesh.castShadow = true;
         
-        // Add user data for raycasting
-        mesh.userData = { isField: true, row: node.row, col: node.col, key: key };
+        // Add user data for raycasting; remember the field's base glow so highlight resets
+        // restore the (now per-player coloured) tip emissive instead of a hardcoded purple.
+        mesh.userData = { isField: true, row: node.row, col: node.col, key: key, baseEmissive: material.emissive.getHex() };
         
         groupBoard.add(mesh);
         fieldMeshes.set(key, mesh);
@@ -628,7 +638,7 @@ function update3DHighlights() {
         });
     });
     fieldMeshes.forEach(mesh => {
-        mesh.material.emissive.setHex(mesh.userData.key.includes("0,2") || mesh.userData.key.includes("8,2") ? 0x4c1d95 : 0x000000);
+        mesh.material.emissive.setHex(mesh.userData.baseEmissive || 0x000000);
     });
 
     if (selectedStone) {

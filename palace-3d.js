@@ -1,8 +1,6 @@
 // ============================================
 // PALACE 3D VIEW — "The Span" (Crystal Palace, glass & cast iron)
-// Two phases:
-//   setup — field pads + oriented placement stones
-//   play  — standing stones, Run targets
+// Standing stones, Run targets, Artifact gems
 // ============================================
 
 let scene, camera, renderer, controls;
@@ -11,54 +9,25 @@ let needsRender = true;
 
 const groupEnv = new THREE.Group();
 const groupBuild = new THREE.Group();   // per-voxel glass + frames + caps
-const groupPads = new THREE.Group();    // setup: clickable fields
 const groupStones = new THREE.Group();
-const groupSel = new THREE.Group();     // setup held-ring
 const groupTargets = new THREE.Group(); // play: run/climb/shatter rings
-const groupHover = new THREE.Group();
+const groupArtifacts = new THREE.Group();
 const groupFX = new THREE.Group();
+const groupArtifactPool = new THREE.Group(); // persistent — artifacts survive sync clears
 
 const voxelMeshes = new Map();  // "x,y,k" -> [meshes]
-const padMeshes = new Map();    // fieldId -> pad
-const stoneMeshes = new Map();  // key -> stone group ('p'+id in play, fieldId in setup)
-let hoverKey = null;
+const stoneMeshes = new Map();  // 'p'+id -> stone group
+const _artifactMeshes = new Map();  // "x,y" -> mesh (persistent pool lookup)
+
 
 // ---- layout ----
 const CELL = 30;
 const STEP = 26;
-const W = 7, D = 5;
+const W = 9, D = 7;
 function worldX(x) { return (x - (W - 1) / 2) * CELL; }
 function worldZ(y) { return (y - (D - 1) / 2) * CELL; }
 function levelTop(l) { return l * STEP; }
-function standPos(x, y, k) { return new THREE.Vector3(worldX(x), k * STEP + 0.2, worldZ(y)); }
-
-// ---- field geometry (setup) ----
-const UP = new THREE.Vector3(0, 1, 0);
-const ZAX = new THREE.Vector3(0, 0, 1);
-function fieldNormal(face) {
-    switch (face) {
-        case 'top': return new THREE.Vector3(0, 1, 0);
-        case 'px': return new THREE.Vector3(1, 0, 0);
-        case 'nx': return new THREE.Vector3(-1, 0, 0);
-        case 'pz': return new THREE.Vector3(0, 0, 1);
-        case 'nz': return new THREE.Vector3(0, 0, -1);
-    }
-    return new THREE.Vector3(0, 1, 0);
-}
-function fieldQuat(face) { return new THREE.Quaternion().setFromUnitVectors(UP, fieldNormal(face)); }
-function ringQuat(face) { return new THREE.Quaternion().setFromUnitVectors(ZAX, fieldNormal(face)); }
-function ringQuatN(n) { return new THREE.Quaternion().setFromUnitVectors(ZAX, n); }
-function fieldCenter(f) {
-    const cx = worldX(f.x), cz = worldZ(f.y);
-    if (f.face === 'top') return new THREE.Vector3(cx, f.k * STEP + 0.2, cz);
-    const n = fieldNormal(f.face), vy = (f.k + 0.5) * STEP;
-    return new THREE.Vector3(cx + n.x * (CELL / 2), vy, cz + n.z * (CELL / 2));
-}
-function stoneFieldPos(f) {
-    const c = fieldCenter(f);
-    if (f.face !== 'top') c.add(fieldNormal(f.face).multiplyScalar(0.5));
-    return c;
-}
+function standPos(x, y, k) { return new THREE.Vector3(worldX(x), k * STEP + 1.6, worldZ(y)); }
 
 // ---- materials ----
 const GLASS = [null,
@@ -81,19 +50,16 @@ const matBevel = new THREE.MeshStandardMaterial({ color: 0xE7C24A, roughness: 0.
 const matGold = new THREE.MeshStandardMaterial({ color: 0xC5A059, roughness: 0.35, metalness: 0.75 });
 const matPortal = new THREE.MeshStandardMaterial({ color: 0x2a2417, roughness: 0.9 });
 const matGround = new THREE.MeshStandardMaterial({ color: 0x6f7d4a, roughness: 1.0 });
-const matPad = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
-const matHover = new THREE.MeshBasicMaterial({ color: 0xfff4d6, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide });
-const matHoverCapture = new THREE.MeshBasicMaterial({ color: 0xe24a3b, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide });
-const matHoverBlocked = new THREE.MeshBasicMaterial({ color: 0x7a7f86, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide });
-const matHoverStone = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
-const matSel = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
+
 const matRun = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide });
-const matClimb = new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
 const matShatter = new THREE.MeshBasicMaterial({ color: 0xe24a3b, transparent: true, opacity: 0.92, depthWrite: false, side: THREE.DoubleSide });
 const matSelStone = new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide });
-const PAD_GEO = new THREE.BoxGeometry(CELL - 3, 1.4, CELL - 3);
+const matPortalTarget = new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide });
+const matStealTarget = new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
+const matLaserTarget = new THREE.MeshBasicMaterial({ color: 0xff2020, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide });
+const ARTIFACT_GEO = new THREE.OctahedronGeometry(4.5);
 
-const PCOL = { W: { stone: 0xf3efe6 }, B: { stone: 0x232323 } };
+const PCOL = { W: { stone: 0xf3efe6, artif: 0xffffff, emissive: 0xffffff, tint: 0xe8e8f0 }, B: { stone: 0x232323, artif: 0x000000, emissive: 0x333333, tint: 0x1a1a22 } };
 
 // ============================================
 function init3D() {
@@ -130,11 +96,10 @@ function init3D() {
     dir.shadow.normalBias = 0.0; dir.shadow.bias = -0.001;
     scene.add(dir);
 
-    scene.add(groupEnv, groupBuild, groupPads, groupStones, groupSel, groupTargets, groupHover, groupFX);
+    scene.add(groupEnv, groupBuild, groupStones, groupTargets, groupArtifacts, groupFX, groupArtifactPool);
 
     buildPlinth();
     buildStructure();
-    buildPads();
 
     window.addEventListener('resize', onResize);
     raycaster = new THREE.Raycaster();
@@ -179,8 +144,17 @@ function buildPlinth() {
 function buildStructure() {
     while (groupBuild.children.length) groupBuild.remove(groupBuild.children[0]);
     voxelMeshes.clear();
+    const matRing = new THREE.MeshStandardMaterial({ color: 0xbabf9f, roughness: 0.9 });
     for (let x = 0; x < W; x++) {
         for (let y = 0; y < D; y++) {
+            if (x === 0 || x === W - 1 || y === 0 || y === D - 1) {
+                const cx = worldX(x), cz = worldZ(y);
+                const ringPad = new THREE.Mesh(new THREE.BoxGeometry(CELL - 2, 1.6, CELL - 2), matRing);
+                ringPad.position.set(cx, 0.8, cz);
+                ringPad.receiveShadow = true;
+                groupBuild.add(ringPad);
+                continue;
+            }
             const L = window.palLevel(x, y), g = GLASS[L];
             const cx = worldX(x), cz = worldZ(y);
             for (let k = 0; k < L; k++) {
@@ -209,21 +183,22 @@ function buildStructure() {
             if (window.palIsPortal(x, y)) buildPortal(x, y, cx, cz, levelTop(L));
         }
     }
-    // goal bands: the end a player must REACH (Black scores at x=6, White at x=0)
+    // goal bands: the end a player must REACH (Black scores at x=W-1, White at x=0)
     for (let y = 0; y < D; y++) {
         addGoal(0, y, matGoalW);          // White wins by reaching x=0
-        addGoal(W - 1, y, matGoalB);      // Black wins by reaching x=14
+        addGoal(W - 1, y, matGoalB);      // Black wins by reaching x=W-1
     }
 }
 function addGoal(x, y, mat) {
     const disc = new THREE.Mesh(new THREE.PlaneGeometry(CELL - 4, CELL - 4), mat);
     disc.rotation.x = -Math.PI / 2;
-    disc.position.set(worldX(x), levelTop(window.palLevel(x, y)) + 1.2, worldZ(y));
+    const h = (x === 0 || x === W - 1 || y === 0 || y === D - 1) ? 1.2 : levelTop(window.palLevel(x, y)) + 1.2;
+    disc.position.set(worldX(x), h, worldZ(y));
     groupBuild.add(disc);
 }
 function buildPortal(x, y, cx, cz, h) {
     let nx = 0, nz = 0;
-    if (y === 2 && x === 0) nx = -1; else if (y === 2 && x === W - 1) nx = 1;
+    if (x === 1) nx = -1; else if (x === W - 2) nx = 1;
     const arch = new THREE.Mesh(new THREE.TorusGeometry(CELL * 0.3, 1.6, 8, 18, Math.PI), matGold);
     arch.position.set(cx + nx * (CELL / 2 - 0.5), h * 0.55, cz + nz * (CELL / 2 - 0.5));
     if (nx) arch.rotation.y = Math.PI / 2;
@@ -234,19 +209,38 @@ function applyShattered(keys) {
     // no-op — shatter removed; keep for API compatibility
 }
 
-// setup field pads
-function buildPads() {
-    while (groupPads.children.length) groupPads.remove(groupPads.children[0]);
-    padMeshes.clear();
-    window.palFields().forEach(function (f) {
-        const pad = new THREE.Mesh(PAD_GEO, matPad);
-        pad.quaternion.copy(fieldQuat(f.face));
-        pad.position.copy(fieldCenter(f)).add(fieldNormal(f.face).multiplyScalar(0.3));
-        pad.userData = { id: f.id, face: f.face };
-        groupPads.add(pad);
-        padMeshes.set(f.id, pad);
+function createArtifact(colorHex, emissiveHex) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({
+        color: colorHex, emissive: emissiveHex, emissiveIntensity: 1.4,
+        roughness: 0.1, metalness: 0.6
     });
-    needsRender = true;
+    const body = new THREE.Mesh(ARTIFACT_GEO, mat);
+    body.scale.set(1.6, 1.0, 1.6);
+    g.add(body);
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(8.0, 16, 12),
+        new THREE.MeshBasicMaterial({ color: emissiveHex, transparent: true, opacity: 0.5 }));
+    g.add(glow);
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(2.0, 10, 8),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 })));
+    g.userData.mat = mat;
+    return g;
+}
+
+function createCarryGem(colorHex, emissiveHex) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({
+        color: colorHex, emissive: emissiveHex, emissiveIntensity: 1.4,
+        roughness: 0.1, metalness: 0.6
+    });
+    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(3.0), mat);
+    gem.position.y = 7.5;
+    g.add(gem);
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(5.0, 12, 8),
+        new THREE.MeshBasicMaterial({ color: emissiveHex, transparent: true, opacity: 0.35 }));
+    glow.position.y = 7.5;
+    g.add(glow);
+    return g;
 }
 
 // ============================================
@@ -262,43 +256,102 @@ function createStone(colorHex, dark) {
     g.userData.mainMat = mat; g.userData.bevelMat = bevel.material; g.userData.baseColor = colorHex;
     return g;
 }
-function setStoneHeld(mesh, held) {
-    const mat = mesh.userData.mainMat, bev = mesh.userData.bevelMat;
-    if (held) { mat.color.setHex(0x9aa0a6); mat.transparent = true; mat.opacity = 0.5; bev.color.setHex(0x9aa0a6); bev.emissiveIntensity = 0; }
-    else { mat.color.setHex(mesh.userData.baseColor); mat.transparent = false; mat.opacity = 1; bev.color.setHex(0xE7C24A); bev.emissiveIntensity = 0.2; }
+function tintGlassColumn(x, y, colorHex) {
+    const L = window.palLevel(x, y);
+    const k = L - 1; // only tint the topmost glass block
+    const list = voxelMeshes.get(x + ',' + y + ',' + k);
+    if (!list) return;
+    const glass = list[0];
+    if (!glass.userData._origColor) {
+        glass.userData._origColor = glass.material.color.getHex();
+        glass.userData._origOpacity = glass.material.opacity;
+    }
+    glass.material.color.setHex(colorHex);
+    glass.material.opacity = Math.min(1, glass.userData._origOpacity + 0.18);
+}
+
+function clearGlassTint(x, y) {
+    const L = window.palLevel(x, y);
+    const k = L - 1;
+    const list = voxelMeshes.get(x + ',' + y + ',' + k);
+    if (!list) return;
+    const glass = list[0];
+    if (glass.userData._origColor != null) {
+        glass.material.color.setHex(glass.userData._origColor);
+        glass.material.opacity = glass.userData._origOpacity;
+    }
 }
 
 function palaceSync3D() {
-    const st = window.getPalState();
-    if (st.phase === 'play') syncPlay(st); else syncSetup(st);
-}
-
-function syncSetup(st) {
-    const live = new Set();
-    st.stones.forEach(function (s) {
-        live.add(s.id);
-        let mesh = stoneMeshes.get(s.id);
-        if (!mesh) { mesh = createStone(PCOL[s.color].stone, s.color !== 'W'); mesh.userData.id = s.id; groupStones.add(mesh); stoneMeshes.set(s.id, mesh); }
-        if (!mesh.userData.animating) { const f = window.palParseField(s.id); mesh.position.copy(stoneFieldPos(f)); mesh.quaternion.copy(fieldQuat(f.face)); }
-    });
-    stoneMeshes.forEach(function (m, id) { if (!live.has(id) && !m.userData.animating) { groupStones.remove(m); stoneMeshes.delete(id); } });
-    const heldId = st.held;
-    stoneMeshes.forEach(function (m, id) { setStoneHeld(m, id === heldId); });
-    while (groupSel.children.length) groupSel.remove(groupSel.children[0]);
-    while (groupTargets.children.length) groupTargets.remove(groupTargets.children[0]);
-    if (st.held) {
-        const f = window.palParseField(st.held);
-        const ring = new THREE.Mesh(new THREE.RingGeometry(CELL * 0.32, CELL * 0.42, 28), matSel);
-        ring.quaternion.copy(ringQuat(f.face));
-        ring.position.copy(stoneFieldPos(f)).add(fieldNormal(f.face).multiplyScalar(0.6));
-        groupSel.add(ring);
-    }
-    applyShattered([]);
-    needsRender = true;
+    syncPlay(window.getPalState());
 }
 
 function syncPlay(st) {
     applyShattered(st.shattered);
+    while (groupArtifacts.children.length) groupArtifacts.remove(groupArtifacts.children[0]);
+
+    // Artifacts — persistent pool with drop animation into glass
+    const currentArtKeys = new Set();
+    if (st.artifacts) {
+        st.artifacts.forEach(function (a) {
+            const key = a.x + ',' + a.y;
+            currentArtKeys.add(key);
+            if (_artifactMeshes.has(key)) {
+                const mesh = _artifactMeshes.get(key);
+                const col = PCOL[a.color];
+                mesh.userData.mat.color.setHex(col.artif);
+                mesh.userData.mat.emissive.setHex(col.emissive);
+                return;
+            }
+            const col = PCOL[a.color];
+            const mesh = createArtifact(col.artif, col.emissive);
+            const L = window.palLevel(a.x, a.y);
+            const restY = (L - 0.5) * STEP;
+            const startY = L * STEP + 40;
+            const cx = worldX(a.x), cz = worldZ(a.y);
+            mesh.position.set(cx, startY, cz);
+            groupArtifactPool.add(mesh);
+            _artifactMeshes.set(key, mesh);
+            // Drop animation into the glass interior
+            const o = { t: 0 };
+            new TWEEN.Tween(o).to({ t: 1 }, 700).easing(TWEEN.Easing.Quadratic.In)
+                .onUpdate(function () {
+                    const frac = o.t;
+                    mesh.position.y = startY + (restY - startY) * frac;
+                    const s = 0.3 + 0.7 * (1 - frac);
+                    mesh.scale.set(s, s, s);
+                    needsRender = true;
+                })
+                .onComplete(function () {
+                    mesh.scale.set(1, 1, 1);
+                    mesh.position.y = restY;
+                    needsRender = true;
+                }).start();
+        });
+    }
+    _artifactMeshes.forEach(function (mesh, key) {
+        if (!currentArtKeys.has(key)) {
+            groupArtifactPool.remove(mesh);
+            _artifactMeshes.delete(key);
+        }
+    });
+
+    // Tint glass columns by territory
+    const tintedCells = new Set();
+    if (st.artifacts) {
+        st.artifacts.forEach(function (a) {
+            const key = a.x + ',' + a.y;
+            tintedCells.add(key);
+            tintGlassColumn(a.x, a.y, PCOL[a.color].tint);
+        });
+    }
+    for (let x = 1; x <= W - 2; x++) {
+        for (let y = 1; y <= D - 2; y++) {
+            if (!tintedCells.has(x + ',' + y)) clearGlassTint(x, y);
+        }
+    }
+
+    // Stones + carrying gems
     const live = new Set();
     st.stones.forEach(function (s) {
         const key = 'p' + s.id; live.add(key);
@@ -306,9 +359,17 @@ function syncPlay(st) {
         if (!mesh) { mesh = createStone(PCOL[s.color].stone, s.color !== 'W'); mesh.userData.id = s.id; groupStones.add(mesh); stoneMeshes.set(key, mesh); }
         mesh.quaternion.identity();
         if (!mesh.userData.animating) mesh.position.copy(standPos(s.x, s.y, s.k));
+        // Carrying indicator
+        mesh.userData.carryGem && mesh.remove(mesh.userData.carryGem);
+        mesh.userData.carryGem = null;
+        if (s.carrying) {
+            const col = PCOL[s.color];
+            const gem = createCarryGem(col.artif, col.emissive);
+            mesh.add(gem);
+            mesh.userData.carryGem = gem;
+        }
     });
     stoneMeshes.forEach(function (m, key) { if (!live.has(key) && !m.userData.animating) { groupStones.remove(m); stoneMeshes.delete(key); } });
-    while (groupSel.children.length) groupSel.remove(groupSel.children[0]);
     while (groupTargets.children.length) groupTargets.remove(groupTargets.children[0]);
 
     // selected stone ring
@@ -322,77 +383,19 @@ function syncPlay(st) {
     }
     // target rings
     st.targets.forEach(function (t) {
-        const mat = t.capture != null ? matShatter : matRun;
-        const ring = new THREE.Mesh(new THREE.RingGeometry(CELL * 0.28, CELL * 0.4, 26), mat);
+        let mat = matRun;
+        if (t.type === 'portal') mat = matPortalTarget;
+        else if (t.type === 'laser') mat = matLaserTarget;
+        else if (t.type === 'run' && t.steal) mat = matStealTarget;
+        else if (t.capture != null) mat = matShatter;
+        const ring = new THREE.Mesh(new THREE.RingGeometry(t.type === 'laser' ? CELL * 0.18 : CELL * 0.28, t.type === 'laser' ? CELL * 0.25 : CELL * 0.4, 26), mat);
         ring.rotation.x = -Math.PI / 2;
-        ring.position.set(worldX(t.x), t.k * STEP + 1.2, worldZ(t.y));
+        ring.position.set(worldX(t.x), t.k * STEP + 1.6, worldZ(t.y));
         ring.userData.target = t;
         groupTargets.add(ring);
     });
     needsRender = true;
 }
-// ============================================
-// PHASE SWITCH
-// ============================================
-function palaceClearStones() {
-    while (groupStones.children.length) groupStones.remove(groupStones.children[0]);
-    stoneMeshes.clear();
-}
-function palaceEnterPlay() {
-    palaceClearStones();
-    while (groupPads.children.length) groupPads.remove(groupPads.children[0]);
-    padMeshes.clear();
-    clearHover();
-    palaceSync3D();
-}
-function palaceEnterSetup() {
-    palaceClearStones();
-    applyShattered([]);
-    buildPads();
-    clearHover();
-    palaceSync3D();
-}
-
-// setup helpers reused by game
-function palaceRebuild() { palaceClearStones(); applyShattered([]); palaceSync3D(); }
-function palaceRebuildPads() { buildPads(); clearHover(); palaceSync3D(); }
-
-// ============================================
-// SETUP animations
-// ============================================
-function palaceAnimPlace(id) {
-    palaceSync3D();
-    const mesh = stoneMeshes.get(id); if (!mesh) return;
-    const f = window.palParseField(id);
-    const end = stoneFieldPos(f), n = fieldNormal(f.face);
-    mesh.userData.animating = true;
-    mesh.position.copy(end).add(n.clone().multiplyScalar(40)); mesh.scale.set(1, 1, 1);
-    new TWEEN.Tween(mesh.position).to({ x: end.x, y: end.y, z: end.z }, 320).easing(TWEEN.Easing.Quadratic.In).start();
-    new TWEEN.Tween(mesh.scale).to({ x: 1.9, y: 1.9, z: 1.9 }, 320).easing(TWEEN.Easing.Back.Out)
-        .onComplete(function () { mesh.userData.animating = false; needsRender = true; }).start();
-    needsRender = true;
-}
-function palaceAnimRemove(id) {
-    const mesh = stoneMeshes.get(id); if (!mesh) return;
-    mesh.userData.animating = true; stoneMeshes.delete(id);
-    new TWEEN.Tween(mesh.scale).to({ x: 0.01, y: 0.01, z: 0.01 }, 240).easing(TWEEN.Easing.Quadratic.In)
-        .onComplete(function () { groupStones.remove(mesh); needsRender = true; }).start();
-    needsRender = true;
-}
-function palaceAnimMove(fromId, toId) {
-    const mesh = stoneMeshes.get(fromId); if (!mesh) { palaceSync3D(); return; }
-    stoneMeshes.delete(fromId); stoneMeshes.set(toId, mesh); mesh.userData.id = toId; setStoneHeld(mesh, false);
-    const tf = window.palParseField(toId);
-    const start = mesh.position.clone(), startQ = mesh.quaternion.clone();
-    const end = stoneFieldPos(tf), endQ = fieldQuat(tf.face);
-    mesh.userData.animating = true;
-    const o = { t: 0 };
-    new TWEEN.Tween(o).to({ t: 1 }, 460).easing(TWEEN.Easing.Quadratic.InOut)
-        .onUpdate(function () { mesh.position.lerpVectors(start, end, o.t); mesh.position.y += Math.sin(Math.PI * o.t) * 26; mesh.quaternion.copy(startQ).slerp(endQ, o.t); needsRender = true; })
-        .onComplete(function () { mesh.position.copy(end); mesh.quaternion.copy(endQ); mesh.userData.animating = false; needsRender = true; }).start();
-    needsRender = true;
-}
-
 // ============================================
 // PLAY animations
 // ============================================
@@ -418,12 +421,90 @@ function palaceAnimCapture(id) {
         .onComplete(function () { groupStones.remove(mesh); needsRender = true; }).start();
     needsRender = true;
 }
+function palaceAnimLaserHit(sx, sy, tx, ty, hitType) {
+    var pk = window.palLevel || function () { return 0; };
+    var start = standPos(sx, sy, pk(sx, sy));
+    var end = standPos(tx, ty, pk(tx, ty));
+    var sy2 = start.y + 4, ey2 = end.y + 4;
+    var dx = (end.x - start.x) / 30, dy = (ey2 - sy2) / 30, dz = (end.z - start.z) / 30;
+    var allPoints = [];
+    for (var i = 0; i <= 30; i++) {
+        allPoints.push(new THREE.Vector3(start.x + dx * i, sy2 + dy * i, start.z + dz * i));
+    }
+    var positions = new Float32Array(allPoints.length * 3);
+    var geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geom.setDrawRange(0, 0);
+    var beam = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: 0xff3030, transparent: true, opacity: 1 }));
+    groupFX.add(beam);
+    var tip = new THREE.Mesh(
+        new THREE.SphereGeometry(2.6, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xff6060, transparent: true, opacity: 1 })
+    );
+    var glow = new THREE.Mesh(
+        new THREE.SphereGeometry(4.2, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xff2020, transparent: true, opacity: 0.4 })
+    );
+    groupFX.add(tip); groupFX.add(glow);
+    var flash = new THREE.Mesh(
+        new THREE.SphereGeometry(5, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xff6060, transparent: true, opacity: 0 })
+    );
+    flash.position.set(end.x, ey2, end.z);
+    groupFX.add(flash);
+    needsRender = true;
+    function ee(t) {
+        if (t < 0.2) return 0.02 * Math.pow(t / 0.2, 4);
+        return 0.02 + 0.98 * Math.pow((t - 0.2) / 0.8, 1.7);
+    }
+    var o = { t: 0 };
+    new TWEEN.Tween(o).to({ t: 1 }, 480).easing(TWEEN.Easing.Quadratic.In)
+        .onUpdate(function () {
+            var p = ee(o.t);
+            var count = Math.min(allPoints.length, Math.max(1, Math.floor(p * allPoints.length)));
+            for (var i = 0; i < count && i < allPoints.length; i++) {
+                positions[i * 3] = allPoints[i].x;
+                positions[i * 3 + 1] = allPoints[i].y;
+                positions[i * 3 + 2] = allPoints[i].z;
+            }
+            geom.setDrawRange(0, count);
+            geom.attributes.position.needsUpdate = true;
+            var tipPt = allPoints[Math.min(count, allPoints.length - 1)];
+            tip.position.copy(tipPt);
+            glow.position.copy(tipPt);
+            tip.scale.set(1 + p * 1.5, 1 + p * 1.5, 1 + p * 1.5);
+            needsRender = true;
+        })
+        .onComplete(function () {
+            tip.material.opacity = 0;
+            glow.material.opacity = 0;
+            flash.material.opacity = 1;
+            flash.scale.set(1, 1, 1);
+            var f = { o: 1 };
+            new TWEEN.Tween(f).to({ o: 0 }, 280).easing(TWEEN.Easing.Quadratic.Out)
+                .onUpdate(function () {
+                    beam.material.opacity = f.o;
+                    flash.material.opacity = f.o;
+                    var fs = 1 + (1 - f.o) * 3;
+                    flash.scale.set(fs, fs, fs);
+                    needsRender = true;
+                })
+                .onComplete(function () {
+                    groupFX.remove(beam);
+                    groupFX.remove(tip);
+                    groupFX.remove(glow);
+                    groupFX.remove(flash);
+                    beam.geometry.dispose();
+                    needsRender = true;
+                }).start();
+        }).start();
+}
 function palaceWin(color) {
     const box = document.getElementById('message-box');
     const title = document.getElementById('message-title');
     const text = document.getElementById('message-text');
     if (title) title.textContent = (color === 'W' ? 'White' : 'Black') + ' Wins';
-    if (text) text.textContent = (color === 'W' ? 'White' : 'Black') + ' raced a stone clear across the Span.';
+    if (text) text.textContent = (color === 'W' ? 'White' : 'Black') + ' reaches 20 points first!';
     if (box) box.classList.add('visible');
     needsRender = true;
 }
@@ -457,68 +538,34 @@ function onPointerDown(event) {
     if (!window.is3DView) return;
     setMouse(event);
     const st = window.getPalState();
-    if (st.phase === 'play') {
-        if (st.winner) return;
-        const hits = castObjects([].concat(groupTargets.children, groupStones.children, groupBuild.children));
-        if (!hits.length) return;
-        // prefer a target ring if one was hit
-        for (let i = 0; i < hits.length; i++) {
-            const t = bubbleTo(hits[i].object, 'target');
-            if (t) { window.palPlayTapTarget(t.userData.target); return; }
-        }
-        // building surface click — find matching target by grid cell
-        for (let i = 0; i < hits.length; i++) {
-            const p = hits[i].object.position;
-            if (!p) continue;
-            if (bubbleTo(hits[i].object, 'id')) continue; // skip stone meshes
-            const gx = Math.round(p.x / CELL + (W - 1) / 2);
-            const gy = Math.round(p.z / CELL + (D - 1) / 2);
-            const t = st.targets.find(function (t) { return t.x === gx && t.y === gy; });
-            if (t) { window.palPlayTapTarget(t); return; }
-        }
-        const so = bubbleTo(hits[0].object, 'id');
-        if (so) window.palPlayTapStone(so.userData.id);
-        return;
-    }
-    const hits = castObjects([].concat(groupStones.children, groupPads.children));
+    if (st.winner) return;
+    const hits = castObjects([].concat(groupTargets.children, groupStones.children, groupBuild.children));
     if (!hits.length) return;
-    const o = bubbleTo(hits[0].object, 'id');
-    if (o) window.palTapField(o.userData.id);
+    for (let i = 0; i < hits.length; i++) {
+        const t = bubbleTo(hits[i].object, 'target');
+        if (t) { window.palPlayTapTarget(t.userData.target); return; }
+    }
+    for (let i = 0; i < hits.length; i++) {
+        const p = hits[i].object.position;
+        if (!p) continue;
+        if (bubbleTo(hits[i].object, 'id')) continue;
+        const gx = Math.round(p.x / CELL + (W - 1) / 2);
+        const gy = Math.round(p.z / CELL + (D - 1) / 2);
+        const t = st.targets.find(function (t) { return t.x === gx && t.y === gy; });
+        if (t) { window.palPlayTapTarget(t); return; }
+    }
+    const so = bubbleTo(hits[0].object, 'id');
+    if (so) window.palPlayTapStone(so.userData.id);
 }
 
 function clearHover() {
-    if (hoverKey === null) return;
-    hoverKey = null;
-    while (groupHover.children.length) groupHover.remove(groupHover.children[0]);
     if (renderer) renderer.domElement.style.cursor = 'default';
-    needsRender = true;
 }
 function onPointerMove(event) {
     if (!window.is3DView) return;
     setMouse(event);
-    const st = window.getPalState();
-    if (st.phase === 'play') {
-        const hits = castObjects([].concat(groupTargets.children, groupStones.children, groupBuild.children));
-        renderer.domElement.style.cursor = hits.length ? 'pointer' : 'default';
-        return;
-    }
-    const hits = castObjects([].concat(groupStones.children, groupPads.children));
-    const o = hits.length ? bubbleTo(hits[0].object, 'id') : null;
-    const key = o ? o.userData.id : null;
-    if (key === hoverKey) return;
-    hoverKey = key;
-    while (groupHover.children.length) groupHover.remove(groupHover.children[0]);
-    renderer.domElement.style.cursor = key ? 'pointer' : 'default';
-    if (o) {
-        const f = window.palParseField(key);
-        const info = window.palPlaceInfo(key);
-        const mat = info === 'stone' ? matHoverStone : info === 'capture' ? matHoverCapture : info === 'blocked' ? matHoverBlocked : matHover;
-        const ring = new THREE.Mesh(new THREE.RingGeometry(CELL * 0.34, CELL * 0.44, 28), mat);
-        ring.quaternion.copy(ringQuat(f.face));
-        ring.position.copy(fieldCenter(f)).add(fieldNormal(f.face).multiplyScalar(0.5));
-        groupHover.add(ring);
-    }
-    needsRender = true;
+    const hits = castObjects([].concat(groupTargets.children, groupStones.children, groupBuild.children));
+    renderer.domElement.style.cursor = hits.length ? 'pointer' : 'default';
 }
 
 function animate(time) {
@@ -529,19 +576,13 @@ function animate(time) {
 
 // ============================================
 window.palaceSync3D = palaceSync3D;
-window.palaceRebuild = palaceRebuild;
-window.palaceRebuildPads = palaceRebuildPads;
-window.palaceEnterPlay = palaceEnterPlay;
-window.palaceEnterSetup = palaceEnterSetup;
-window.palaceAnimPlace = palaceAnimPlace;
-window.palaceAnimRemove = palaceAnimRemove;
-window.palaceAnimMove = palaceAnimMove;
 window.palaceAnimStoneMove = palaceAnimStoneMove;
 window.palaceAnimShatter = palaceAnimShatter;
 window.palaceAnimCapture = palaceAnimCapture;
+window.palaceAnimLaserHit = palaceAnimLaserHit;
 window.palaceWin = palaceWin;
 
 document.addEventListener('DOMContentLoaded', function () {
     init3D();
-    if (window.palStartPlay) window.palStartPlay();   // jump straight into the race demo
+    if (window.palStartPlay) window.palStartPlay();
 });
