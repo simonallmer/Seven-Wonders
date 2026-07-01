@@ -4,16 +4,49 @@
 // ============================================
 // CONSTANTS
 // ============================================
-const BOARD_SIZE = 9;
+const BOARD_SIZE_2 = 9;
+const BOARD_SIZE_4 = 11;
+let BOARD_SIZE = BOARD_SIZE_2;
+
+// Clockwise seating: white(bottom) -> red(left) -> black(top) -> blue(right)
+const PLAYERS_4 = ['white', 'red', 'black', 'blue'];
+// Opposite edges are allies: white+black (colorless), red+blue (colored).
+// Allies can spend light on each other but only one player ultimately wins.
+const PARTNER = { white: 'black', black: 'white', red: 'blue', blue: 'red' };
+
+function isAlly(a, b) {
+    if (!a || !b) return false;
+    if (a === b) return true;
+    // The white/black vs red/blue alliance pairing only applies in 4-player mode;
+    // in 2-player mode white and black are the only colors and are always enemies.
+    return playerCount === 4 && PARTNER[a] === b;
+}
+
+function isEnemy(a, b) {
+    return !!a && !!b && !isAlly(a, b);
+}
 
 // ============================================
 // GAME STATE
 // ============================================
 let board = [];
+let playerCount = 2;
 let currentPlayer = 'white';
+let eliminatedPlayers = new Set();
 // States: SELECT_MOVE_STONE, SELECT_LIGHT_SOURCE, SELECT_TARGET_CELL, GAME_OVER
 let gameState = 'SELECT_MOVE_STONE';
-let isVsComputer = false;
+// "Computer" is currently the only opponent option, so it is always active.
+// The human always plays White; every other color is computer-controlled.
+let isVsComputer = true;
+const HUMAN_PLAYER = 'white';
+let aiIsActing = false;
+// True while a move's 3D tween is in flight (board state not yet applied).
+// Prevents the AI (and stray clicks) from acting on stale board state.
+let boardAnimating = false;
+
+function isComputerPlayer(color) {
+    return isVsComputer && color !== HUMAN_PLAYER;
+}
 
 // The piece currently being moved {r, c}
 let moveSource = null;
@@ -66,10 +99,11 @@ if (modalResetBtn) {
  * Checks if a cell is one of the designated beacon fields.
  */
 function isBeaconField(r, c) {
-    // Center Beacon (4, 4)
-    if (r === 4 && c === 4) return true;
+    // Center Beacon
+    const center = Math.floor(BOARD_SIZE / 2);
+    if (r === center && c === center) return true;
 
-    // Corner Beacons (0, 0), (0, 8), (8, 0), (8, 8)
+    // Corner Beacons
     const isCorner = (r === 0 || r === BOARD_SIZE - 1) && (c === 0 || c === BOARD_SIZE - 1);
     if (isCorner) return true;
 
@@ -78,21 +112,22 @@ function isBeaconField(r, c) {
 
 /**
  * Determines the maximum number of times a position (r, c) can be used as a light source this turn.
+ * Allied colors (opposite edges) may spend each other's light, so "friendly" here means own or ally.
  */
 function getMaxLightUsesForPosition(r, c, playerColor) {
     const key = `${r},${c}`;
     const pieceColor = board[r][c].piece;
     const isBeacon = isBeaconField(r, c);
-    const isLitByPlayer = litBeacons[key] === playerColor;
+    const isLitByAlly = isAlly(litBeacons[key], playerColor);
 
-    if (pieceColor === playerColor) {
-        if (isBeacon && isLitByPlayer) {
+    if (isAlly(pieceColor, playerColor)) {
+        if (isBeacon && isLitByAlly) {
             return 2; // Piece light (1) + Beacon light (1)
         } else {
             return 1; // Piece light only
         }
-    } else if (pieceColor === null && isBeacon && isLitByPlayer) {
-        return 1; // Empty, but friendly lit beacon light only
+    } else if (pieceColor === null && isBeacon && isLitByAlly) {
+        return 1; // Empty, but allied lit beacon light only
     }
 
     return 0; // Not a friendly light source
@@ -113,52 +148,129 @@ function hasAvailableLight(r, c, playerColor) {
 // ============================================
 
 function initializeBoard() {
+    BOARD_SIZE = playerCount === 4 ? BOARD_SIZE_4 : BOARD_SIZE_2;
+
     board = Array(BOARD_SIZE).fill(0).map((_, r) =>
         Array(BOARD_SIZE).fill(0).map((_, c) => ({ piece: null, r, c }))
     );
 
     const START_INDEX = 2;
-    const END_INDEX = 6;
+    const END_INDEX = BOARD_SIZE - 3;
 
-    // White stones (Row 0 and 8)
-    for (let c = START_INDEX; c <= END_INDEX; c++) {
-        board[0][c].piece = 'white';
-    }
-    for (let c = START_INDEX; c <= END_INDEX; c++) {
-        board[BOARD_SIZE - 1][c].piece = 'white';
+    if (playerCount === 4) {
+        // White (bottom) + Black (top) are allies; Red (left) + Blue (right) are allies.
+        for (let c = START_INDEX; c <= END_INDEX; c++) {
+            board[BOARD_SIZE - 1][c].piece = 'white';
+            board[0][c].piece = 'black';
+        }
+        for (let r = START_INDEX; r <= END_INDEX; r++) {
+            board[r][0].piece = 'red';
+            board[r][BOARD_SIZE - 1].piece = 'blue';
+        }
+    } else {
+        // White stones (Row 0 and 8)
+        for (let c = START_INDEX; c <= END_INDEX; c++) {
+            board[0][c].piece = 'white';
+        }
+        for (let c = START_INDEX; c <= END_INDEX; c++) {
+            board[BOARD_SIZE - 1][c].piece = 'white';
+        }
+
+        // Red stones (Col 0 and 8)
+        for (let r = START_INDEX; r <= END_INDEX; r++) {
+            board[r][0].piece = 'black';
+        }
+        for (let r = START_INDEX; r <= END_INDEX; r++) {
+            board[r][BOARD_SIZE - 1].piece = 'black';
+        }
     }
 
-    // Red stones (Col 0 and 8)
-    for (let r = START_INDEX; r <= END_INDEX; r++) {
-        board[r][0].piece = 'black';
-    }
-    for (let r = START_INDEX; r <= END_INDEX; r++) {
-        board[r][BOARD_SIZE - 1].piece = 'black';
-    }
-
-    currentPlayer = 'white';
     lightSourceUsage = {};
     litBeacons = {};
+    eliminatedPlayers = new Set();
 
-    // Check for game start condition
-    if (!canMove('white')) {
-        gameState = 'GAME_OVER';
-        showMessage(`Game Over! White has no legal moves. Red wins!`, true);
+    if (playerCount === 4) {
+        if (!advanceTurn4p(0)) {
+            // Game already ended (only possible if 3 of 4 starting positions are somehow stuck)
+        } else {
+            resetMoveState(true);
+        }
     } else {
-        resetMoveState(true);
+        currentPlayer = 'white';
+        // Check for game start condition
+        if (!canMove('white')) {
+            gameState = 'GAME_OVER';
+            showMessage(`Game Over! White has no legal moves. Red wins!`, true);
+        } else {
+            resetMoveState(true);
+        }
     }
 
     drawBoard();
     updateUI();
-    
+
     // Ensure the status panel is hidden initially
     const statusElPanel = document.getElementById('game-status')?.closest('.status-panel');
     if (statusElPanel) statusElPanel.classList.remove('visible');
-    
+
     hideMessage();
     hideGameOverModal();
 
-    if (window.is3DView && typeof sync3D === 'function') sync3D();
+    if (window.is3DView && typeof rebuild3DBoard === 'function') rebuild3DBoard();
+    else if (window.is3DView && typeof sync3D === 'function') sync3D();
+
+    triggerAIIfNeeded();
+}
+
+/**
+ * Finds the next player (starting at PLAYERS_4[startIdx], searching forward) who still
+ * has a legal move, eliminating any stuck players found along the way. Returns true and
+ * sets currentPlayer if someone can move; returns false if the game just ended.
+ */
+function advanceTurn4p(startIdx) {
+    for (let attempts = 0, idx = startIdx; attempts < PLAYERS_4.length; attempts++, idx++) {
+        const candidate = PLAYERS_4[((idx % PLAYERS_4.length) + PLAYERS_4.length) % PLAYERS_4.length];
+        if (eliminatedPlayers.has(candidate)) continue;
+
+        if (canMove(candidate)) {
+            currentPlayer = candidate;
+            return true;
+        }
+
+        eliminatePlayer(candidate);
+        const survivors = PLAYERS_4.filter(p => !eliminatedPlayers.has(p));
+        if (survivors.length <= 1) {
+            declareFourPlayerWinner(survivors[0]);
+            return false;
+        }
+    }
+    return false;
+}
+
+function eliminatePlayer(color) {
+    eliminatedPlayers.add(color);
+    for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+            if (board[r][c].piece === color) board[r][c].piece = null;
+        }
+    }
+    Object.keys(litBeacons).forEach(key => {
+        if (litBeacons[key] === color) delete litBeacons[key];
+    });
+    showMessage(`${color.charAt(0).toUpperCase() + color.slice(1)} has no legal moves and is eliminated!`, true);
+}
+
+function declareFourPlayerWinner(winner) {
+    currentPlayer = winner || currentPlayer;
+    gameState = 'GAME_OVER';
+    const name = winner ? winner.charAt(0).toUpperCase() + winner.slice(1) : 'Nobody';
+    showGameOverModal(`${name} Wins!`, winner ? `All other players are eliminated!` : `All players eliminated.`);
+    updateStatus(`Game Over! ${name} Wins!`);
+    drawBoard();
+
+    if (typeof toggleMenu === 'function') {
+        setTimeout(() => toggleMenu(), 1000);
+    }
 }
 
 function showGameOverModal(title, text) {
@@ -198,17 +310,30 @@ function resetMoveState(fullReset = false) {
     const indicator = document.getElementById('player-indicator');
     if (indicator) {
         indicator.className = 'count-stone ' + currentPlayer;
-        if (currentPlayer === 'black') {
-            indicator.style.backgroundColor = '#8b0000';
-        } else {
-            indicator.style.backgroundColor = '#ffffff';
-        }
+        indicator.style.backgroundColor = getPlayerColorHex(currentPlayer);
     }
     if (window.is3DView && typeof sync3D === 'function') sync3D();
 }
 
+/**
+ * Maps a player color to its swatch. In 2-player mode 'black' is displayed as red
+ * (thematic White vs Red); in 4-player mode all four colors are true to their name.
+ */
+function getPlayerColorHex(color) {
+    if (playerCount === 4) {
+        const map = { white: '#ffffff', black: '#1a1a1a', red: '#ff4d4d', blue: '#3b82f6' };
+        return map[color] || '#ffffff';
+    }
+    return color === 'black' ? '#8b0000' : '#ffffff';
+}
+
 function drawBoard() {
     boardElement.innerHTML = '';
+    boardElement.style.gridTemplateColumns = `repeat(${BOARD_SIZE}, 1fr)`;
+    boardElement.style.gridTemplateRows = `repeat(${BOARD_SIZE}, 1fr)`;
+    boardElement.style.width = `calc(var(--cell-size) * ${BOARD_SIZE})`;
+    boardElement.style.height = `calc(var(--cell-size) * ${BOARD_SIZE})`;
+    boardElement.classList.toggle('four-player', playerCount === 4);
 
     for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
@@ -223,7 +348,7 @@ function drawBoard() {
             // Add beacon visual indicators
             if (isBeaconField(r, c)) {
                 if (litBeacons[key]) {
-                    const displayColorClass = litBeacons[key] === 'black' ? 'red' : litBeacons[key];
+                    const displayColorClass = (playerCount === 2 && litBeacons[key] === 'black') ? 'red' : litBeacons[key];
                     const litIndicator = document.createElement('div');
                     litIndicator.classList.add('beacon-lit-indicator', `beacon-lit-${displayColorClass}`);
                     cell.appendChild(litIndicator);
@@ -246,7 +371,7 @@ function drawBoard() {
                 // Check for piece being fully darkened
                 const maxUsesForPiece = getMaxLightUsesForPosition(r, c, currentPlayer);
                 const currentUses = lightSourceUsage[key] || 0;
-                const isFullyDarkened = (cellData.piece === currentPlayer) && (maxUsesForPiece > 0 && currentUses >= maxUsesForPiece);
+                const isFullyDarkened = isAlly(cellData.piece, currentPlayer) && (maxUsesForPiece > 0 && currentUses >= maxUsesForPiece);
 
                 if (isFullyDarkened) {
                     piece.classList.add('darkened');
@@ -284,9 +409,18 @@ function updateStatus(message = null) {
     const playerColorEl = document.getElementById('current-player-color');
     const playerIndicatorEl = document.getElementById('player-indicator');
     
-    const displayColor = currentPlayer === 'white' ? 'White' : 'Red';
-    const activeColor = currentPlayer === 'white' ? '#ffffff' : '#ff4d4d'; // Match Skyscraper/3D Red
-    const borderColor = currentPlayer === 'white' ? '#1a1a1a' : '#ffd700';
+    let displayColor, activeColor, borderColor;
+    if (playerCount === 4) {
+        const names = { white: 'White', black: 'Black', red: 'Red', blue: 'Blue' };
+        const borders = { white: '#1a1a1a', black: '#e5e5e5', red: '#1a1a1a', blue: '#1a1a1a' };
+        displayColor = names[currentPlayer] || currentPlayer;
+        activeColor = getPlayerColorHex(currentPlayer);
+        borderColor = borders[currentPlayer] || '#1a1a1a';
+    } else {
+        displayColor = currentPlayer === 'white' ? 'White' : 'Red';
+        activeColor = currentPlayer === 'white' ? '#ffffff' : '#ff4d4d'; // Match Skyscraper/3D Red
+        borderColor = currentPlayer === 'white' ? '#1a1a1a' : '#ffd700';
+    }
 
     if (gameState === 'GAME_OVER') {
         if (playerEl) playerEl.textContent = `${displayColor} Wins!`;
@@ -361,6 +495,7 @@ function hideMessage() {
  */
 function getPossibleMoves(r, c) {
     const moves = [];
+    const ownerColor = board[r][c].piece;
     const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
 
     for (const [dr, dc] of directions) {
@@ -369,7 +504,9 @@ function getPossibleMoves(r, c) {
 
         if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) continue;
 
-        if (board[nr][nc].piece !== board[r][c].piece) {
+        const targetPiece = board[nr][nc].piece;
+        // A stone may step onto an empty field or capture an enemy; allies block the way.
+        if (targetPiece === null || isEnemy(targetPiece, ownerColor)) {
             moves.push({ r: nr, c: nc });
         }
     }
@@ -382,7 +519,6 @@ function getPossibleMoves(r, c) {
 function findAvailableLightSources(r, c, playerColor) {
     const sources = new Map();
     const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
-    const opponent = playerColor === 'white' ? 'black' : 'white';
     const isMovingPiece = moveSource && moveSource.r === r && moveSource.c === c;
 
     const key = `${r},${c}`;
@@ -413,8 +549,8 @@ function findAvailableLightSources(r, c, playerColor) {
             const pos = { r: nr, c: nc };
             const currentKey = `${nr},${nc}`;
 
-            // Check for blocker (opponent's piece)
-            if (cell.piece === opponent) {
+            // Check for blocker (an enemy piece)
+            if (cell.piece && isEnemy(cell.piece, playerColor)) {
                 break;
             }
 
@@ -461,6 +597,14 @@ function handleCellClick(r, c) {
     if (gameState === 'GAME_OVER') {
         showMessage("Game Over! Click New Game to play again.", true);
         return;
+    }
+
+    if (isComputerPlayer(currentPlayer) && !aiIsActing) {
+        return; // Block manual clicks during the computer's turn.
+    }
+
+    if (boardAnimating) {
+        return; // A move's tween is still in flight; ignore clicks until it lands.
     }
 
     const cellData = board[r][c];
@@ -595,6 +739,7 @@ function handleCellClick(r, c) {
 }
 
 function executeMove(targetPos) {
+    boardAnimating = true;
     if (window.is3DView && typeof animate3DMove === 'function') {
         animate3DMove(moveSource.r, moveSource.c, targetPos.r, targetPos.c).then(() => {
             finalizeMove(targetPos);
@@ -605,6 +750,7 @@ function executeMove(targetPos) {
 }
 
 function finalizeMove(targetPos) {
+    boardAnimating = false;
     const { r: sourceR, c: sourceC } = moveSource;
     const { r: targetR, c: targetC } = targetPos;
 
@@ -698,6 +844,21 @@ function finalizeMove(targetPos) {
 }
 
 function endTurn() {
+    if (playerCount === 4) {
+        const finishedPlayer = currentPlayer;
+        resetMoveState(true);
+
+        if (!advanceTurn4p(PLAYERS_4.indexOf(finishedPlayer) + 1)) {
+            return; // Game already ended inside advanceTurn4p
+        }
+
+        gameState = 'SELECT_MOVE_STONE';
+        drawBoard();
+        updateStatus();
+        triggerAIIfNeeded();
+        return;
+    }
+
     const winningPlayer = currentPlayer;
     const losingPlayer = currentPlayer === 'white' ? 'black' : 'white';
 
@@ -725,8 +886,16 @@ function endTurn() {
     drawBoard();
     updateStatus();
 
-    if (isVsComputer && currentPlayer === 'black') {
-        gameState = 'SELECT_MOVE_STONE';
+    gameState = 'SELECT_MOVE_STONE';
+    triggerAIIfNeeded();
+}
+
+/**
+ * Schedules the AI's move if the current player is computer-controlled.
+ */
+function triggerAIIfNeeded() {
+    if (gameState === 'GAME_OVER') return;
+    if (isComputerPlayer(currentPlayer)) {
         setTimeout(makeAIMove, 600);
     }
 }
@@ -766,15 +935,37 @@ function canMove(player) {
 // INITIALIZATION
 // ============================================
 
+// Switch player count (2 or 4) and restart with the matching board.
+function setPlayerCount(n) {
+    if (n !== 2 && n !== 4) return;
+    playerCount = n;
+    initializeBoard();
+}
+window.setPlayerCount = setPlayerCount;
+
 resetButton.addEventListener('click', initializeBoard);
 endTurnButton.addEventListener('click', () => {
     showMessage(`${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)} chose to end their movement chain using the End Turn button.`);
     endTurn();
 });
-let _opponentBtnTimeout = null;
-opponentButton.addEventListener('click', () => {
-    showMessage("Computer Opponent: Coming Soon");
-});
+// Toggles between a computer-controlled opponent (every non-White seat) and
+// full human hotseat play, updating both the menu and action-bar buttons.
+function toggleOpponentMode() {
+    isVsComputer = !isVsComputer;
+
+    const label = `Opponent: ${isVsComputer ? 'Computer' : 'Human'}`;
+    if (opponentButton) opponentButton.textContent = label;
+    const opponentBtnMenu = document.getElementById('opponent-btn-menu');
+    if (opponentBtnMenu) opponentBtnMenu.textContent = label;
+
+    showMessage(isVsComputer ? "Computer opponent enabled." : "Human opponent enabled. Pass and play on the same device.");
+
+    // Kick off the AI immediately if it's now a computer-controlled player's turn.
+    triggerAIIfNeeded();
+}
+window.toggleOpponentMode = toggleOpponentMode;
+
+opponentButton.addEventListener('click', toggleOpponentMode);
 
 
 // ============================================
@@ -801,39 +992,38 @@ function countOpponentMoves(player) {
 
 function evaluateMove(stone, target, light, player) {
     let score = 0;
-    const opponent = player === 'white' ? 'black' : 'white';
     const targetColor = board[target.r][target.c].piece;
-    
-    // PRIORITY 1: Kill opponent stones (ATTACK)
-    if (targetColor === opponent) {
+
+    // PRIORITY 1: Kill enemy stones (ATTACK)
+    if (targetColor && isEnemy(targetColor, player)) {
         score += 1000;
-        
+
         // Check if this capture also controls a beacon
         if (isBeaconField(target.r, target.c)) {
             score += 200;
         }
     }
-    
-    // PRIORITY 2: Control beacons (limit opponent movement)
+
+    // PRIORITY 2: Control beacons (limit enemy movement)
     if (isBeaconField(target.r, target.c)) {
         score += 300;
-        
+
         // If we can light a beacon, that's very valuable
         if (targetColor === null) {
             score += 150;
         }
     }
-    
-    // PRIORITY 3: Block opponent lines of sight
-    // Check if this move blocks opponent light sources
+
+    // PRIORITY 3: Block enemy lines of sight
+    // Check if this move blocks enemy light sources
     const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
     for (const [dr, dc] of directions) {
         let nr = target.r + dr;
         let nc = target.c + dc;
         while (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
             const cell = board[nr][nc];
-            if (cell.piece === opponent) {
-                // Moving here might block this opponent stone's light path
+            if (cell.piece && isEnemy(cell.piece, player)) {
+                // Moving here might block this enemy stone's light path
                 score += 50;
                 break;
             }
@@ -844,14 +1034,14 @@ function evaluateMove(stone, target, light, player) {
             nc += dc;
         }
     }
-    
-    // PRIORITY 4: Advance towards opponent side (strategic positioning)
-    if (player === 'black') {
-        score += (8 - target.r) * 10; // Move up the board
-    } else {
-        score += target.r * 10;
-    }
-    
+
+    // PRIORITY 4: Advance towards the center (strategic positioning, works
+    // symmetrically for every starting edge in both 2p and 4p layouts)
+    const center = (BOARD_SIZE - 1) / 2;
+    const distBefore = Math.abs(stone.r - center) + Math.abs(stone.c - center);
+    const distAfter = Math.abs(target.r - center) + Math.abs(target.c - center);
+    score += (distBefore - distAfter) * 10;
+
     // PRIORITY 5: Prefer moves that keep options open (more adjacent moves)
     const futureTargets = getPossibleMoves(target.r, target.c);
     score += futureTargets.length * 5;
@@ -870,19 +1060,37 @@ function evaluateMove(stone, target, light, player) {
     return score;
 }
 
+// Executes a click as part of the AI's own turn (bypasses the human-input guard).
+function aiClick(r, c) {
+    aiIsActing = true;
+    handleCellClick(r, c);
+    aiIsActing = false;
+}
+
 function makeAIMove() {
-    if (gameState === 'GAME_OVER' || currentPlayer !== 'black') return;
+    if (!isComputerPlayer(currentPlayer)) return;
+    if (gameState === 'GAME_OVER') return;
+
+    // A move animation from the previous step hasn't landed on the board yet
+    // (the tween runs longer than the AI's step delay) — wait for it instead
+    // of re-evaluating stale board state, which would double-process the move.
+    if (boardAnimating) {
+        setTimeout(makeAIMove, 100);
+        return;
+    }
+
+    const aiColor = currentPlayer;
 
     if (gameState === 'SELECT_MOVE_STONE') {
-        // AI: Find all legal moves for all black stones
+        // AI: Find all legal moves for all of its own stones
         let validFirstMoves = [];
 
         for (let r = 0; r < BOARD_SIZE; r++) {
             for (let c = 0; c < BOARD_SIZE; c++) {
-                if (board[r][c].piece === 'black') {
+                if (board[r][c].piece === aiColor) {
                     moveSource = { r, c };
                     const targets = getPossibleMoves(r, c);
-                    const lights = findAvailableLightSources(r, c, 'black');
+                    const lights = findAvailableLightSources(r, c, aiColor);
                     moveSource = null;
 
                     if (targets.length > 0 && lights.length > 0) {
@@ -906,7 +1114,7 @@ function makeAIMove() {
         let bestMove = validFirstMoves[0];
 
         validFirstMoves.forEach(m => {
-            const score = evaluateMove(m.stone, m.target, m.light, 'black');
+            const score = evaluateMove(m.stone, m.target, m.light, aiColor);
             if (score > bestScore) {
                 bestScore = score;
                 bestMove = m;
@@ -914,7 +1122,7 @@ function makeAIMove() {
         });
 
         // Execute first click
-        handleCellClick(bestMove.stone.r, bestMove.stone.c);
+        aiClick(bestMove.stone.r, bestMove.stone.c);
         setTimeout(makeAIMove, 400);
         return;
     }
@@ -924,24 +1132,24 @@ function makeAIMove() {
         if (potentialLightSources.length > 0) {
             let bestScore = -Infinity;
             let bestSource = potentialLightSources[0];
-            
+
             potentialLightSources.forEach(ls => {
                 let score = 0;
                 // Prefer light sources that are closer to the target
                 const dist = Math.abs(ls.r - moveSource.r) + Math.abs(ls.c - moveSource.c);
                 score -= dist * 10;
                 score += Math.random() * 5;
-                
+
                 if (score > bestScore) {
                     bestScore = score;
                     bestSource = ls;
                 }
             });
-            
-            handleCellClick(bestSource.r, bestSource.c);
+
+            aiClick(bestSource.r, bestSource.c);
             setTimeout(makeAIMove, 400);
         } else {
-            endTurnButton.click();
+            endTurn();
         }
         return;
     }
@@ -954,25 +1162,27 @@ function makeAIMove() {
             potentialMoveTargets.forEach(tgt => {
                 let score = 0;
                 const targetColor = board[tgt.r][tgt.c].piece;
-                
+
                 // Attack is most important
-                if (targetColor === 'white') score += 500;
-                
+                if (targetColor && isEnemy(targetColor, aiColor)) score += 500;
+
                 // Beacon control
                 if (isBeaconField(tgt.r, tgt.c)) score += 150;
-                
-                // Strategic position
-                score += (8 - tgt.r) * 10;
-                
+
+                // Strategic position: prefer moves that head towards the board center
+                const center = (BOARD_SIZE - 1) / 2;
+                const dist = Math.abs(tgt.r - center) + Math.abs(tgt.c - center);
+                score -= dist * 10;
+
                 if (score > bestScore) {
                     bestScore = score;
                     bestTarget = tgt;
                 }
             });
-            handleCellClick(bestTarget.r, bestTarget.c);
+            aiClick(bestTarget.r, bestTarget.c);
             setTimeout(makeAIMove, 400);
         } else {
-            endTurnButton.click();
+            endTurn();
         }
         return;
     }
