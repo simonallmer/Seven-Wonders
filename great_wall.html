@@ -155,12 +155,11 @@
         // bottom` bar anchors to the layout viewport — CSS `env(safe-area-inset-bottom)` handles it now.
         (function () {
             const bar = document.querySelector('.action-bar');
-            // On tablets, mobile Safari's bottom toolbar overlaps a fixed bottom:12px bar
-            // (safe-area-inset-bottom is 0 on iPad), hiding the movement menu. Lift it into
-            // the lower third so it clears the browser chrome; phones/desktop stay low.
-            const isTabletTouch = window.matchMedia('(pointer: coarse)').matches
-                && Math.min(window.innerWidth, window.innerHeight) >= 481;
-            const baseGap = isTabletTouch ? 64 : 12;
+            // On tablets & phones, the browser's bottom toolbar/address bar overlaps a
+            // fixed bottom:12px bar (safe-area-inset-bottom is 0), cutting off the movement
+            // menu. Lift it well into the lower third to clear the chrome; desktop stays low.
+            const isTouch = window.matchMedia('(pointer: coarse)').matches;
+            const baseGap = isTouch ? 100 : 12;
             function pin() {
                 const vv = window.visualViewport;
                 if (!vv) return;

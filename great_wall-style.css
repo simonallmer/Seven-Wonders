@@ -663,12 +663,12 @@ body {
     }
 }
 
-/* Tablets / touch devices: mobile Safari's bottom toolbar overlaps a fixed
-   bottom:12px bar (safe-area-inset-bottom is 0 on iPad), hiding the movement
-   menu. Lift it into the lower third so it clears the browser chrome. The
+/* Touch devices (tablets & phones): the browser's bottom toolbar/address bar
+   overlaps a fixed bottom:12px bar (safe-area-inset-bottom is 0), cutting off
+   the movement menu. Lift it well into the lower third to clear the chrome. The
    pin() script applies the same clearance inline so it wins over this rule. */
-@media (min-width: 481px) and (pointer: coarse) {
+@media (pointer: coarse) {
     .action-bar {
-        bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
     }
 }
