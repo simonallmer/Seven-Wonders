@@ -662,3 +662,13 @@ body {
         grid-template-rows: repeat(3, 54px);
     }
 }
+
+/* Tablets / touch devices: mobile Safari's bottom toolbar overlaps a fixed
+   bottom:12px bar (safe-area-inset-bottom is 0 on iPad), hiding the movement
+   menu. Lift it into the lower third so it clears the browser chrome. The
+   pin() script applies the same clearance inline so it wins over this rule. */
+@media (min-width: 481px) and (pointer: coarse) {
+    .action-bar {
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
+    }
+}

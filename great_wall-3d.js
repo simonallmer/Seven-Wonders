@@ -32,8 +32,9 @@ function cellTo3D(r, c) {
 }
 
 // Materials — golden-hour stone, two armies: jade limestone vs vermilion basalt
-const matBrick = new THREE.MeshStandardMaterial({ color: 0xcc3b22, roughness: 0.85, metalness: 0.03 });
-const matBrickDark = new THREE.MeshStandardMaterial({ color: 0x992d1a, roughness: 0.85, metalness: 0.03 });
+// Beijing-area Great Wall (Badaling/Mutianyu): weathered gray-brown stone brick, not red
+const matBrick = new THREE.MeshStandardMaterial({ color: 0x958b7c, roughness: 0.9, metalness: 0.02 });
+const matBrickDark = new THREE.MeshStandardMaterial({ color: 0x726a5e, roughness: 0.9, metalness: 0.02 });
 const matSlab = new THREE.MeshStandardMaterial({ color: 0xcfc2a4, roughness: 0.85, metalness: 0.05 });
 const matSlabDark = new THREE.MeshStandardMaterial({ color: 0xc2b393, roughness: 0.85, metalness: 0.05 });
 const matRock = new THREE.MeshStandardMaterial({ color: 0x6e6052, roughness: 1.0 });
