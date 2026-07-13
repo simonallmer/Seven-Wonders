@@ -599,6 +599,19 @@ body {
     font-style: italic;
 }
 
+/* Touch devices (tablets & phones): the browser's bottom toolbar/address bar
+   overlaps the fixed action bar (safe-area-inset-bottom is 0), hiding the
+   contextual menu. Lift it into the lower third to clear the chrome. The pin()
+   script applies the same clearance inline so it wins over this rule. */
+@media (pointer: coarse) {
+    .action-bar {
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
+    }
+    .action-prompt {
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 154px);
+    }
+}
+
 /* Responsive */
 @media (max-width: 480px) {
     :root {

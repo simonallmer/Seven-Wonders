@@ -134,12 +134,19 @@
         (function () {
             const bar = document.querySelector('.action-bar');
             const prompt = document.querySelector('.action-prompt');
+            // On tablets & phones, the browser's bottom toolbar/address bar overlaps a fixed
+            // bottom bar (safe-area-inset-bottom is 0, and visualViewport doesn't shrink on iPad),
+            // hiding the contextual action menu. Lift it well into the lower third to clear the
+            // chrome; desktop stays low. The prompt rides 54px above the bar.
+            const isTouch = window.matchMedia('(pointer: coarse)').matches;
+            const barGap = isTouch ? 100 : 20;
+            const promptGap = isTouch ? 154 : 74;
             function pin() {
                 let hiddenBelow = 0;
                 const vv = window.visualViewport;
                 if (vv) hiddenBelow = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
-                if (bar) bar.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + 20) + 'px)';
-                if (prompt) prompt.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + 74) + 'px)';
+                if (bar) bar.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + barGap) + 'px)';
+                if (prompt) prompt.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + promptGap) + 'px)';
             }
             if (window.visualViewport) {
                 window.visualViewport.addEventListener('resize', pin);
