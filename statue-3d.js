@@ -1894,6 +1894,7 @@ function triggerStatueFadeOut() {
         })
         .start();
 }
+window.triggerStatueFadeOut = triggerStatueFadeOut;
 
 /**
  * Fades out the Statue of Zeus as the camera zooms in for better board clarity.
@@ -1917,45 +1918,54 @@ function updateStatueFade() {
         opacity *= window.statueClickFade;
     }
     
-    groupThrone.traverse(child => {
-        // Handle Lights fading
-        if (child.isLight) {
-            if (child.userData.baseIntensity === undefined) {
-                child.userData.baseIntensity = child.intensity || 0.5;
-            }
-            child.intensity = opacity * child.userData.baseIntensity;
-            child.visible = child.intensity > 0.01;
-            return;
-        }
-
-        if (child.isMesh && child.material) {
-            const materials = Array.isArray(child.material) ? child.material : [child.material];
-            materials.forEach(mat => {
-                // To prevent shared materials (like matGold on board trim) from fading,
-                // we isolate/clone them once the first time we start fading.
-                if (mat.userData.isIsolated === undefined) {
-                    if (mat === matGold || mat === matMarble) {
-                        child.material = mat.clone();
-                        // re-fetch it if it was an array... simplified for now
-                        const newMat = Array.isArray(child.material) ? child.material[0] : child.material;
-                        newMat.userData.isIsolated = true;
-                        newMat.userData.baseOpacity = (newMat.opacity !== undefined) ? newMat.opacity : 1.0;
-                        newMat.transparent = true;
-                    } else {
-                        mat.userData.isIsolated = true;
-                        mat.userData.baseOpacity = (mat.opacity !== undefined) ? mat.opacity : 1.0;
-                        mat.transparent = true;
-                    }
+    // Applies the fade to one throne group. In 4-player mode the statue is cloned
+    // into groupThroneB, so both must be faded or the second figure lingers.
+    const fadeThroneGroup = (group) => {
+        if (!group) return;
+        group.traverse(child => {
+            // Handle Lights fading
+            if (child.isLight) {
+                if (child.userData.baseIntensity === undefined) {
+                    child.userData.baseIntensity = child.intensity || 0.5;
                 }
-                
-                const m = Array.isArray(child.material) ? child.material[materials.indexOf(mat)] : child.material;
-                m.opacity = opacity * (m.userData.baseOpacity || 1.0);
-                
-                // Optimization: hide entirely if transparent
-                child.visible = m.opacity > 0.005;
-            });
-        }
-    });
+                child.intensity = opacity * child.userData.baseIntensity;
+                child.visible = child.intensity > 0.01;
+                return;
+            }
+
+            if (child.isMesh && child.material) {
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                materials.forEach(mat => {
+                    // To prevent shared materials (like matGold on board trim) from fading,
+                    // we isolate/clone them once the first time we start fading. The clone
+                    // (groupThroneB) shares material refs, so it needs its own isolation too.
+                    if (mat.userData.isIsolated === undefined) {
+                        if (mat === matGold || mat === matMarble) {
+                            child.material = mat.clone();
+                            // re-fetch it if it was an array... simplified for now
+                            const newMat = Array.isArray(child.material) ? child.material[0] : child.material;
+                            newMat.userData.isIsolated = true;
+                            newMat.userData.baseOpacity = (newMat.opacity !== undefined) ? newMat.opacity : 1.0;
+                            newMat.transparent = true;
+                        } else {
+                            mat.userData.isIsolated = true;
+                            mat.userData.baseOpacity = (mat.opacity !== undefined) ? mat.opacity : 1.0;
+                            mat.transparent = true;
+                        }
+                    }
+
+                    const m = Array.isArray(child.material) ? child.material[materials.indexOf(mat)] : child.material;
+                    m.opacity = opacity * (m.userData.baseOpacity || 1.0);
+
+                    // Optimization: hide entirely if transparent
+                    child.visible = m.opacity > 0.005;
+                });
+            }
+        });
+    };
+
+    fadeThroneGroup(groupThrone);
+    fadeThroneGroup(groupThroneB);
 }
 
 function updateFloatingButtonPosition() {

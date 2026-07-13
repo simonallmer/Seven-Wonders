@@ -499,6 +499,9 @@ window.handle3DClick = function(r, c) {
             };
             onBoardDice.push(newDie);
 
+            // First stone placed hides the Statue of Zeus for a clearer board.
+            if (window.triggerStatueFadeOut) window.triggerStatueFadeOut();
+
             if (window.syncBoard3D) window.syncBoard3D();
             renderBoard();
             endTurn(`Player ${currentPlayer} placed a stone.`);
@@ -895,6 +898,9 @@ function handlePlaceClick(event) {
         player: currentPlayer
     });
     reserveDice[currentPlayer]--;
+
+    // First stone placed hides the Statue of Zeus for a clearer board.
+    if (window.triggerStatueFadeOut) window.triggerStatueFadeOut();
 
     renderBoard();
     endTurn(`Player ${currentPlayer} placed a new die (Value 1) at ${String.fromCharCode(97 + c).toUpperCase()}${BOARD_SIZE - r}.`);
