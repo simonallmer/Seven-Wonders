@@ -38,6 +38,10 @@ let gameState = 'SELECT_MOVE_STONE';
 // "Computer" is currently the only opponent option, so it is always active.
 // The human always plays White; every other color is computer-controlled.
 let isVsComputer = true;
+// When false, the board has no beacon fields at all (simpler variant that some
+// players prefer). Gates isBeaconField(), so it removes beacons mechanically,
+// visually (2D indicators + 3D towers), and from the AI in one place.
+let beaconsEnabled = true;
 const HUMAN_PLAYER = 'white';
 let aiIsActing = false;
 // True while a move's 3D tween is in flight (board state not yet applied).
@@ -99,6 +103,9 @@ if (modalResetBtn) {
  * Checks if a cell is one of the designated beacon fields.
  */
 function isBeaconField(r, c) {
+    // "No Beacons" variant: the board has no beacon fields.
+    if (!beaconsEnabled) return false;
+
     // Center Beacon
     const center = Math.floor(BOARD_SIZE / 2);
     if (r === center && c === center) return true;
@@ -966,6 +973,22 @@ function toggleOpponentMode() {
 window.toggleOpponentMode = toggleOpponentMode;
 
 opponentButton.addEventListener('click', toggleOpponentMode);
+
+// Toggles the "No Beacons" variant. Because this changes the board layout, it
+// starts a fresh game so the beacons appear/disappear cleanly in both 2D and 3D.
+function toggleBeaconsMode() {
+    beaconsEnabled = !beaconsEnabled;
+
+    const label = `Field: ${beaconsEnabled ? 'Beacons' : 'No Beacons'}`;
+    const beaconsBtnMenu = document.getElementById('beacons-btn-menu');
+    if (beaconsBtnMenu) beaconsBtnMenu.textContent = label;
+
+    initializeBoard();
+    showMessage(beaconsEnabled
+        ? "Beacons enabled. New game started."
+        : "Beacons removed. New game started with the simpler variant.");
+}
+window.toggleBeaconsMode = toggleBeaconsMode;
 
 
 // ============================================
