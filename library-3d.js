@@ -829,6 +829,13 @@ function createEntranceMarkers() {
     });
 }
 
+function toggleOpenEndsMode() {
+    game.setOpenEnds(!game.openEnds);
+    const btn = document.getElementById('variant-btn');
+    if (btn) btn.textContent = game.openEnds ? 'Field: Open Ends' : 'Field: Safe Ends';
+    startNewGame(game.numPlayers, null);
+}
+
 document.getElementById('btn-p2').onclick = (e) => startNewGame(2, e.target);
 document.getElementById('btn-p3').onclick = (e) => startNewGame(3, e.target);
 document.getElementById('btn-p4').onclick = (e) => startNewGame(4, e.target);
@@ -941,6 +948,54 @@ game.on('onSphereMoved', (data) => {
         })
         .onComplete(() => {
             sharedSphereMesh.position.copy(end);
+        })
+        .start();
+});
+
+game.on('onSphereFell', (data) => {
+    if (!sharedSphereMesh) return;
+
+    const start = sharedSphereMesh.position.clone();
+    const lastPlate = getPos(data.fromR, data.fromC);
+    const step = TILE_SIZE + GAP_SIZE;
+    // Roll past the last plate and out over the open end, then drop.
+    const edge = new THREE.Vector3(
+        lastPlate.x + data.dirC * step,
+        SPHERE_RADIUS,
+        lastPlate.z + data.dirR * step
+    );
+    const fountain = getPos(CENTER, CENTER);
+
+    const delta = new THREE.Vector3().subVectors(edge, start);
+    const dist = delta.length();
+    const dir = dist > 0.001 ? delta.clone().normalize() : new THREE.Vector3(data.dirC, 0, data.dirR);
+    const rollAxis = new THREE.Vector3(-dir.z, 0, dir.x);
+    const totalAngle = dist / SPHERE_RADIUS;
+    const baseQuat = sharedSphereMesh.quaternion.clone();
+    const rollDuration = Math.min(1200, Math.max(280, dist * 220));
+
+    const o = { t: 0 };
+    new TWEEN.Tween(o)
+        .to({ t: 1 }, rollDuration)
+        .easing(TWEEN.Easing.Quadratic.In)
+        .onUpdate(() => {
+            sharedSphereMesh.position.lerpVectors(start, edge, o.t);
+            const rollQuat = new THREE.Quaternion().setFromAxisAngle(rollAxis, o.t * totalAngle);
+            sharedSphereMesh.quaternion.copy(rollQuat).multiply(baseQuat);
+        })
+        .onComplete(() => {
+            // Fall off the open end, then respawn above the fountain.
+            new TWEEN.Tween(sharedSphereMesh.position)
+                .to({ y: -3 }, 380)
+                .easing(TWEEN.Easing.Quadratic.In)
+                .onComplete(() => {
+                    sharedSphereMesh.position.set(fountain.x, 4, fountain.z);
+                    new TWEEN.Tween(sharedSphereMesh.position)
+                        .to({ y: SPHERE_RADIUS }, 450)
+                        .easing(TWEEN.Easing.Bounce.Out)
+                        .start();
+                })
+                .start();
         })
         .start();
 });
@@ -1214,6 +1269,10 @@ class LibraryAI {
                 if (this.game.vWalls[sphere.r][Math.min(sphere.c, nc)] !== null) continue;
             }
             if (this.game.fields[nr][nc] === null) continue;
+            if (this.game.openEnds) {
+                const res = this.game.simulateSphereRoll(dirR, dirC);
+                if (res.fell) continue;
+            }
             this.game.doPushSphere(dirR, dirC);
             return true;
         }

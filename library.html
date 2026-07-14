@@ -48,6 +48,7 @@
                 </div>
             </div>
 
+            <button id="variant-btn" class="menu-btn">Field: Safe Ends</button>
             <button id="rules-btn" class="menu-btn">Rules</button>
             <button id="scheme-btn" class="menu-btn">Controls: Adaptive</button>
             <button id="reset-button" class="menu-btn">New Game</button>
@@ -109,6 +110,9 @@
                     <li><strong>Topple Wall:</strong> Click your wall to select it. Click an adjacent cell to topple it — the wall becomes a walkable plate!</li>
                     <li><strong>Push Sphere:</strong> Select the sphere, then click a direction arrow to push it. It slides in a straight line through connected plates until blocked. If it stops on your entrance — you win!</li>
                 </ul>
+
+                <p><strong>VARIANT — OPEN ENDS</strong><br>
+                The sphere only stops at walls. If it rolls past the end of a plate road or over the board edge, it falls and returns to the fountain. Your own entrance is a doorway — the sphere rolling into it wins immediately, no wall needed.</p>
             </div>
             <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
         </div>
@@ -185,6 +189,11 @@
         });
         document.getElementById('rules-overlay').addEventListener('click', function () {
             document.getElementById('rules-modal').classList.add('hidden');
+        });
+
+        // Open Ends variant toggle
+        document.getElementById('variant-btn').addEventListener('click', function () {
+            if (typeof toggleOpenEndsMode === 'function') toggleOpenEndsMode();
         });
 
         // Control scheme toggle

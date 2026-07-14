@@ -35,6 +35,11 @@ class LibraryGame {
         this._prevSpherePos = { r: CENTER, c: CENTER };
         this._lastPushTurn = -1;
 
+        // "Open Ends" variant: the sphere only stops at walls. Rolling past the
+        // end of a plate road (or over the board edge) makes it fall and respawn
+        // at the fountain. The player's own entrance still catches it mid-roll.
+        this.openEnds = false;
+
         this.interactionState = 'IDLE'; // IDLE | WALL_SELECTED | SPHERE_SELECTED
         this.selectedWall = null;
 
@@ -57,8 +62,10 @@ class LibraryGame {
             onPlateRemoved: [],
             onGameOver: [],
             onSphereMoved: [],
+            onSphereFell: [],
             onSphereSelected: [],
             onSphereDeselected: [],
+            onVariantChanged: [],
             onMessage: [],
             onControlSchemeChanged: [],
             onActionChanged: []
@@ -91,6 +98,11 @@ class LibraryGame {
         this.interactionState = 'IDLE';
         this.selectedWall = null;
         this.trigger('onActionChanged', action);
+    }
+
+    setOpenEnds(enabled) {
+        this.openEnds = !!enabled;
+        this.trigger('onVariantChanged', this.openEnds);
     }
 
     initGame(pCount) {
@@ -235,28 +247,59 @@ class LibraryGame {
         this.endTurn();
     }
 
-    doPushSphere(dirR, dirC) {
-        if (dirR === 0 && dirC === 0) return;
-
+    // Traces where a push would take the sphere without moving it.
+    // In the Open Ends variant the sphere only stops at walls: an open end
+    // (board edge or unplated cell ahead) means it falls, and the current
+    // player's own entrance catches it mid-roll like a doorway.
+    simulateSphereRoll(dirR, dirC) {
         let r = this.sharedSphere.r;
         let c = this.sharedSphere.c;
+        const entrance = this.players[this.currentPlayer].entrance;
+        let fell = false;
 
         while (true) {
             const nr = r + dirR, nc = c + dirC;
-            if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) break;
-            if (dirR !== 0) {
-                if (this.hWalls[Math.min(r, nr)][c] !== null) break;
-            } else {
-                if (this.vWalls[r][Math.min(c, nc)] !== null) break;
+            const offBoard = nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE;
+            if (!offBoard) {
+                if (dirR !== 0) {
+                    if (this.hWalls[Math.min(r, nr)][c] !== null) break;
+                } else {
+                    if (this.vWalls[r][Math.min(c, nc)] !== null) break;
+                }
             }
-            if (this.fields[nr][nc] === null) break;
+            if (offBoard || this.fields[nr][nc] === null) {
+                if (this.openEnds && (r !== this.sharedSphere.r || c !== this.sharedSphere.c)) fell = true;
+                break;
+            }
             r = nr;
             c = nc;
+            if (this.openEnds && r === entrance.r && c === entrance.c) break;
         }
 
-        if (r === this.sharedSphere.r && c === this.sharedSphere.c) {
+        return { r, c, fell };
+    }
+
+    doPushSphere(dirR, dirC) {
+        if (dirR === 0 && dirC === 0) return;
+
+        let { r, c, fell } = this.simulateSphereRoll(dirR, dirC);
+
+        if (!fell && r === this.sharedSphere.r && c === this.sharedSphere.c) {
             this.log('The sphere cannot move in that direction.');
             this.trigger('onSphereDeselected', {});
+            return;
+        }
+
+        if (fell) {
+            const cp = this.players[this.currentPlayer];
+            this._prevSpherePos = { r: CENTER, c: CENTER };
+            this._lastPushTurn = -1;
+            this.sharedSphere.r = CENTER;
+            this.sharedSphere.c = CENTER;
+            this.trigger('onSphereFell', { fromR: r, fromC: c, dirR, dirC });
+            this.trigger('onSphereDeselected', {});
+            this.log(`${cp.name} pushed the sphere over an open end! It returns to the fountain.`);
+            this.endTurn();
             return;
         }
 
