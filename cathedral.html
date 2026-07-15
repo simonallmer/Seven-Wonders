@@ -1,65 +1,216 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Cathedral – The Pilgrimage</title>
+    <title>Cathedral - Seven Wonders</title>
+    <meta name="description" content="Play Cathedral, an ancient strategy game of conversion from the Seven Wonders series">
+    <link rel="stylesheet" href="cathedral-style.css">
+</head>
 
-    <!-- 3D libs -->
+<body>
+    <!-- Overlay for side menu -->
+    <div id="overlay" class="overlay"></div>
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <a href="index.html?menu=new" class="top-bar-btn top-bar-link">← Menu</a>
+        <button id="menu-toggle" class="top-bar-btn menu-toggle-btn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+
+    <!-- Side Menu -->
+    <div id="side-menu" class="side-menu">
+        <div class="menu-content">
+            <h1 class="game-title">CATHEDRAL</h1>
+            <p class="game-subtitle" style="text-align: center; margin-top: -14px; opacity: 0.7; color: #d4cfc4; font-family: 'Cinzel', serif;">The Conversion<span class="proto-badge">Prototype</span></p>
+
+            <div class="menu-divider"></div>
+
+            <div class="players-dropdown">
+                <button id="players-btn" class="menu-btn">2 Players</button>
+                <div class="players-menu" id="players-menu">
+                    <button id="btn-p2" class="active menu-btn-sub" data-players="2">2 Players</button>
+                    <button id="btn-p4" class="menu-btn-sub" data-players="4">4 Players</button>
+                </div>
+            </div>
+
+            <div class="opp-dropdown">
+                <button id="opponent-btn" class="menu-btn">Opponent: Computer</button>
+                <div class="opp-menu" id="opponent-menu">
+                    <button id="btn-opp-human" class="menu-btn-sub" data-opp="human">Human</button>
+                    <button id="btn-opp-computer" class="active menu-btn-sub" data-opp="computer">Computer</button>
+                </div>
+            </div>
+
+            <button id="field-btn" class="menu-btn">Field: Middle 4</button>
+            <button id="rules-btn" class="menu-btn">Rules</button>
+            <button id="classic-btn" class="menu-btn" onclick="window.location.href='cathedral-classic.html'">Mode: Classic</button>
+            <button id="reset-button" class="menu-btn">New Game</button>
+            <button id="close-menu-btn" class="menu-btn">Close</button>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <div id="canvas3d" class="canvas-container"></div>
+
+        <div id="status-panel-top">
+            <div class="status-row">
+                <div id="player-indicator" class="player-indicator white"></div>
+                <span id="player-name" style="font-family:'Cinzel',serif;font-size:0.95rem;letter-spacing:1px;">White 15 · Black 15</span>
+            </div>
+            <span id="action-prompt">White, tap a stone — approach or withdraw to convert</span>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="message-overlay hidden">
+        <div class="message-content">
+            <h2 id="modal-title" class="message-title"></h2>
+            <p id="modal-text" class="message-text"></p>
+            <div class="modal-actions">
+                <button id="modal-new-game" class="modal-btn">New Game</button>
+                <button id="modal-menu" class="modal-btn secondary" onclick="window.location.href='index.html'">Back to Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div id="rules-modal" class="rules-modal hidden">
+        <div class="rules-overlay" id="rules-overlay"></div>
+        <div class="rules-content">
+            <h2>Cathedral Rules</h2>
+            <div class="rules-body" style="text-align: left; font-size: 0.9em; max-height: 60vh; overflow-y: auto; padding-right: 15px;">
+                <p><strong>GOAL</strong><br>
+                Reduce every enemy below 4 stones of their color. A congregation of fewer than four falls silent — its remaining stones stay on the board, but it has lost.</p>
+
+                <p><strong>THE FIELD</strong><br>
+                A cross of five 5×5 fields. Stones travel along the engraved lines: straight lines everywhere, diagonals only through the larger strong nodes. Each player begins with 15 stones in the outer rows of their arm.</p>
+
+                <p><strong>PROCESSION</strong><br>
+                A stone may move up to as many empty fields in a straight line as the longest unbroken line of friendly stones standing directly beside it — a lone stone always moves at least one field. Long processions are fast, but they convert whole.</p>
+
+                <p><strong>CONVERSION</strong> (never forced)</p>
+                <ul style="padding-left: 20px; margin-bottom: 15px;">
+                    <li><strong>Approach:</strong> end your move directly in front of an unbroken enemy line in your direction of travel — the whole line converts to your color.</li>
+                    <li><strong>Withdraw:</strong> move directly away from an enemy line touching your starting field — that line converts.</li>
+                    <li>Conversion stops where the line's color changes, at an empty field, or at your own stone. If a move is both approach and withdrawal, choose one.</li>
+                </ul>
+
+                <p><strong>CHAIN</strong><br>
+                After converting, the same stone may keep converting — but may never re-enter a field it has touched this turn. You may rest (stop) at any time.</p>
+
+                <p><strong>PASSAGE</strong><br>
+                Exterior walkways circle the crossing, joining the flank midpoints of neighboring arms. A passage is a doorway, not a line: crossing it is always a single step, and nothing converts through it.</p>
+
+                <p><strong>FOUR PLAYERS</strong><br>
+                Blue and Red fill the side arms. Converted stones fight on under their new color; a player who falls below four stones is out, their remnant frozen where it stands — and the game runs until one faith remains.</p>
+            </div>
+            <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="camera-pan.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
-    <link href="base.css" rel="stylesheet">
-    <style>
-        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-        html,body{width:100%;height:100%;overflow:hidden;background:#372c1f;font-family:'Palatino','Georgia',serif}
-        #canvas3d{position:fixed;top:0;left:0;width:100%;height:100%}
-        #ui{position:fixed;top:16px;right:16px;z-index:10;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
-        #ui>*{pointer-events:auto}
-        #top-bar{position:fixed;top:0;left:0;width:100%;z-index:11;display:flex;justify-content:space-between;align-items:center;padding:8px 16px}
-        #top-bar h1{font-size:15px;color:#e7dcc0;letter-spacing:3px;text-transform:uppercase;text-shadow:0 1px 3px #00000044;font-weight:400}
-        #top-bar .back-link{font-size:13px;color:#b8925a;text-decoration:none;letter-spacing:1px}
-        #top-bar .back-link:hover{color:#e7c24a}
-        #player-indicator{width:14px;height:14px;border-radius:50%;border:1px solid #3a2f1e}
-        #player-indicator.white{background:linear-gradient(135deg,#f3efe6,#c4b79b)}
-        #player-indicator.black{background:linear-gradient(135deg,#3a3530,#1a1816)}
-        #action-bar{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10;display:flex;gap:12px;pointer-events:none;align-items:center}
-        #action-bar>*{pointer-events:auto}
-        #info-bar{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:10;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
-        #info-bar>*{pointer-events:auto}
-        #player-name{font-size:15px;color:#e7dcc0;letter-spacing:1px}
-        #action-prompt{font-size:12px;color:#b8a582;letter-spacing:0.5px}
-        #game-message{position:fixed;bottom:130px;left:50%;transform:translateX(-50%);z-index:12;font-size:14px;color:#e7b87a;letter-spacing:1px;transition:opacity .3s}
-        #game-message.hidden{opacity:0;pointer-events:none}
-        #reset-link{color:#7a6b4e;text-decoration:none;font-size:11px;letter-spacing:1px;cursor:pointer;transition:.2s}
-        #reset-link:hover{color:#e7c24a}
-        @media(max-width:540px){
-            #action-bar{bottom:16px;flex-wrap:wrap;justify-content:center;width:90%}
-            #info-bar{bottom:72px}
-        }
-    </style>
-</head>
-<body>
-    <div id="top-bar">
-        <h1>Cathedral <span style="color:#8a7a5a;font-size:11px;letter-spacing:2px">· The Pilgrimage</span></h1>
-        <a href="index.html?menu=new" class="back-link">← Aisle</a>
-    </div>
-
-    <div id="canvas3d"></div>
-
-    <div id="info-bar">
-        <div id="player-name">White — level 0</div>
-        <div id="action-prompt">White, move — ground sinks under your steps</div>
-    </div>
-
-    <div id="action-bar">
-        <div id="player-indicator" class="white"></div>
-        <a id="reset-link" onclick="cathReset()">↻ restart</a>
-    </div>
-
-    <div id="game-message" class="hidden"></div>
-
     <script src="cathedral-game.js"></script>
     <script src="cathedral-3d.js"></script>
+    <script>
+        // Side menu logic
+        const menuToggle = document.getElementById('menu-toggle');
+        const sideMenu = document.getElementById('side-menu');
+        const overlay = document.getElementById('overlay');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+
+        function toggleMenu() {
+            sideMenu.classList.toggle('open');
+            overlay.classList.toggle('active');
+            menuToggle.classList.toggle('active');
+            if (!sideMenu.classList.contains('open')) {
+                document.getElementById('players-menu').classList.remove('show-flyout');
+                document.getElementById('opponent-menu').classList.remove('show-flyout');
+            }
+        }
+
+        menuToggle.addEventListener('click', toggleMenu);
+        overlay.addEventListener('click', toggleMenu);
+        closeMenuBtn.addEventListener('click', toggleMenu);
+
+        // Flyout logic
+        document.getElementById('players-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('players-menu').classList.toggle('show-flyout');
+            document.getElementById('opponent-menu').classList.remove('show-flyout');
+        });
+        document.getElementById('opponent-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('opponent-menu').classList.toggle('show-flyout');
+            document.getElementById('players-menu').classList.remove('show-flyout');
+        });
+        document.addEventListener('click', () => {
+            document.getElementById('players-menu').classList.remove('show-flyout');
+            document.getElementById('opponent-menu').classList.remove('show-flyout');
+        });
+
+        // Player count selection
+        document.querySelectorAll('#players-menu .menu-btn-sub').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const n = parseInt(this.dataset.players, 10);
+                document.querySelectorAll('#players-menu .menu-btn-sub').forEach(b => b.classList.toggle('active', b === this));
+                document.getElementById('players-btn').textContent = n + ' Players';
+                cathReset(n);
+                toggleMenu();
+            });
+        });
+
+        // Opponent selection
+        document.querySelectorAll('#opponent-menu .menu-btn-sub').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const isComputer = this.dataset.opp === 'computer';
+                document.querySelectorAll('#opponent-menu .menu-btn-sub').forEach(b => b.classList.toggle('active', b === this));
+                document.getElementById('opponent-btn').textContent = 'Opponent: ' + (isComputer ? 'Computer' : 'Human');
+                cathSetOpponent(isComputer);
+                toggleMenu();
+            });
+        });
+
+        // New game
+        document.getElementById('reset-button').addEventListener('click', function () {
+            cathReset();
+            toggleMenu();
+        });
+        document.getElementById('modal-new-game').addEventListener('click', function () {
+            document.getElementById('game-over-modal').classList.add('hidden');
+            document.getElementById('game-over-modal').classList.remove('visible');
+            cathReset();
+        });
+
+        // Field position toggle — Middle 4 (default) vs Middle 8
+        document.getElementById('field-btn').addEventListener('click', function () {
+            const toMiddle8 = this.textContent.includes('Middle 4');
+            cathSetField(toMiddle8 ? 'middle8' : 'middle4');
+            this.textContent = 'Field: ' + (toMiddle8 ? 'Middle 8' : 'Middle 4');
+        });
+
+        // Space (menu) and Escape (back) are handled by global-keys.js
+
+        // Rules modal logic
+        document.getElementById('rules-btn').addEventListener('click', function () {
+            document.getElementById('rules-modal').classList.remove('hidden');
+        });
+        document.getElementById('rules-close-btn').addEventListener('click', function () {
+            document.getElementById('rules-modal').classList.add('hidden');
+        });
+        document.getElementById('rules-overlay').addEventListener('click', function () {
+            document.getElementById('rules-modal').classList.add('hidden');
+        });
+    </script>
+    <script src="global-keys.js"></script>
 </body>
+
 </html>

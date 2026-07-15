@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Cathedral – Classic · The Pilgrimage</title>
+
+    <!-- 3D libs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <link href="base.css" rel="stylesheet">
+    <style>
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        html,body{width:100%;height:100%;overflow:hidden;background:#372c1f;font-family:'Palatino','Georgia',serif}
+        #canvas3d{position:fixed;top:0;left:0;width:100%;height:100%}
+        #ui{position:fixed;top:16px;right:16px;z-index:10;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
+        #ui>*{pointer-events:auto}
+        #top-bar{position:fixed;top:0;left:0;width:100%;z-index:11;display:flex;justify-content:space-between;align-items:center;padding:8px 16px}
+        #top-bar h1{font-size:15px;color:#e7dcc0;letter-spacing:3px;text-transform:uppercase;text-shadow:0 1px 3px #00000044;font-weight:400}
+        #top-bar .back-link{font-size:13px;color:#b8925a;text-decoration:none;letter-spacing:1px}
+        #top-bar .back-link:hover{color:#e7c24a}
+        #player-indicator{width:14px;height:14px;border-radius:50%;border:1px solid #3a2f1e}
+        #player-indicator.white{background:linear-gradient(135deg,#f3efe6,#c4b79b)}
+        #player-indicator.black{background:linear-gradient(135deg,#3a3530,#1a1816)}
+        #action-bar{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10;display:flex;gap:12px;pointer-events:none;align-items:center}
+        #action-bar>*{pointer-events:auto}
+        #info-bar{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:10;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
+        #info-bar>*{pointer-events:auto}
+        #player-name{font-size:15px;color:#e7dcc0;letter-spacing:1px}
+        #action-prompt{font-size:12px;color:#b8a582;letter-spacing:0.5px}
+        #game-message{position:fixed;bottom:130px;left:50%;transform:translateX(-50%);z-index:12;font-size:14px;color:#e7b87a;letter-spacing:1px;transition:opacity .3s}
+        #game-message.hidden{opacity:0;pointer-events:none}
+        #reset-link{color:#7a6b4e;text-decoration:none;font-size:11px;letter-spacing:1px;cursor:pointer;transition:.2s}
+        #reset-link:hover{color:#e7c24a}
+        @media(max-width:540px){
+            #action-bar{bottom:16px;flex-wrap:wrap;justify-content:center;width:90%}
+            #info-bar{bottom:72px}
+        }
+    </style>
+</head>
+<body>
+    <div id="top-bar">
+        <h1>Cathedral <span style="color:#8a7a5a;font-size:11px;letter-spacing:2px">· Classic · The Pilgrimage</span></h1>
+        <div style="display:flex;gap:14px;align-items:center">
+            <a href="cathedral.html" class="back-link">The Conversion</a>
+            <a href="index.html?menu=new" class="back-link">← Aisle</a>
+        </div>
+    </div>
+
+    <div id="canvas3d"></div>
+
+    <div id="info-bar">
+        <div id="player-name">White — level 0</div>
+        <div id="action-prompt">White, move — ground sinks under your steps</div>
+    </div>
+
+    <div id="action-bar">
+        <div id="player-indicator" class="white"></div>
+        <a id="reset-link" onclick="cathReset()">↻ restart</a>
+    </div>
+
+    <div id="game-message" class="hidden"></div>
+
+    <script src="cathedral-classic-game.js"></script>
+    <script src="cathedral-classic-3d.js"></script>
+</body>
+</html>

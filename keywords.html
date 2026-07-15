@@ -260,6 +260,7 @@
                     <button class="game-filter" data-game="pharos">Pharos</button>
                     <button class="game-filter" data-game="great_wall">Great Wall</button>
                     <button class="game-filter" data-game="skyscraper">Skyscraper</button>
+                    <button class="game-filter" data-game="cathedral">Cathedral</button>
                 </div>
                 <button class="filter-reset hidden" id="filter-reset">Show all</button>
             </div>
@@ -282,7 +283,7 @@
                             <tr>
                                 <td class="kw-name">Stone</td>
                                 <td class="kw-desc">Game piece in four colors.</td>
-                                <td class="kw-game"><a href="pyramid.html">Pyramid</a><span class="sep">, </span><a href="gardens.html">Gardens</a><span class="sep">, </span><a href="temple.html">Temple</a><span class="sep">, </span><a href="mausoleum.html">Mausoleum</a><span class="sep">, </span><a href="colossus.html">Colossus</a><span class="sep">, </span><a href="pharos.html">Pharos</a><span class="sep">, </span><a href="great_wall.html">Great Wall</a></td>
+                                <td class="kw-game"><a href="pyramid.html">Pyramid</a><span class="sep">, </span><a href="gardens.html">Gardens</a><span class="sep">, </span><a href="temple.html">Temple</a><span class="sep">, </span><a href="mausoleum.html">Mausoleum</a><span class="sep">, </span><a href="colossus.html">Colossus</a><span class="sep">, </span><a href="pharos.html">Pharos</a><span class="sep">, </span><a href="great_wall.html">Great Wall</a><span class="sep">, </span><a href="cathedral.html">Cathedral</a></td>
                             </tr>
                             <tr>
                                 <td class="kw-name">Die</td>
@@ -372,6 +373,26 @@
                                 <td class="kw-desc">A field is lit up in the player's color, requiring an unbroken line of sight through the structure and no higher than the elevator.</td>
                                 <td class="kw-game"><a href="skyscraper.html">Skyscraper</a></td>
                             </tr>
+                            <tr>
+                                <td class="kw-name">Procession</td>
+                                <td class="kw-desc">A stone moves up to as many fields in a straight line as the longest unbroken line of friendly stones directly adjacent to it, at least one.</td>
+                                <td class="kw-game"><a href="cathedral.html">Cathedral</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Passage</td>
+                                <td class="kw-desc">An exterior walkway joins the flank midpoints of neighboring arms. Crossing it is a single step and never converts.</td>
+                                <td class="kw-game"><a href="cathedral.html">Cathedral</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Approach</td>
+                                <td class="kw-desc">A stone steps toward an unbroken enemy line in the same direction, converting it.</td>
+                                <td class="kw-game"><a href="cathedral.html">Cathedral</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Withdraw</td>
+                                <td class="kw-desc">A stone steps away from an adjacent enemy line, converting it.</td>
+                                <td class="kw-game"><a href="cathedral.html">Cathedral</a></td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -459,6 +480,11 @@
                                 <td class="kw-name">Shield</td>
                                 <td class="kw-desc">A warrior carries its shield across its back, guarding the three rear directions. An arrow striking the shield dead-on reflects straight back at the shooter; one striking at an angle deflects 90° and flies onward. Only hits from the front or open flanks are lethal.</td>
                                 <td class="kw-game"><a href="great_wall.html">Great Wall</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Convert</td>
+                                <td class="kw-desc">Converted stones change to the converting player's color instead of being removed. A stone may keep converting in one turn, never re-entering a field it has touched.</td>
+                                <td class="kw-game"><a href="cathedral.html">Cathedral</a></td>
                             </tr>
                             <!-- Future passive keyword (not yet listed): SUPPLY (chain to the Legendary Field). Add when the register covers it. -->
                         </tbody>
