@@ -542,12 +542,17 @@ function endTurn() {
     }
 }
 
+var winRevealTimer = null;
 function showEndGameMessage(title, text) {
     gameOver = true;
     if (messageTitle) messageTitle.textContent = title;
     if (messageText) messageText.textContent = text;
-    if (messageBox) messageBox.classList.add('visible');
     if (window.trigger3DVictory) window.trigger3DVictory(title.indexOf('White') === 0 ? 'W' : 'B');
+    // let the final move play out before covering the board
+    clearTimeout(winRevealTimer);
+    winRevealTimer = setTimeout(() => {
+        if (messageBox) messageBox.classList.add('visible');
+    }, 1100);
 }
 
 function initGame() {
@@ -561,6 +566,7 @@ function initGame() {
     busy = false;
     gameOver = false;
     _validPlaceCache = null;
+    clearTimeout(winRevealTimer);
     if (messageBox) messageBox.classList.remove('visible');
     if (window.is3DView && typeof window.rebuild3DBoard === 'function') window.rebuild3DBoard();
     setMode('place');

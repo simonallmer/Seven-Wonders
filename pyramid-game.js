@@ -151,6 +151,7 @@ function initializeUI() {
     rulesOverlay.addEventListener('click', closeRules);
 
     playAgainBtn.addEventListener('click', () => {
+        clearTimeout(winRevealTimer);
         document.getElementById('game-over-overlay').classList.add('hidden');
         initializePyramid();
         if (view3D) view3D.updateStones();
@@ -426,6 +427,7 @@ function checkWinConditions(counts, victoryStones) {
     }
 }
 
+var winRevealTimer = null;
 function showGameOver(title, text) {
     const overlay = document.getElementById('game-over-overlay');
     const titleEl = document.getElementById('game-over-title');
@@ -433,7 +435,9 @@ function showGameOver(title, text) {
     
     titleEl.textContent = title;
     textEl.textContent = text;
-    overlay.classList.remove('hidden');
+    // let the final move play out before covering the board
+    clearTimeout(winRevealTimer);
+    winRevealTimer = setTimeout(() => overlay.classList.remove('hidden'), 1100);
 }
 
 function showMessage(text) {

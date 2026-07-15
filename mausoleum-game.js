@@ -623,11 +623,16 @@ function checkStalemate(player) {
     return true;
 }
 
+var winRevealTimer = null;
 function showEndGameMessage(title, text) {
     gameOver = true;
     if (messageTitle) messageTitle.textContent = title;
     if (messageText) messageText.textContent = text;
-    if (messageBox) messageBox.classList.add('visible');
+    // let the final move play out before covering the board
+    clearTimeout(winRevealTimer);
+    winRevealTimer = setTimeout(() => {
+        if (messageBox) messageBox.classList.add('visible');
+    }, 1100);
 }
 
 function initGame() {

@@ -228,6 +228,7 @@ function nextTurn() {
     if (!colGameOver && colIsComputer[colTurn]) setTimeout(colAI, 800);
 }
 
+var winRevealTimer = null;
 function endGame(winner) {
     colGameOver = true;
     refresh();
@@ -235,8 +236,12 @@ function endGame(winner) {
     var text = winner ? COL_COLORS[winner].name + ' is the last commander standing in the arena!' : 'No commanders remain.';
     if (messageTitle) messageTitle.textContent = title;
     if (messageText) messageText.textContent = text;
-    if (messageBox) messageBox.classList.add('visible');
     if (window.colVictory) window.colVictory(winner);
+    // let the final move play out before covering the board
+    clearTimeout(winRevealTimer);
+    winRevealTimer = setTimeout(() => {
+        if (messageBox) messageBox.classList.add('visible');
+    }, 1100);
 }
 
 // ============================================
@@ -300,6 +305,7 @@ window.toggleColOpponent = toggleColOpponent;
 function newColosseum() {
     colStones = []; colSelected = null; colTerritory = {}; colNextId = 1;
     colBusy = false; colGameOver = false;
+    clearTimeout(winRevealTimer);
     if (messageBox) messageBox.classList.remove('visible');
     colPlayers = COL_SETUP[colPlayerCount].map(function (p) { return p.color; });
     colPlayers.forEach(function (p) {

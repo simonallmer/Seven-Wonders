@@ -451,13 +451,18 @@ function endTurn() {
 
     if (!gameOver && isVsComputer && turn === 'B') setTimeout(makeAIMove, 750);
 }
+var winRevealTimer = null;
 function endGame(title, text) {
     gameOver = true;
     drawBoard();
     if (messageTitle) messageTitle.textContent = title;
     if (messageText) messageText.textContent = text;
-    if (messageBox) messageBox.classList.add('visible');
     if (window.towerVictory) window.towerVictory(title.indexOf('White') === 0 ? 'W' : 'B');
+    // let the final move play out before covering the board
+    clearTimeout(winRevealTimer);
+    winRevealTimer = setTimeout(() => {
+        if (messageBox) messageBox.classList.add('visible');
+    }, 1100);
 }
 
 function initGame() {
@@ -465,6 +470,7 @@ function initGame() {
     for (var l = 0; l < LEVELS; l++) { var row = []; for (var s = 0; s < SLOTS; s++) row.push(null); board.push(row); }
     pool = { W: POOL_START, B: POOL_START };
     turn = 'W'; selected = null; attackTargets = []; bonusActive = false; busy = false; gameOver = false;
+    clearTimeout(winRevealTimer);
     if (messageBox) messageBox.classList.remove('visible');
     if (window.is3DView && window.towerRebuild) window.towerRebuild();
     setMode('place');

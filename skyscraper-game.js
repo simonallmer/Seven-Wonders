@@ -1304,7 +1304,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('msg-title').textContent = `${winName} Wins!`;
             document.getElementById('msg-body').textContent =
                 `${winName} controlled ${maxSc} field${maxSc !== 1 ? 's' : ''} — more than ${fraction} of the board.`;
-            document.getElementById('message-modal').style.display = 'flex';
+            // let the final move play out before covering the board
+            setTimeout(() => { document.getElementById('message-modal').style.display = 'flex'; }, 1100);
         }
     };
 

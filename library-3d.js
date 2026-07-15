@@ -843,6 +843,7 @@ document.getElementById('reset-button').onclick = () => startNewGame(game.numPla
 document.getElementById('modal-new-game').onclick = () => startNewGame(game.numPlayers, null);
 
 function startNewGame(pCount, btnElem) {
+    clearTimeout(winRevealTimer);
     document.getElementById('game-over-modal').classList.add('hidden');
     if (btnElem) {
         document.querySelectorAll('#players-menu button').forEach(b => b.classList.remove('active'));
@@ -1083,10 +1084,15 @@ game.on('onWallToppled', (data) => {
         .start();
 });
 
+let winRevealTimer = null;
 game.on('onGameOver', (data) => {
     document.getElementById('modal-title').innerText = "Game Over!";
     document.getElementById('modal-text').innerText = `${data.winner.name} guided the sphere to their study room!`;
-    document.getElementById('game-over-modal').classList.remove('hidden');
+    // let the sphere's final roll play out before covering the board
+    clearTimeout(winRevealTimer);
+    winRevealTimer = setTimeout(() => {
+        document.getElementById('game-over-modal').classList.remove('hidden');
+    }, 1100);
 });
 
 game.on('onMessage', (msg) => {

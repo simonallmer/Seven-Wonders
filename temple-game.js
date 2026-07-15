@@ -164,16 +164,22 @@ function initializeBoard() {
     hideGameOverModal();
 }
 
+var winRevealTimer = null;
 function showGameOverModal(title, text) {
     modalTitle.textContent = title;
     modalText.textContent = text;
-    gameOverModal.classList.remove('hidden');
-    // Trigger reflow to enable transition
-    void gameOverModal.offsetWidth;
-    gameOverModal.classList.add('visible');
+    // let the final move play out before covering the board
+    clearTimeout(winRevealTimer);
+    winRevealTimer = setTimeout(() => {
+        gameOverModal.classList.remove('hidden');
+        // Trigger reflow to enable transition
+        void gameOverModal.offsetWidth;
+        gameOverModal.classList.add('visible');
+    }, 1100);
 }
 
 function hideGameOverModal() {
+    clearTimeout(winRevealTimer);
     gameOverModal.classList.remove('visible');
     setTimeout(() => {
         gameOverModal.classList.add('hidden');
