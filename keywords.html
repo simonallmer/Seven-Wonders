@@ -380,18 +380,8 @@
                                 <td class="kw-game"><a href="cathedral.html">Cathedral</a></td>
                             </tr>
                             <tr>
-                                <td class="kw-name">Passage</td>
-                                <td class="kw-desc">An exterior walkway joins the flank midpoints of neighboring arms. Crossing it is a single step and never converts.</td>
-                                <td class="kw-game"><a href="cathedral.html">Cathedral</a></td>
-                            </tr>
-                            <tr>
-                                <td class="kw-name">Approach</td>
-                                <td class="kw-desc">A stone steps toward an unbroken enemy line in the same direction, converting it.</td>
-                                <td class="kw-game"><a href="cathedral.html">Cathedral</a></td>
-                            </tr>
-                            <tr>
-                                <td class="kw-name">Withdraw</td>
-                                <td class="kw-desc">A stone steps away from an adjacent enemy line, converting it.</td>
+                                <td class="kw-name">Convert</td>
+                                <td class="kw-desc">A stone steps toward an unbroken enemy line, converting the stones it approaches to its own color.</td>
                                 <td class="kw-game"><a href="cathedral.html">Cathedral</a></td>
                             </tr>
                             <tr>
@@ -408,6 +398,11 @@
                                 <td class="kw-name">Carom</td>
                                 <td class="kw-desc">Rolling into a sphere on the same tier shoves it exactly one pane on and the striker takes its place — momentum passed through like a struck ball.</td>
                                 <td class="kw-game"><a href="palace.html">Palace</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">No Return</td>
+                                <td class="kw-desc">A piece may not end a move on the position it held the previous round in the same state.</td>
+                                <td class="kw-game"><a href="pyramid.html">Pyramid</a><span class="sep">, </span><a href="temple.html">Temple</a><span class="sep">, </span><a href="colossus.html">Colossus</a><span class="sep">, </span><a href="library.html">Library</a><span class="sep">, </span><a href="palace.html">Palace</a></td>
                             </tr>
                         </tbody>
                     </table>
@@ -444,8 +439,8 @@
                             </tr>
                             <tr>
                                 <td class="kw-name">Hades</td>
-                                <td class="kw-desc">Stones of the same color get surrounded by the opposing color horizontally and vertically with no adjacent empty fields. These stones get removed.</td>
-                                <td class="kw-game"><a href="colossus.html">Colossus</a></td>
+                                <td class="kw-desc">A connected group of same-color stones with no adjacent empty field is removed — sealed on every orthogonal side by the opposing color or by an impassable boundary (the game's edge, or in Palace a heightened wall two-plus levels up). Diagonals never count, and the capture is not limited to a single stone.</td>
+                                <td class="kw-game"><a href="colossus.html">Colossus</a><span class="sep">, </span><a href="palace.html">Palace</a></td>
                             </tr>
                             <tr>
                                 <td class="kw-name">Hit</td>
@@ -535,14 +530,17 @@
             function apply() {
                 const sel = activeGames();
                 rows.forEach(row => {
+                    // Universal rules apply to every game — always shown.
+                    if (row.closest('.universal-section')) { row.style.display = ''; return; }
                     const games = row.dataset.games ? row.dataset.games.split(' ') : [];
                     // No filter: show all. Otherwise show only rows that include a selected game.
                     const show = sel.length === 0 || games.some(g => sel.includes(g));
                     row.style.display = show ? '' : 'none';
                 });
-                // Hide any section whose rows are all hidden.
+                // Hide any (non-universal) section whose rows are all hidden.
                 let anyVisible = false;
                 sections.forEach(sec => {
+                    if (sec.classList.contains('universal-section')) { sec.style.display = ''; return; }
                     const visible = [...sec.querySelectorAll('tbody tr')].some(r => r.style.display !== 'none');
                     sec.style.display = visible ? '' : 'none';
                     if (visible) anyVisible = true;
