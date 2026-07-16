@@ -41,6 +41,16 @@ Object.keys(PCOL).forEach(function (c) {
 });
 const matBevel = new THREE.MeshStandardMaterial({ color: 0xccaa44, roughness: 0.3, metalness: 0.8, emissive: 0x3a2a00, emissiveIntensity: 0.15 });
 
+// --- basilica interior materials ---
+const matStone = new THREE.MeshStandardMaterial({ color: 0xbcac8c, roughness: 0.9 });
+const matStoneWarm = new THREE.MeshStandardMaterial({ color: 0xc9b994, roughness: 0.85 });
+const matStoneDark = new THREE.MeshStandardMaterial({ color: 0x8f8064, roughness: 0.9 });
+const matIron = new THREE.MeshStandardMaterial({ color: 0x2a2620, roughness: 0.6, metalness: 0.5 });
+const matWood = new THREE.MeshStandardMaterial({ color: 0x5b3d27, roughness: 0.8 });
+const matGold = new THREE.MeshStandardMaterial({ color: 0xcaa24a, roughness: 0.3, metalness: 0.85, emissive: 0x3a2a00, emissiveIntensity: 0.2 });
+const matFlame = new THREE.MeshBasicMaterial({ color: 0xffb24d });      // unlit — always reads as "lit"
+const matFlameCore = new THREE.MeshBasicMaterial({ color: 0xfff2c4 });
+
 function init3D() {
     const container = document.getElementById('canvas3d');
     if (!container) return;
@@ -92,15 +102,159 @@ function onResize() { camera.aspect = window.innerWidth / window.innerHeight; ca
 function buildEnvironment() {
     const ground = new THREE.Mesh(new THREE.CircleGeometry(4000, 48), matFloor);
     ground.rotation.x = -Math.PI / 2; ground.position.y = FLOOR_Y - 8; ground.receiveShadow = true; groupEnv.add(ground);
-    // four columns at the inner corners of the crossing
-    const matCol = new THREE.MeshStandardMaterial({ color: 0x9a8c72, roughness: 0.8 });
-    [[4.1, 4.1], [4.1, 9.9], [9.9, 4.1], [9.9, 9.9]].forEach(function (p) {
-        const col = new THREE.Mesh(new THREE.CylinderGeometry(7, 9, 170, 14), matCol);
-        col.position.set(wX(p[0]), FLOOR_Y + 85, wZ(p[1]));
-        col.castShadow = true; groupEnv.add(col);
-        const base = new THREE.Mesh(new THREE.BoxGeometry(24, 8, 24), matCol);
-        base.position.set(wX(p[0]), FLOOR_Y + 4, wZ(p[1])); base.castShadow = true; groupEnv.add(base);
+
+    // Four dome-piers, pulled out to the diagonal corners so they frame the
+    // crossing rather than crowd the foreground.
+    [[150, 150], [-150, 150], [150, -150], [-150, -150]].forEach(function (p) {
+        makeColumn(p[0], p[1], 250, 12, true);
+        makeTorch(p[0] - Math.sign(p[0]) * 16, 152, p[1] - Math.sign(p[1]) * 16, true, 1);
     });
+
+    // Colonnades lining the four arms — the long naves of the basilica.
+    addColonnade(-95, -70, -95, -200, 4, 200, 8);
+    addColonnade(95, -70, 95, -200, 4, 200, 8);
+    addColonnade(-95, 70, -95, 200, 4, 200, 8);
+    addColonnade(95, 70, 95, 200, 4, 200, 8);
+    addColonnade(-70, -95, -200, -95, 4, 200, 8);
+    addColonnade(-70, 95, -200, 95, 4, 200, 8);
+    addColonnade(70, -95, 200, -95, 4, 200, 8);
+    addColonnade(70, 95, 200, 95, 4, 200, 8);
+    // Extend the far nave down toward the sanctuary.
+    addColonnade(-95, -210, -95, -320, 3, 200, 8);
+    addColonnade(95, -210, 95, -320, 3, 200, 8);
+
+    buildPerimeter();   // enclosing arcaded walls make it an interior
+    buildAltar();       // the baldachin vista straight down the far nave
+}
+
+// A classical column: stepped base, faintly tapered shaft, blocky capital.
+function makeColumn(x, z, height, radius, cast) {
+    const g = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.BoxGeometry(radius * 3.4, height * 0.05, radius * 3.4), matStoneDark);
+    base.position.y = height * 0.025; g.add(base);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.82, radius, height * 0.84, 20), matStone);
+    shaft.position.y = height * 0.49; g.add(shaft);
+    const echinus = new THREE.Mesh(new THREE.CylinderGeometry(radius * 1.5, radius * 0.85, height * 0.045, 20), matStoneWarm);
+    echinus.position.y = height * 0.895; g.add(echinus);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(radius * 2.3, height * 0.035, radius * 2.3), matStoneDark);
+    cap.position.y = height * 0.935; g.add(cap);
+    g.position.set(x, FLOOR_Y, z);
+    if (cast) g.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
+    groupEnv.add(g);
+    return g;
+}
+
+// A wall torch — an iron cup and an unlit flame that always reads as burning.
+// addLight adds a warm point light (used sparingly to keep the render cheap).
+function makeTorch(x, y, z, addLight, scale) {
+    scale = scale || 1;
+    const g = new THREE.Group();
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(2.4 * scale, 1.2 * scale, 4 * scale, 8), matIron);
+    g.add(cup);
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(2.3 * scale, 8 * scale, 8), matFlame);
+    flame.position.y = 5 * scale; g.add(flame);
+    const core = new THREE.Mesh(new THREE.ConeGeometry(1.1 * scale, 4.6 * scale, 8), matFlameCore);
+    core.position.y = 4.5 * scale; g.add(core);
+    g.position.set(x, y, z); groupEnv.add(g);
+    if (addLight) {
+        const pl = new THREE.PointLight(0xffb160, 0.55, 240, 2);
+        pl.position.set(x, y + 6, z); groupEnv.add(pl);
+    }
+    return g;
+}
+
+// A row of columns along a segment; every other one carries a torch turned
+// toward the crossing.
+function addColonnade(x0, z0, x1, z1, count, h, r) {
+    for (let i = 0; i < count; i++) {
+        const t = count === 1 ? 0 : i / (count - 1);
+        const x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
+        makeColumn(x, z, h, r, true);
+        if (i % 2 === 0) {
+            const d = Math.hypot(x, z) || 1;
+            makeTorch(x - (x / d) * (r + 4), h * 0.62, z - (z / d) * (r + 4), false, 1);
+        }
+    }
+}
+
+// A carved pew, backrest toward the crossing so it faces the altar.
+function makePew(x, z, width) {
+    const g = new THREE.Group();
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(width, 3, 8), matWood);
+    seat.position.y = 8; seat.castShadow = true; g.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(width, 10, 2), matWood);
+    back.position.set(0, 13, 4); back.castShadow = true; g.add(back);
+    g.position.set(x, FLOOR_Y, z); groupEnv.add(g);
+}
+
+// The four enclosing walls, each with a cornice and an inner blind arcade
+// of pilasters and round arches.
+function buildPerimeter() {
+    const R = 470, H = 320, T = 18, L = 1080;
+    [{ axis: 'z', sign: -1 }, { axis: 'z', sign: 1 }, { axis: 'x', sign: -1 }, { axis: 'x', sign: 1 }].forEach(function (s) {
+        const rotY = s.axis === 'z' ? 0 : Math.PI / 2;
+        const place = function (mesh, u, y, depth) {
+            if (s.axis === 'z') mesh.position.set(u, y, s.sign * depth);
+            else { mesh.position.set(s.sign * depth, y, u); mesh.rotation.y = Math.PI / 2; }
+        };
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(L, H, T), matStoneWarm);
+        place(wall, 0, H / 2, R); wall.rotation.y = rotY; wall.receiveShadow = true; groupEnv.add(wall);
+        const cor = new THREE.Mesh(new THREE.BoxGeometry(L, 18, T + 10), matStoneDark);
+        place(cor, 0, H - 26, R); cor.rotation.y = rotY; groupEnv.add(cor);
+
+        const n = 9, span = L * 0.86, inner = R - T / 2 - 3;
+        for (let i = 0; i < n; i++) {
+            const u = -span / 2 + span * (i / (n - 1));
+            const pil = new THREE.Mesh(new THREE.BoxGeometry(14, H * 0.82, 6), matStone);
+            place(pil, u, H * 0.41, inner); groupEnv.add(pil);
+        }
+        const arcR = (span / (n - 1)) / 2 * 0.9;
+        for (let i = 0; i < n - 1; i++) {
+            const u = -span / 2 + span * ((i + 0.5) / (n - 1));
+            const arch = new THREE.Mesh(new THREE.TorusGeometry(arcR, 3, 6, 16, Math.PI), matStone);
+            place(arch, u, H * 0.58, inner); groupEnv.add(arch);
+        }
+    });
+}
+
+// A raised sanctuary at the head of the far nave: stepped dais, altar block,
+// a gilded four-column baldachin crowned with a cross, candles and pews.
+function buildAltar() {
+    const zc = -330;
+    for (let i = 0; i < 3; i++) {
+        const w = 150 - i * 34;
+        const step = new THREE.Mesh(new THREE.BoxGeometry(w, 10, w * 0.6), matStone);
+        step.position.set(0, 5 + i * 10, zc + 10); step.receiveShadow = true; step.castShadow = true; groupEnv.add(step);
+    }
+    const altar = new THREE.Mesh(new THREE.BoxGeometry(46, 26, 24), matStoneWarm);
+    altar.position.set(0, 43, zc); altar.castShadow = true; groupEnv.add(altar);
+
+    const bh = 150;
+    [[-30, -18], [30, -18], [-30, 18], [30, 18]].forEach(function (o) {
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 4, bh, 12), matGold);
+        col.position.set(o[0], 40 + bh / 2, zc + o[1]); col.castShadow = true; groupEnv.add(col);
+    });
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(80, 12, 56), matGold);
+    canopy.position.set(0, 40 + bh + 6, zc); canopy.castShadow = true; groupEnv.add(canopy);
+    [[-38, -26], [38, -26], [-38, 26], [38, 26]].forEach(function (o) {
+        const fin = new THREE.Mesh(new THREE.SphereGeometry(5, 12, 10), matGold);
+        fin.position.set(o[0], 40 + bh + 14, zc + o[1]); groupEnv.add(fin);
+    });
+    const crossV = new THREE.Mesh(new THREE.BoxGeometry(4, 22, 4), matGold); crossV.position.set(0, 40 + bh + 26, zc); groupEnv.add(crossV);
+    const crossH = new THREE.Mesh(new THREE.BoxGeometry(14, 4, 4), matGold); crossH.position.set(0, 40 + bh + 24, zc); groupEnv.add(crossH);
+
+    [-30, 30].forEach(function (x) {
+        const stick = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 2, 20, 8), matGold);
+        stick.position.set(x, 50, zc + 6); groupEnv.add(stick);
+        makeTorch(x, 62, zc + 6, false, 0.5);
+    });
+    const glow = new THREE.PointLight(0xffcb87, 0.85, 480, 2); glow.position.set(0, 120, zc + 20); groupEnv.add(glow);
+
+    for (let i = 0; i < 4; i++) {
+        const z = -215 - i * 26;
+        makePew(-38, z, 60);
+        makePew(38, z, 60);
+    }
 }
 
 function buildBoard() {
