@@ -261,6 +261,7 @@
                     <button class="game-filter" data-game="great_wall">Great Wall</button>
                     <button class="game-filter" data-game="skyscraper">Skyscraper</button>
                     <button class="game-filter" data-game="cathedral">Cathedral</button>
+                    <button class="game-filter" data-game="palace">Palace</button>
                 </div>
                 <button class="filter-reset hidden" id="filter-reset">Show all</button>
             </div>
@@ -293,7 +294,7 @@
                             <tr>
                                 <td class="kw-name">Reservoir</td>
                                 <td class="kw-desc">Game pieces not yet on the field. A player may place one when wished.</td>
-                                <td class="kw-game"><a href="statue.html">Statue</a><span class="sep">, </span><a href="great_wall.html">Great Wall</a></td>
+                                <td class="kw-game"><a href="statue.html">Statue</a><span class="sep">, </span><a href="great_wall.html">Great Wall</a><span class="sep">, </span><a href="palace.html">Palace</a></td>
                             </tr>
                         </tbody>
                     </table>
@@ -350,8 +351,8 @@
                             </tr>
                             <tr>
                                 <td class="kw-name">Place</td>
-                                <td class="kw-desc">Stone or die is placed on an unoccupied field from the reservoir (out of game).</td>
-                                <td class="kw-game"><a href="statue.html">Statue</a><span class="sep">, </span><a href="great_wall.html">Great Wall</a></td>
+                                <td class="kw-desc">Stone or die is placed on an unoccupied field from the reservoir (out of game). In Palace each reserve sphere is locked to its own entrance column.</td>
+                                <td class="kw-game"><a href="statue.html">Statue</a><span class="sep">, </span><a href="great_wall.html">Great Wall</a><span class="sep">, </span><a href="palace.html">Palace</a></td>
                             </tr>
                             <tr>
                                 <td class="kw-name">Stride</td>
@@ -393,6 +394,21 @@
                                 <td class="kw-desc">A stone steps away from an adjacent enemy line, converting it.</td>
                                 <td class="kw-game"><a href="cathedral.html">Cathedral</a></td>
                             </tr>
+                            <tr>
+                                <td class="kw-name">Roll</td>
+                                <td class="kw-desc">A committed slide in a straight line: a flat runs on, a step down keeps rolling, a step up or a wall stops it. A sphere's only way to move.</td>
+                                <td class="kw-game"><a href="palace.html">Palace</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Hop</td>
+                                <td class="kw-desc">From the pane directly below a one-step rise, a sphere hops up onto it and stops — only ever a deliberate first move, never carried by momentum.</td>
+                                <td class="kw-game"><a href="palace.html">Palace</a></td>
+                            </tr>
+                            <tr>
+                                <td class="kw-name">Carom</td>
+                                <td class="kw-desc">Rolling into a sphere on the same tier shoves it exactly one pane on and the striker takes its place — momentum passed through like a struck ball.</td>
+                                <td class="kw-game"><a href="palace.html">Palace</a></td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -414,12 +430,12 @@
                             <tr>
                                 <td class="kw-name">Smash</td>
                                 <td class="kw-desc">Stone from higher level falls on stone from lower level through a run. Smashed stone is removed.</td>
-                                <td class="kw-game"><a href="pyramid.html">Pyramid</a></td>
+                                <td class="kw-game"><a href="pyramid.html">Pyramid</a><span class="sep">, </span><a href="palace.html">Palace</a></td>
                             </tr>
                             <tr>
                                 <td class="kw-name">Fall</td>
-                                <td class="kw-desc">Stone on the edge field of the lowest level is pushed out of the game field. Fallen stone is removed.</td>
-                                <td class="kw-game"><a href="pyramid.html">Pyramid</a></td>
+                                <td class="kw-desc">A stone rolled or shoved clean off the building's edge is removed. In Palace the two side edges are lethal, while the entrance (pool-side) edges hold a low lip.</td>
+                                <td class="kw-game"><a href="pyramid.html">Pyramid</a><span class="sep">, </span><a href="palace.html">Palace</a></td>
                             </tr>
                             <tr>
                                 <td class="kw-name">Osiris</td>

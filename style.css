@@ -425,3 +425,58 @@ body::before {
     border-color: #C5A059;
     box-shadow: 0 0 15px rgba(197, 160, 89, 0.2);
 }
+
+/* Two-column Old / New menu — both sets of wonders visible at once */
+.container.menu-page {
+    max-width: 880px;
+}
+
+.menu-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-bottom: 2rem;
+    align-items: start;
+}
+
+.column-title {
+    font-family: 'Ancient Tulip', serif;
+    font-size: 1.5rem;
+    font-weight: 400;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #C5A059;
+    margin: 0 0 14px;
+    text-align: center;
+    text-shadow: 0 0 18px rgba(197, 160, 89, 0.35), 1px 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.menu-columns .game-menu {
+    padding: 26px 24px;
+    height: 100%;
+}
+
+.menu-columns .game-list {
+    gap: 12px;
+}
+
+.menu-columns .game-link {
+    font-size: 1.05rem;
+    padding: 12px 18px;
+    letter-spacing: 0.1em;
+}
+
+.menu-columns .game-link:hover {
+    padding-left: 28px;
+}
+
+.menu-columns .proto-tag {
+    right: 12px;
+}
+
+@media (max-width: 640px) {
+    .menu-columns {
+        grid-template-columns: 1fr;
+        gap: 22px;
+    }
+}

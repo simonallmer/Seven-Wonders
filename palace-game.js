@@ -110,10 +110,11 @@ function palSetTier(band, delta) {
 //   1/2+ down       drop and keep rolling / hard-drop and stay
 //   drop onto sphere SMASH it, land on its pane
 // CAROM: roll into a sphere on the same tier and it is shoved exactly ONE pane
-//   further along (a clean push, not a slide). Shove it off the rim and it dies.
-//   A sphere with anything behind it (a sphere, a step, a wall) won't budge.
-// THE RIM has no railing: any sphere rolled clean off the building's edge FALLS
-//   and is destroyed — your own included.
+//   further along (a clean push, not a slide). Shove it off a side edge and it
+//   dies. A sphere with anything behind it (a sphere, a step, a wall) won't budge.
+// EDGES: the two long SIDE edges (x) are a sheer, lethal drop — roll off and the
+//   sphere falls and shatters. The two ENTRANCE edges (y, the pool sides) have a
+//   low lip: a sphere rolled toward its own baseline just stops there, safe.
 //
 // Returns null (nothing changes — illegal) or a consequence:
 //   { type,   // 'roll' | 'hop' | 'smash' | 'fall' | 'carom'
@@ -131,9 +132,13 @@ function palRollInDir(s, d) {
     while (true) {
         const nx = cx + d.dx, ny = cy + d.dy;
 
-        if (!palInBounds(nx, ny)) {                            // striker rolls off the rim
-            kills.push({ id: s.id, mode: 'fall', x: cx, y: cy, k: lv, dx: d.dx, dy: d.dy });
-            sFell = true;
+        if (!palInBounds(nx, ny)) {                            // reached an edge
+            if (nx < 0 || nx >= PAL_W) {                       // side edge — sheer lethal drop
+                kills.push({ id: s.id, mode: 'fall', x: cx, y: cy, k: lv, dx: d.dx, dy: d.dy });
+                sFell = true;
+            } else {
+                stopBefore();                                  // pool-side lip — rest on the last pane
+            }
             break;
         }
 
@@ -143,9 +148,11 @@ function palRollInDir(s, d) {
         if (nlv === lv) {
             if (occ) {                                        // CAROM — shove it one pane along
                 const px = nx + d.dx, py = ny + d.dy;
-                if (!palInBounds(px, py)) {                   // shoved clean off the rim
+                if (px < 0 || px >= PAL_W) {                  // shoved over a side edge — it dies
                     kills.push({ id: occ.id, mode: 'fall', x: nx, y: ny, k: nlv, dx: d.dx, dy: d.dy });
                     moves.push({ id: s.id, x: nx, y: ny });   // striker takes the vacated pane
+                } else if (!palInBounds(px, py)) {            // shoved against the pool-side lip — it holds
+                    stopBefore();
                 } else if (palLevel(px, py) === nlv && !palStoneAt(px, py)) {
                     moves.push({ id: occ.id, x: px, y: py });  // clean push onto an empty same-tier pane
                     moves.push({ id: s.id, x: nx, y: ny });

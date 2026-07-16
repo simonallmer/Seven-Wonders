@@ -16,6 +16,7 @@ const groupTargets = new THREE.Group();
 const groupControls = new THREE.Group(); // band raise/lower handles on the building's edge
 const groupFX = new THREE.Group();
 const bandHandles = [];         // [{band, up, down, post}]
+const edgeLips = [];            // [{group, band}] — low curbs on the two entrance (pool-side) edges
 
 const voxelMeshes = new Map();  // "x,y,k" -> [meshes]
 const capMeshes = new Map();    // "x,y"   -> cap mesh (per-pane material)
@@ -106,6 +107,7 @@ function init3D() {
     buildPlinth();
     buildHydePark();
     buildStructure();
+    buildEdgeLips();
     buildBandControls();
 
     window.addEventListener('resize', onResize);
@@ -227,6 +229,35 @@ function buildHydePark() {
     tower(RING + 5, 40, 132); tower(-(RING + 5), 40, 132);                        // flanking towers to the sides
 
     groupEnv.add(park);
+}
+
+// A low stone curb along the two ENTRANCE (pool-side) edges — the visual cue that
+// a sphere rolled toward its own baseline stops here instead of falling. Rides at
+// the top of its entrance band so it stays flush as the band raises or lowers.
+function buildEdgeLips() {
+    const mat = new THREE.MeshStandardMaterial({ color: 0xd8cfb4, roughness: 0.7, metalness: 0.1 });
+    const spanX = W * CELL + 4;
+    const defs = [
+        { band: 0, z: worldZ(0) - CELL / 2 },
+        { band: window.PAL_BANDS - 1, z: worldZ(D - 1) + CELL / 2 }
+    ];
+    defs.forEach(function (dfn) {
+        const g = new THREE.Group();
+        const curb = new THREE.Mesh(new THREE.BoxGeometry(spanX, 6, 5), mat);
+        curb.position.y = 3; curb.castShadow = true; curb.receiveShadow = true; g.add(curb);
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(spanX, 1.6, 6), matGold);
+        cap.position.y = 6.6; g.add(cap);
+        g.position.set(0, 0, dfn.z);
+        groupEnv.add(g);
+        edgeLips.push({ group: g, band: dfn.band });
+    });
+    updateEdgeLips();
+}
+function updateEdgeLips() {
+    edgeLips.forEach(function (l) {
+        const h = window.palBandHeight ? window.palBandHeight(l.band) : 1;
+        l.group.position.y = h * STEP;          // sit on top of the entrance band's pane
+    });
 }
 
 // one glass cube per voxel — the whole footprint is the building
@@ -516,6 +547,7 @@ function palaceSync3D() {
 function syncPlay(st) {
     ensureHeights();
     updateBandControls();
+    updateEdgeLips();
 
     // spheres on the building
     const live = new Set();
