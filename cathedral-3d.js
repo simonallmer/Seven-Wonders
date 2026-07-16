@@ -9,6 +9,7 @@ let raycaster, mouse;
 let needsRender = true;
 
 const groupEnv = new THREE.Group();
+const groupPillars = new THREE.Group();  // columns + their torches — retract after the first move
 const groupBoard = new THREE.Group();   // slabs, lines, node pads
 const groupStones = new THREE.Group();
 const groupTargets = new THREE.Group();
@@ -51,6 +52,18 @@ const matGold = new THREE.MeshStandardMaterial({ color: 0xcaa24a, roughness: 0.3
 const matFlame = new THREE.MeshBasicMaterial({ color: 0xffb24d });      // unlit — always reads as "lit"
 const matFlameCore = new THREE.MeshBasicMaterial({ color: 0xfff2c4 });
 
+// The pillars (and their torches) own a private set of materials so they can
+// fade out on their own after the first move without touching the walls,
+// altar or pews, which share the plain names above.
+const matPCol = new THREE.MeshStandardMaterial({ color: 0xbcac8c, roughness: 0.9 });
+const matPWarm = new THREE.MeshStandardMaterial({ color: 0xc9b994, roughness: 0.85 });
+const matPDark = new THREE.MeshStandardMaterial({ color: 0x8f8064, roughness: 0.9 });
+const matPIron = new THREE.MeshStandardMaterial({ color: 0x2a2620, roughness: 0.6, metalness: 0.5 });
+const matPFlame = new THREE.MeshBasicMaterial({ color: 0xffb24d });
+const matPCore = new THREE.MeshBasicMaterial({ color: 0xfff2c4 });
+const pillarMats = [matPCol, matPWarm, matPDark, matPIron, matPFlame, matPCore];
+let firstMoveDone = false;
+
 function init3D() {
     const container = document.getElementById('canvas3d');
     if (!container) return;
@@ -84,7 +97,7 @@ function init3D() {
     dir.shadow.normalBias = 1.0; dir.shadow.bias = -0.0004;
     scene.add(dir);
 
-    scene.add(groupEnv, groupBoard, groupStones, groupTargets, groupFX);
+    scene.add(groupEnv, groupPillars, groupBoard, groupStones, groupTargets, groupFX);
     buildEnvironment();
     buildBoard();
 
@@ -123,42 +136,64 @@ function buildEnvironment() {
     addColonnade(-95, -210, -95, -320, 3, 200, 8);
     addColonnade(95, -210, 95, -320, 3, 200, 8);
 
-    buildPerimeter();   // enclosing arcaded walls make it an interior
-    buildAltar();       // the baldachin vista straight down the far nave
+    buildPerimeter();       // enclosing arcaded walls make it an interior
+    buildAltar();           // the baldachin vista straight down the far nave
+    buildCornerSeating();   // congregation seats in every corner — these stay
+}
+
+// Retract (or restore) the pillars by fading their shared materials. Once
+// faded out the group is hidden, so its torch lights stop contributing too.
+function setPillars(show) {
+    groupPillars.visible = true;
+    pillarMats.forEach(function (m) { m.transparent = true; });
+    const o = { v: show ? 0 : 1 };
+    new TWEEN.Tween(o).to({ v: show ? 1 : 0 }, 800).easing(TWEEN.Easing.Quadratic.InOut)
+        .onUpdate(function () { pillarMats.forEach(function (m) { m.opacity = o.v; }); needsRender = true; })
+        .onComplete(function () {
+            if (!show) { groupPillars.visible = false; }
+            else { pillarMats.forEach(function (m) { m.transparent = false; m.opacity = 1; }); }
+            needsRender = true;
+        }).start();
+    needsRender = true;
 }
 
 // A classical column: stepped base, faintly tapered shaft, blocky capital.
 function makeColumn(x, z, height, radius, cast) {
     const g = new THREE.Group();
-    const base = new THREE.Mesh(new THREE.BoxGeometry(radius * 3.4, height * 0.05, radius * 3.4), matStoneDark);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(radius * 3.4, height * 0.05, radius * 3.4), matPDark);
     base.position.y = height * 0.025; g.add(base);
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.82, radius, height * 0.84, 20), matStone);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.82, radius, height * 0.84, 20), matPCol);
     shaft.position.y = height * 0.49; g.add(shaft);
-    const echinus = new THREE.Mesh(new THREE.CylinderGeometry(radius * 1.5, radius * 0.85, height * 0.045, 20), matStoneWarm);
+    const echinus = new THREE.Mesh(new THREE.CylinderGeometry(radius * 1.5, radius * 0.85, height * 0.045, 20), matPWarm);
     echinus.position.y = height * 0.895; g.add(echinus);
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(radius * 2.3, height * 0.035, radius * 2.3), matStoneDark);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(radius * 2.3, height * 0.035, radius * 2.3), matPDark);
     cap.position.y = height * 0.935; g.add(cap);
     g.position.set(x, FLOOR_Y, z);
     if (cast) g.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
-    groupEnv.add(g);
+    groupPillars.add(g);
     return g;
 }
 
 // A wall torch — an iron cup and an unlit flame that always reads as burning.
 // addLight adds a warm point light (used sparingly to keep the render cheap).
-function makeTorch(x, y, z, addLight, scale) {
+function makeTorch(x, y, z, addLight, scale, pillar) {
     scale = scale || 1;
+    if (pillar === undefined) pillar = true;   // most torches ride the columns
+    const grp = pillar ? groupPillars : groupEnv;
+    const mIron = pillar ? matPIron : matIron;
+    const mFlame = pillar ? matPFlame : matFlame;
+    const mCore = pillar ? matPCore : matFlameCore;
     const g = new THREE.Group();
-    const cup = new THREE.Mesh(new THREE.CylinderGeometry(2.4 * scale, 1.2 * scale, 4 * scale, 8), matIron);
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(2.4 * scale, 1.2 * scale, 4 * scale, 8), mIron);
     g.add(cup);
-    const flame = new THREE.Mesh(new THREE.ConeGeometry(2.3 * scale, 8 * scale, 8), matFlame);
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(2.3 * scale, 8 * scale, 8), mFlame);
     flame.position.y = 5 * scale; g.add(flame);
-    const core = new THREE.Mesh(new THREE.ConeGeometry(1.1 * scale, 4.6 * scale, 8), matFlameCore);
+    const core = new THREE.Mesh(new THREE.ConeGeometry(1.1 * scale, 4.6 * scale, 8), mCore);
     core.position.y = 4.5 * scale; g.add(core);
-    g.position.set(x, y, z); groupEnv.add(g);
+    g.position.set(x, y, z); grp.add(g);
     if (addLight) {
         const pl = new THREE.PointLight(0xffb160, 0.55, 240, 2);
-        pl.position.set(x, y + 6, z); groupEnv.add(pl);
+        pl.position.set(x, y + 6, z); grp.add(pl);   // rides with the pillars, so it dims out too
     }
     return g;
 }
@@ -177,14 +212,26 @@ function addColonnade(x0, z0, x1, z1, count, h, r) {
     }
 }
 
-// A carved pew, backrest toward the crossing so it faces the altar.
-function makePew(x, z, width) {
+// A carved pew. The backrest sits on the pew's local +z, so the seated
+// congregation looks toward local -z; yaw aims that gaze (0 = toward the altar).
+function makePew(x, z, width, yaw) {
     const g = new THREE.Group();
     const seat = new THREE.Mesh(new THREE.BoxGeometry(width, 3, 8), matWood);
     seat.position.y = 8; seat.castShadow = true; g.add(seat);
     const back = new THREE.Mesh(new THREE.BoxGeometry(width, 10, 2), matWood);
     back.position.set(0, 13, 4); back.castShadow = true; g.add(back);
-    g.position.set(x, FLOOR_Y, z); groupEnv.add(g);
+    g.position.set(x, FLOOR_Y, z); g.rotation.y = yaw || 0; groupEnv.add(g);
+}
+
+// Blocks of pews tucked into each diagonal corner, angled to face the crossing.
+function buildCornerSeating() {
+    [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (s) {
+        const yaw = Math.atan2(s[0], s[1]);   // local +z (backrest) points out to the corner
+        for (let r = 0; r < 3; r++) {
+            const d = 116 + r * 22;
+            makePew(s[0] * d * 0.707, s[1] * d * 0.707, 58, yaw);
+        }
+    });
 }
 
 // The four enclosing walls, each with a cornice and an inner blind arcade
@@ -246,7 +293,7 @@ function buildAltar() {
     [-30, 30].forEach(function (x) {
         const stick = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 2, 20, 8), matGold);
         stick.position.set(x, 50, zc + 6); groupEnv.add(stick);
-        makeTorch(x, 62, zc + 6, false, 0.5);
+        makeTorch(x, 62, zc + 6, false, 0.5, false);   // permanent altar candle, not a pillar torch
     });
     const glow = new THREE.PointLight(0xffcb87, 0.85, 480, 2); glow.position.set(0, 120, zc + 20); groupEnv.add(glow);
 
@@ -373,10 +420,15 @@ function cathSync3D() {
 function cathRebuild() {
     while (groupStones.children.length) groupStones.remove(groupStones.children[0]);
     stoneMeshes.clear();
+    // new game — bring the pillars back for the opening tableau
+    firstMoveDone = false;
+    groupPillars.visible = true;
+    pillarMats.forEach(function (m) { m.transparent = false; m.opacity = 1; });
     buildBoard(); cathSync3D();
 }
 
 function cathAnimMove(from, to) {
+    if (!firstMoveDone) { firstMoveDone = true; setPillars(false); }   // the pillars retract once play begins
     const fromKey = from.x + ',' + from.y, toKey = to.x + ',' + to.y;
     const m = stoneMeshes.get(fromKey); if (!m) return;
     stoneMeshes.delete(fromKey); stoneMeshes.set(toKey, m);
