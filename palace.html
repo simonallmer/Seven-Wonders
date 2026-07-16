@@ -32,6 +32,7 @@
     <div id="side-menu" class="side-menu">
         <div class="menu-content">
             <h1 class="game-title">PALACE</h1>
+            <p class="game-subtitle" style="text-align:center;margin-top:-10px;opacity:0.7;color:#d4cfc4;">The Carom <span style="font-size:0.7em;border:1px solid rgba(197,160,89,0.5);border-radius:4px;padding:1px 6px;margin-left:6px;color:#C5A059;">Prototype</span></p>
 
             <div class="player-info">
                 <div class="current-player-display">
@@ -41,13 +42,26 @@
             </div>
 
             <div class="score-display">
-                <div class="score-item"><span class="score-label">White</span> <span id="w-score" class="score-value">0</span></div>
-                <div class="score-item"><span class="score-label">Black</span> <span id="b-score" class="score-value">0</span></div>
+                <div class="score-item"><span class="score-label">White</span> <span id="w-score" class="score-value">8</span></div>
+                <div class="score-item"><span class="score-label">Black</span> <span id="b-score" class="score-value">8</span></div>
             </div>
 
             <div class="menu-divider"></div>
 
-            <button id="clear-btn" class="menu-btn">Clear Board</button>
+            <div style="padding:4px 0 8px;">
+                <p style="text-align:center;margin:0 0 6px;font-size:0.8em;letter-spacing:1px;opacity:0.7;color:#d4cfc4;">LEVEL CONTROL</p>
+                <div id="tier-controls" style="display:flex;flex-direction:column;gap:3px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span style="font-size:0.8em;color:#d4cfc4;">White Front</span><span><button class="tier-btn" data-band="0" data-d="-1" style="width:26px;">▼</button> <span id="tier-val-0" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">1</span> <button class="tier-btn" data-band="0" data-d="1" style="width:26px;">▲</button></span></div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span style="font-size:0.8em;color:#d4cfc4;">White Mid</span><span><button class="tier-btn" data-band="1" data-d="-1" style="width:26px;">▼</button> <span id="tier-val-1" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">2</span> <button class="tier-btn" data-band="1" data-d="1" style="width:26px;">▲</button></span></div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span style="font-size:0.8em;color:#d4cfc4;">Summit</span><span><button class="tier-btn" data-band="2" data-d="-1" style="width:26px;">▼</button> <span id="tier-val-2" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">3</span> <button class="tier-btn" data-band="2" data-d="1" style="width:26px;">▲</button></span></div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span style="font-size:0.8em;color:#d4cfc4;">Black Mid</span><span><button class="tier-btn" data-band="3" data-d="-1" style="width:26px;">▼</button> <span id="tier-val-3" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">2</span> <button class="tier-btn" data-band="3" data-d="1" style="width:26px;">▲</button></span></div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span style="font-size:0.8em;color:#d4cfc4;">Black Front</span><span><button class="tier-btn" data-band="4" data-d="-1" style="width:26px;">▼</button> <span id="tier-val-4" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">1</span> <button class="tier-btn" data-band="4" data-d="1" style="width:26px;">▲</button></span></div>
+                </div>
+            </div>
+
+            <button id="clear-btn" class="menu-btn">New Game</button>
+            <button id="ai-btn" class="menu-btn">Computer: On</button>
+            <button id="free-btn" class="menu-btn">Free Move: Off</button>
             <button id="rules-btn" class="menu-btn">About</button>
             <button id="close-menu-btn" class="menu-btn">Close Menu</button>
 
@@ -57,16 +71,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Action Bar: stone pool -->
-    <div class="action-bar">
-        <span id="play-chips">
-            <button id="btn-place" class="action-chip">Place Artifact</button>
-            <button id="btn-regrow" class="action-chip">Regrow</button>
-            <button id="btn-fire" class="action-chip" style="display:none">🔥 Fire Laser</button>
-        </span>
-    </div>
-    <div id="action-prompt" class="action-prompt"></div>
 
     <!-- Game Message -->
     <div id="game-message" class="game-message hidden"></div>
@@ -87,17 +91,21 @@
     <div id="rules-modal" class="rules-modal" style="display:none;">
         <div class="rules-overlay" id="rules-overlay" onclick="document.getElementById('rules-modal').style.display='none'"></div>
         <div class="rules-content">
-            <h2>Palace — “The Span”</h2>
+            <h2>Palace — “The Carom”</h2>
             <div class="rules-body">
-                <p><strong>GOAL</strong><br>First to 20 points. Place artifacts on the glass caps to score each turn.</p>
-                <p><strong>THE BOARD</strong><br>The Crystal Palace sits on a 9x7 plinth. The outer ring is the walkway. The inner 5 rows of glass are exhibition halls — their caps score 1, 2, or 4 points per turn each.</p>
-                <p><strong>STONES</strong><br>5 per player on the outer ring. Each stone carries an artifact (shown as a glowing gem).</p>
-                <p><strong>RUN</strong><br>Roll in a straight line. Land on an enemy stone to capture it. Roll onto an enemy artifact while empty to steal it.</p>
-                <p><strong>PLACE</strong><br>Stand on a glass cap while carrying → click Place Artifact. Your artifact scores each turn at the cap's level.</p>
-                <p><strong>LASER</strong><br>Select a stone, then press Fire Laser (L). Red markers show laser targets — tap one to fire. Laser passes through friendly territory and is blocked by enemy glass. If the enemy stone carries an artifact, the artifact absorbs the shot (destroyed). If the stone is empty, it is eliminated permanently.</p>
-                <p><strong>CAPTURE</strong><br>Land on an enemy stone → they are eliminated permanently. If you are empty, you steal one of their board artifacts.</p>
-                <p><strong>REGROW</strong><br>An empty stone can use its turn to Regrow instead of moving. No free regrows — the world is tough.</p>
-                <p><strong>PASSAGE</strong><br>The central ridge has portals at the left and right. Enter one and exit the other in one move.</p>
+                <p><strong>GOAL</strong><br>Break your opponent below <strong>four</strong> spheres. Each side starts with eight (board + reserve).</p>
+                <p><strong>ONE BUILDING</strong><br>The palace is the whole board — five 8×2 glass bands, heights 1 to 3, starting 1-2-3-2-1. Your eight spare spheres wait off-board, one lined up before each column of your entrance row — each can only enter on its own column.</p>
+                <p><strong>ROLL</strong><br>The roll is the only way a sphere moves. One action per turn: PLACE a sphere onto its own free level-1 entrance pane, or ROLL one sphere — a single committed slide in a straight line, resolved by the terrain it crosses:</p>
+                <ul style="padding-left: 20px; margin-bottom: 15px;">
+                    <li><strong>Flat</strong> — keep rolling until a wall or a sphere. <strong>There is no railing:</strong> roll off the building's edge and the sphere falls and shatters — gone.</li>
+                    <li><strong>One step up</strong> — hop up onto the next pane and stop — but only from the pane right below the step. A flat run that reaches a rise later just stops at the wall.</li>
+                    <li><strong>Two-plus up</strong> — a wall; stop before it.</li>
+                    <li><strong>One step down</strong> — drop and keep rolling on the lower level.</li>
+                    <li><strong>Two-plus down</strong> — drop and stay where you land.</li>
+                </ul>
+                <p><strong>CAROM</strong><br>Roll into a sphere on the same tier and you shove it exactly one pane along, taking the pane it vacated. Shove a foe over the rim to break it — but a sphere backed by a step, a wall, or another sphere won't budge, and rolling too far sends your own sphere over the edge.</p>
+                <p><strong>SMASH</strong><br>A sphere you <em>drop onto</em> — of either colour — is smashed and removed from the game; you take its pane. Get above your foe and roll down onto them. Beware smashing your own.</p>
+                <p><strong>THE BANDS</strong><br>Whole bands rise and sink via the gold handles on the west edge (or LEVEL CONTROL in the menu). Spheres ride their band. Raising a band by two makes an impassable wall; by one, a step you can hop. Lower the ground to turn a foe's flat roll into a fatal drop — terrain is how you set up the kill.</p>
             </div>
             <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
         </div>
@@ -127,18 +135,28 @@
         rulesCloseBtn.addEventListener('click', () => rulesModal.style.display = 'none');
 
         document.getElementById('clear-btn').addEventListener('click', () => { window.palClear(); if (sideMenu.classList.contains('open')) toggleMenu(); });
-        document.getElementById('btn-place').addEventListener('click', () => window.palActionPlace());
-        document.getElementById('btn-regrow').addEventListener('click', () => window.palActionRegrow());
-        document.getElementById('btn-fire').addEventListener('click', () => window.palActionFire());
-
+        document.getElementById('free-btn').addEventListener('click', function () {
+            const on = this.textContent.includes('Off');
+            window.palSetFree(on);
+            this.textContent = 'Free Move: ' + (on ? 'On' : 'Off');
+        });
+        document.getElementById('ai-btn').addEventListener('click', function () {
+            const on = this.textContent.includes('Off');
+            window.palSetAI(on);
+            this.textContent = 'Computer: ' + (on ? 'On' : 'Off');
+        });
+        document.querySelectorAll('.tier-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                window.palSetTier(parseInt(btn.dataset.band, 10), parseInt(btn.dataset.d, 10));
+            });
+        });
         document.addEventListener('keydown', (e) => {
             const tag = (e.target && e.target.tagName) || '';
             if (/^(INPUT|TEXTAREA)$/.test(tag)) return;
             const k = e.key.toLowerCase();
             if (k === 'r') { window.palClear(); }
-            else if (k === 'p') { window.palActionPlace(); }
-            else if (k === 'g') { window.palActionRegrow(); }
-            else if (k === 'l' || k === 'f') { window.palActionFire(); }
+            else if (k === 'p') { window.palTapPool(window.getPalState().turn); }
         });
 
         // Pin the bottom UI above mobile Safari's toolbar / home indicator.

@@ -89,7 +89,7 @@ const games = {
     palace: {
         name: 'Palace',
         description: 'The Crystal Palace',
-        status: 'playtest',
+        status: 'available',
         url: 'palace.html'
     },
     skyscraper: {
