@@ -7,8 +7,9 @@
 // nodes see 8 directions, weak nodes 4.
 //
 // SETUP: each player fills the outer 3 rows of their arm (15 stones).
-// 2 players: White (south) vs Black (north). 4 players: + Blue (west)
-// and Red (east). Turn order runs clockwise: W → U → B → R.
+// 2 players: White (south) vs Black (north). 4 players: + Red (west)
+// and Blue (east) — matching Temple's seating (red left, blue right).
+// Turn order runs clockwise from White: W → R → B → U.
 //
 // MOVE (Procession): a stone may travel UP TO as many empty fields in a
 // straight line as the longest unbroken run of friendly stones standing
@@ -74,12 +75,20 @@ function cathSetField(mode) { // 'middle4' | 'middle8'
     cathParity = (mode === 'middle8') ? 0 : 1;
     cathReset();
 }
+// Conversion mode: attack-only (default) converts on approach alone.
+// The original approach+withdraw rule allowed endless jump-back loops,
+// so withdraw is kept as an optional legacy setting until one rule wins.
+var cathWithdrawOn = false;
+function cathSetWithdraw(on) {
+    cathWithdrawOn = !!on;
+    cathReset();
+}
 function cDirs(x, y) { return cStrong(x, y) ? CATH_D8 : CATH_D8.slice(0, 4); }
 function cStoneAt(x, y) { return cathBoard[cKey(x, y)] || null; }
 
 function cathReset(nPlayers) {
     if (nPlayers === 2 || nPlayers === 4)
-        cathPlayers = nPlayers === 2 ? ['W', 'B'] : ['W', 'U', 'B', 'R'];
+        cathPlayers = nPlayers === 2 ? ['W', 'B'] : ['W', 'R', 'B', 'U'];
     cathBoard = {};
     var four = cathPlayers.length === 4;
     for (var i = CATH_ARM_LO; i <= CATH_ARM_HI; i++) {
@@ -87,8 +96,8 @@ function cathReset(nPlayers) {
             cathBoard[cKey(i, CATH_N - 1 - d)] = 'W';           // south
             cathBoard[cKey(i, d)] = 'B';                        // north
             if (four) {
-                cathBoard[cKey(d, i)] = 'U';                    // west
-                cathBoard[cKey(CATH_N - 1 - d, i)] = 'R';       // east
+                cathBoard[cKey(d, i)] = 'R';                    // west (screen left)  — Red, as in Temple
+                cathBoard[cKey(CATH_N - 1 - d, i)] = 'U';       // east (screen right) — Blue, as in Temple
             }
         }
     }
@@ -137,7 +146,8 @@ function cathTargetsFor(color, sx, sy) {
     var reach = cReach(color, sx, sy);
     cDirs(sx, sy).forEach(function (d) {
         // withdrawal reads the line touching the START — same for every landing
-        var wdr = cRun(color, sx - d[0], sy - d[1], -d[0], -d[1]);
+        // (legacy rule — only when the Withdraw setting is on)
+        var wdr = cathWithdrawOn ? cRun(color, sx - d[0], sy - d[1], -d[0], -d[1]) : null;
         for (var k = 1; k <= reach; k++) {
             var nx = sx + d[0] * k, ny = sy + d[1] * k;
             if (!cIn(nx, ny) || cStoneAt(nx, ny)) break;                 // no jumping
@@ -307,7 +317,7 @@ function refreshCath() {
         ? who + ' is deliberating…'
         : cathChain
             ? who + ', keep converting — or tap your stone to rest'
-            : who + ', tap a stone — approach or withdraw to convert';
+            : who + ', tap a stone — ' + (cathWithdrawOn ? 'approach or withdraw to convert' : 'approach to convert');
     if (cathIsComputer(cathTurn)) {
         clearTimeout(cathAiTimer);
         cathAiTimer = setTimeout(cathAiMove, 800);
@@ -485,3 +495,4 @@ window.cathTapTarget = cathTapTarget;
 window.refreshCath = refreshCath;
 window.cathSetOpponent = cathSetOpponent;
 window.cathSetField = cathSetField;
+window.cathSetWithdraw = cathSetWithdraw;

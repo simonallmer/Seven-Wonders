@@ -31,25 +31,11 @@
 
             <div class="menu-divider"></div>
 
-            <div class="players-dropdown">
-                <button id="players-btn" class="menu-btn">2 Players</button>
-                <div class="players-menu" id="players-menu">
-                    <button id="btn-p2" class="active menu-btn-sub" data-players="2">2 Players</button>
-                    <button id="btn-p4" class="menu-btn-sub" data-players="4">4 Players</button>
-                </div>
-            </div>
-
-            <div class="opp-dropdown">
-                <button id="opponent-btn" class="menu-btn">Opponent: Computer</button>
-                <div class="opp-menu" id="opponent-menu">
-                    <button id="btn-opp-human" class="menu-btn-sub" data-opp="human">Human</button>
-                    <button id="btn-opp-computer" class="active menu-btn-sub" data-opp="computer">Computer</button>
-                </div>
-            </div>
-
+            <button id="players-btn" class="menu-btn">2 Players</button>
+            <button id="opponent-btn" class="menu-btn">Opponent: Computer</button>
             <button id="field-btn" class="menu-btn">Field: Middle 4</button>
+            <button id="convert-btn" class="menu-btn">Convert: Attack Only</button>
             <button id="rules-btn" class="menu-btn">Rules</button>
-            <button id="classic-btn" class="menu-btn" onclick="window.location.href='cathedral-classic.html'">Mode: Classic</button>
             <button id="reset-button" class="menu-btn">New Game</button>
             <button id="close-menu-btn" class="menu-btn">Close</button>
         </div>
@@ -63,7 +49,7 @@
                 <div id="player-indicator" class="player-indicator white"></div>
                 <span id="player-name" style="font-family:'Cinzel',serif;font-size:0.95rem;letter-spacing:1px;">White 15 · Black 15</span>
             </div>
-            <span id="action-prompt">White, tap a stone — approach or withdraw to convert</span>
+            <span id="action-prompt">White, tap a stone — approach to convert</span>
         </div>
     </div>
 
@@ -97,7 +83,7 @@
                 <p><strong>CONVERSION</strong> (never forced)</p>
                 <ul style="padding-left: 20px; margin-bottom: 15px;">
                     <li><strong>Approach:</strong> end your move directly in front of an unbroken enemy line in your direction of travel — the whole line converts to your color.</li>
-                    <li><strong>Withdraw:</strong> move directly away from an enemy line touching your starting field — that line converts.</li>
+                    <li><strong>Withdraw</strong> (optional setting, off by default): move directly away from an enemy line touching your starting field — that line converts. Enable via Convert: Attack + Withdraw in the menu.</li>
                     <li>Conversion stops where the line's color changes, at an empty field, or at your own stone. If a move is both approach and withdrawal, choose one.</li>
                 </ul>
 
@@ -131,52 +117,24 @@
             sideMenu.classList.toggle('open');
             overlay.classList.toggle('active');
             menuToggle.classList.toggle('active');
-            if (!sideMenu.classList.contains('open')) {
-                document.getElementById('players-menu').classList.remove('show-flyout');
-                document.getElementById('opponent-menu').classList.remove('show-flyout');
-            }
         }
 
         menuToggle.addEventListener('click', toggleMenu);
         overlay.addEventListener('click', toggleMenu);
         closeMenuBtn.addEventListener('click', toggleMenu);
 
-        // Flyout logic
-        document.getElementById('players-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.getElementById('players-menu').classList.toggle('show-flyout');
-            document.getElementById('opponent-menu').classList.remove('show-flyout');
-        });
-        document.getElementById('opponent-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.getElementById('opponent-menu').classList.toggle('show-flyout');
-            document.getElementById('players-menu').classList.remove('show-flyout');
-        });
-        document.addEventListener('click', () => {
-            document.getElementById('players-menu').classList.remove('show-flyout');
-            document.getElementById('opponent-menu').classList.remove('show-flyout');
+        // Player count — one button toggles 2 ⇄ 4 in place
+        document.getElementById('players-btn').addEventListener('click', function () {
+            const n = this.textContent.startsWith('2') ? 4 : 2;
+            this.textContent = n + ' Players';
+            cathReset(n);
         });
 
-        // Player count selection
-        document.querySelectorAll('#players-menu .menu-btn-sub').forEach(btn => {
-            btn.addEventListener('click', function () {
-                const n = parseInt(this.dataset.players, 10);
-                document.querySelectorAll('#players-menu .menu-btn-sub').forEach(b => b.classList.toggle('active', b === this));
-                document.getElementById('players-btn').textContent = n + ' Players';
-                cathReset(n);
-                toggleMenu();
-            });
-        });
-
-        // Opponent selection
-        document.querySelectorAll('#opponent-menu .menu-btn-sub').forEach(btn => {
-            btn.addEventListener('click', function () {
-                const isComputer = this.dataset.opp === 'computer';
-                document.querySelectorAll('#opponent-menu .menu-btn-sub').forEach(b => b.classList.toggle('active', b === this));
-                document.getElementById('opponent-btn').textContent = 'Opponent: ' + (isComputer ? 'Computer' : 'Human');
-                cathSetOpponent(isComputer);
-                toggleMenu();
-            });
+        // Opponent — one button toggles Computer ⇄ Human in place
+        document.getElementById('opponent-btn').addEventListener('click', function () {
+            const toComputer = this.textContent.includes('Human');
+            this.textContent = 'Opponent: ' + (toComputer ? 'Computer' : 'Human');
+            cathSetOpponent(toComputer);
         });
 
         // New game
@@ -188,6 +146,13 @@
             document.getElementById('game-over-modal').classList.add('hidden');
             document.getElementById('game-over-modal').classList.remove('visible');
             cathReset();
+        });
+
+        // Conversion toggle — Attack Only (default) vs Attack + Withdraw (legacy)
+        document.getElementById('convert-btn').addEventListener('click', function () {
+            const toWithdraw = this.textContent.includes('Attack Only');
+            cathSetWithdraw(toWithdraw);
+            this.textContent = 'Convert: ' + (toWithdraw ? 'Attack + Withdraw' : 'Attack Only');
         });
 
         // Field position toggle — Middle 4 (default) vs Middle 8
