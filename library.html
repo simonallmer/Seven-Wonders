@@ -26,33 +26,30 @@
     <!-- Side Menu -->
     <div id="side-menu" class="side-menu">
         <div class="menu-content">
-            <h1 class="game-title" style="text-align: center; font-size: 2.2rem; margin-bottom: 5px; font-family: 'Ancient Tulip', 'Cinzel', serif; letter-spacing: 5px;">LIBRARY</h1>
-            <p class="game-subtitle" style="text-align: center; margin-top: 0; opacity: 0.7; color: #d4cfc4; font-family: 'Cinzel', serif;">House of Wisdom</p>
-            
-            <div class="menu-divider" style="height: 1px; background: rgba(100, 90, 80, 0.2); margin: 20px 0;"></div>
+            <h1 class="game-title">LIBRARY</h1>
+            <p class="game-subtitle">House of Wisdom</p>
 
-            <div class="players-dropdown" style="margin-bottom: 10px;">
-                <button id="players-btn" class="menu-btn">2 Players</button>
-                <div class="players-menu" id="players-menu" style="display: none;">
-                    <button id="btn-p2" class="active menu-btn-sub" data-players="2">2 Players</button>
-                    <button id="btn-p3" class="menu-btn-sub" data-players="3">3 Players</button>
-                    <button id="btn-p4" class="menu-btn-sub" data-players="4">4 Players</button>
+            <div class="player-info">
+                <div class="current-player-display">
+                    <div id="player-indicator" class="player-indicator"></div>
+                    <span id="player-name">Player 1 to move</span>
                 </div>
             </div>
 
-            <div class="opp-dropdown" style="margin-bottom: 10px;">
-                <button id="opponent-btn" class="menu-btn">Opponent: Computer</button>
-                <div class="opp-menu" id="opponent-menu" style="display: none;">
-                    <button id="btn-opp-human" class="menu-btn-sub" data-opp="human">Human</button>
-                    <button id="btn-opp-computer" class="active menu-btn-sub" data-opp="computer">Computer</button>
-                </div>
-            </div>
+            <div class="menu-divider"></div>
 
+            <button id="players-btn" class="menu-btn">Players: 2</button>
+            <button id="opponent-btn" class="menu-btn">Opponent: Computer</button>
             <button id="variant-btn" class="menu-btn">Field: Safe Ends</button>
-            <button id="rules-btn" class="menu-btn">Rules</button>
             <button id="scheme-btn" class="menu-btn">Controls: Adaptive</button>
+            <button id="rules-btn" class="menu-btn">Rules</button>
             <button id="reset-button" class="menu-btn">New Game</button>
-            <button id="close-menu-btn" class="menu-btn">Close</button>
+            <button id="close-menu-btn" class="menu-btn">Close Menu</button>
+
+            <div class="menu-footer">
+                <p>Design: Simon Allmer</p>
+                <p>After the House of Wisdom, Baghdad</p>
+            </div>
         </div>
     </div>
 
@@ -139,46 +136,16 @@
         function toggleMenu() {
             sideMenu.classList.toggle('open');
             overlay.classList.toggle('active');
-            // Close flyouts when closing menu
-            if (!sideMenu.classList.contains('open')) {
-                document.getElementById('players-menu').classList.remove('show-flyout');
-                document.getElementById('opponent-menu').classList.remove('show-flyout');
-            }
         }
 
         menuToggle.addEventListener('click', toggleMenu);
         overlay.addEventListener('click', toggleMenu);
         closeMenuBtn.addEventListener('click', toggleMenu);
 
-        // Flyout logic
-        document.getElementById('players-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.getElementById('players-menu').classList.toggle('show-flyout');
-            document.getElementById('opponent-menu').classList.remove('show-flyout');
-        });
-        document.getElementById('opponent-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.getElementById('opponent-menu').classList.toggle('show-flyout');
-            document.getElementById('players-menu').classList.remove('show-flyout');
-        });
-        // Close flyouts on outside click
-        document.addEventListener('click', () => {
-            document.getElementById('players-menu').classList.remove('show-flyout');
-            document.getElementById('opponent-menu').classList.remove('show-flyout');
-        });
-
-        // Global Keydown (Space for menu, Esc for main menu)
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                window.location.href = 'index.html';
-            } else if (e.code === 'Space') {
-                // Prevent scrolling
-                if (e.target === document.body || e.target === document.documentElement) {
-                    e.preventDefault();
-                }
-                toggleMenu();
-            }
-        });
+        // Players / Opponent are simple toggle buttons (wired in library-3d.js),
+        // matching the single-button menu format used across the other games.
+        // Space (menu) and Escape (main menu) are handled globally by global-keys.js —
+        // do NOT re-bind them here or the two handlers cancel each other out.
 
         // Rules modal logic
         document.getElementById('rules-btn').addEventListener('click', function () {

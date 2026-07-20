@@ -53,6 +53,10 @@ const matTrunk = new THREE.MeshStandardMaterial({ color: 0x4a3a28, roughness: 0.
 const matTileBody = new THREE.MeshStandardMaterial({ color: 0xeae3d2, roughness: 0.6 });
 const matCapW = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
 const matCapB = new THREE.MeshStandardMaterial({ color: 0x1d1d1d, roughness: 0.4 });
+const matCapR = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.35 });
+const matCapU = new THREE.MeshStandardMaterial({ color: 0x2a5db0, roughness: 0.35 });
+const CAP_MATS = { W: matCapW, B: matCapB, R: matCapR, U: matCapU };
+function capMat(owner) { return CAP_MATS[owner] || matCapW; }
 const matBar = new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.5, emissive: 0x3a0000, emissiveIntensity: 0.25 });
 
 const matHiPlace = new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.55, depthWrite: false });
@@ -307,7 +311,7 @@ function makeTile(owner, num) {
     const body = new THREE.Mesh(PRISM_GEO, matTileBody.clone());
     body.castShadow = true; body.receiveShadow = true;
     g.add(body);
-    const cap = new THREE.Mesh(CAP_GEO, owner === 'W' ? matCapW : matCapB);
+    const cap = new THREE.Mesh(CAP_GEO, capMat(owner));
     cap.position.y = TILE_H + 0.2;
     g.add(cap);
     g.userData = { owner: owner, num: num, bars: [] };
@@ -352,7 +356,7 @@ function towerSync3D() {
                 // reconcile owner/num
                 if (mesh.userData.owner !== t.owner) {
                     mesh.userData.owner = t.owner;
-                    mesh.children.forEach(c => { if (c.geometry === CAP_GEO) c.material = t.owner === 'W' ? matCapW : matCapB; });
+                    mesh.children.forEach(c => { if (c.geometry === CAP_GEO) c.material = capMat(t.owner); });
                 }
                 if (mesh.userData.num !== t.num) buildBars(mesh, t.num);
                 const p = slotPos(l, s);

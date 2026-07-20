@@ -331,18 +331,21 @@ window.newColosseum = newColosseum;
 
 function setColPlayerCount(n) {
     colPlayerCount = n;
-    [2, 3, 4].forEach(function (k) {
-        var b = document.getElementById('col-btn-' + k + 'p');
-        if (b) b.classList.toggle('active', k === n);
-    });
+    var pb = document.getElementById('col-players-btn');
+    if (pb) pb.textContent = 'Players: ' + n;
     newColosseum();
     showMessage(n + '-player arena');
 }
 window.setColPlayerCount = setColPlayerCount;
 
+// simple 2 <-> 4 toggle, matching the single Players button in the other games
+function toggleColPlayers() {
+    setColPlayerCount(colPlayerCount === 2 ? 4 : 2);
+}
+window.toggleColPlayers = toggleColPlayers;
+
 if (resetButton) resetButton.addEventListener('click', function () { newColosseum(); showMessage('The arena is reset.'); });
 
 document.addEventListener('DOMContentLoaded', function () {
-    var b2 = document.getElementById('col-btn-2p'); if (b2) b2.classList.add('active');
     newColosseum();
 });

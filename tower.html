@@ -7,6 +7,30 @@
     <title>Tower - Seven Wonders</title>
     <meta name="description" content="Play Tower, an ancient strategy game from the Seven Wonders series inspired by the Porcelain Tower of Nanjing">
     <link rel="stylesheet" href="tower-style.css">
+    <style>
+        /* Four-seat HUD (shared by 2- and 4-player) */
+        .stone-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+        .stone-dot.white { background: #f3efe6; }
+        .stone-dot.black { background: #232323; }
+        .stone-dot.red { background: #c0392b; }
+        .stone-dot.blue { background: #2a5db0; }
+        .stone-hud {
+            position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+            max-width: 92vw; z-index: 40; pointer-events: none;
+        }
+        .stone-hud-item {
+            display: flex; align-items: center; gap: 2px;
+            background: rgba(28, 24, 16, 0.82); border: 1px solid rgba(197, 160, 89, 0.35);
+            border-radius: 20px; padding: 5px 12px; font-size: 0.82em; color: #efe7d4;
+            transition: opacity 0.25s, border-color 0.25s, box-shadow 0.25s;
+        }
+        .stone-hud-item.active-turn { border-color: #C5A059; box-shadow: 0 0 14px rgba(197, 160, 89, 0.5); }
+        .stone-hud-item.dead { opacity: 0.32; text-decoration: line-through; }
+        .hud-reserve { opacity: 0.6; margin-left: 3px; font-size: 0.9em; }
+        .count-stone.red { background: #c0392b; }
+        .count-stone.blue { background: #2a5db0; }
+    </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="camera-pan.js"></script>
@@ -16,6 +40,14 @@
 <body class="view-3d">
     <div id="game-container">
         <div id="canvas3d" class="canvas-container"></div>
+    </div>
+
+    <!-- Seat HUD (always visible) -->
+    <div id="tower-hud" class="stone-hud">
+        <div class="stone-hud-item" id="hud-item-W"><span class="stone-dot white"></span><span id="hud-W">0</span><span class="hud-reserve">+<span id="res-W">12</span></span></div>
+        <div class="stone-hud-item" id="hud-item-R"><span class="stone-dot red"></span><span id="hud-R">0</span><span class="hud-reserve">+<span id="res-R">12</span></span></div>
+        <div class="stone-hud-item" id="hud-item-U"><span class="stone-dot blue"></span><span id="hud-U">0</span><span class="hud-reserve">+<span id="res-U">12</span></span></div>
+        <div class="stone-hud-item" id="hud-item-B"><span class="stone-dot black"></span><span id="hud-B">0</span><span class="hud-reserve">+<span id="res-B">12</span></span></div>
     </div>
 
     <!-- Top Bar -->
@@ -40,21 +72,9 @@
                 </div>
             </div>
 
-            <div class="stone-counts-display">
-                <div class="count-item">
-                    <div class="count-stone white"></div>
-                    <span id="w-board-hud">0</span>
-                    <span class="res">+<span id="w-res-hud">12</span> pool</span>
-                </div>
-                <div class="count-item">
-                    <div class="count-stone black"></div>
-                    <span id="b-board-hud">0</span>
-                    <span class="res">+<span id="b-res-hud">12</span> pool</span>
-                </div>
-            </div>
-
             <div class="menu-divider"></div>
 
+            <button id="players-btn" class="menu-btn">Players: 2</button>
             <button id="opponent-btn" class="menu-btn">Opponent: Computer</button>
             <button id="rules-btn" class="menu-btn">Rules</button>
             <button id="reset-button" class="menu-btn">Reset Game</button>

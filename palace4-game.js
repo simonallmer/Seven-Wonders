@@ -1,136 +1,132 @@
 // ============================================
-// PALACE — "The Carom"  (rolling glass spheres, momentum / elimination)
+// PALACE — "Twin Palaces"  (4-player carom / elimination)
 // ============================================
-// The palace is five 8x2 glass BANDS, heights 1-3, starting 1-2-3-2-1.
-// Whole bands raise or lower (Level Control handles on the building's edge).
+// TWO Crystal Palaces, joined along their long side edge into one 16x10 board.
+//   Palace A  = columns x 0..7     Palace B  = columns x 8..15
+// Each palace keeps its OWN five 8x2 elevator bands (heights 1-3, start 1-2-3-2-1)
+// worked from its own edge. Because the two are attached, the old lethal side
+// edge between them is no longer a void — it is LIVE TERRAIN. Roll across the
+// seam and the neighbour palace's band decides everything:
+//   same level      keep rolling straight into the other palace
+//   1 up            a step (hop only if staged) or a stop
+//   2+ up           a WALL — you hit it and stop, you do NOT fall
+//   1/2+ down       drop across and roll / hard-drop into the other palace
+// Only the two OUTER long edges (x = 0 and x = 15) are still a sheer, lethal drop.
 //
-// PIECES are glass spheres. The ROLL is the ONLY way a sphere moves — a single
-// committed slide in a straight line, resolved by the terrain it crosses:
-//   flat        — keep rolling
-//   1 level UP  — HOP up, but ONLY from the pane directly below the step
-//                 (you must be staged on your band's front edge); a flat run
-//                 that only reaches a rise later stops at the wall instead
-//   2+ up       — a wall; stop before it
-//   1 level DOWN— drop and KEEP ROLLING on the lower level
-//   2+ down     — drop and STAY where you land
-//   a sphere you DROP onto (any colour) is SMASHED — it is out, you take its pane.
+// FOUR seats around the ring, each with a home end and eight column-locked reserves:
+//   White  A-south (y0, x0..7)      Red   B-south (y0, x8..15)
+//   Black  A-north (y9, x0..7)      Blue  B-north (y9, x8..15)
+// Turn order runs around the ring: White -> Red -> Blue -> Black.
 //
-// CAROM: rolling into a sphere on the same tier shoves it exactly ONE pane along
-//   (a clean push, not a slide); the striker takes the pane it vacated. Shove a
-//   sphere off the rim and it dies. A sphere backed by a step, wall, or another
-//   sphere won't budge, and the striker just stops against it.
-// THE RIM: the two long SIDE edges are lethal (roll off = fall & shatter); the
-//   two ENTRANCE (pool-side) edges hold a low lip — a sphere rolled toward its
-//   own baseline stops there, safe.
-// HADES: a connected group of same-colour spheres with no liberty (every
-//   orthogonal neighbour sealed by an enemy, the board edge, or a 2+ heightened
-//   wall) is removed — not limited to one sphere.
-// NO RETURN: a caromed sphere may not be shoved straight back onto the pane it
-//   just came from on the immediately following move.
-//
-// GOAL: reduce any opponent below 4 spheres (board + reserve pool).
+// A band answers to any player standing a sphere on it — so an invader who rolls
+// into the enemy palace can seize its elevators. Reduce a rival below four spheres
+// (board + reserve) to knock them out; the last palace still standing wins.
 // ============================================
 
-const PAL_W = 8;
+const PAL_HALF = 8;                        // each palace is 8 wide
+const PAL_W = 16;                          // two palaces, joined along x
 const PAL_D = 10;
-const PAL_TIER_START = [1, 2, 3, 2, 1];   // five 8x2 bands, south to north
+const PAL_BANDS = 5;
+const PAL_TIER_START = [1, 2, 3, 2, 1];    // per palace, south to north
 const PAL_TIER_MIN = 1;
 const PAL_TIER_MAX = 3;
 const PAL_STONES = 8;                      // one reserve per column, locked to its entry pane
-const PAL_LOSE_BELOW = 4;                  // lose when total (board + reserve) drops below this — tune me
+const PAL_LOSE_BELOW = 4;                  // a seat is out when total (board + reserve) drops below this
 
+// seats & geometry ------------------------------------------------------------
+const PAL_PLAYERS = ['W', 'R', 'U', 'B'];  // turn order, clockwise around the ring
+const PAL_SEAT = {
+    W: { name: 'White', palace: 'A', end: 'S' },
+    R: { name: 'Red', palace: 'B', end: 'S' },
+    U: { name: 'Blue', palace: 'B', end: 'N' },
+    B: { name: 'Black', palace: 'A', end: 'N' }
+};
+
+function palPalaceOf(x) { return x < PAL_HALF ? 'A' : 'B'; }
+function palPalaceX0(p) { return p === 'A' ? 0 : PAL_HALF; }         // west column of a palace
 function palBand(y) { return Math.floor(y / 2); }
-function palBandHeight(b) { return palTierHeights[b]; }
-function palIsApex() { return false; }     // crown removed — kept as a safe stub for the 3D view
-function palLevel(x, y) { return palTierHeights[palBand(y)]; }
+function palBandHeight(palace, b) { return palTierHeights[palace][b]; }
+function palIsApex() { return false; }     // no crown — safe stub for the 3D view
+function palLevel(x, y) { return palTierHeights[palPalaceOf(x)][palBand(y)]; }
 function palInBounds(x, y) { return x >= 0 && x < PAL_W && y >= 0 && y < PAL_D; }
-function palEntranceRow(color) { return color === 'W' ? 0 : PAL_D - 1; }
+function palEntranceRow(color) { return PAL_SEAT[color].end === 'S' ? 0 : PAL_D - 1; }
+function palSeatCols(color) { const x0 = palPalaceX0(PAL_SEAT[color].palace); return [x0, x0 + PAL_HALF - 1]; }
+function palColOffset(color, x) { return x - palPalaceX0(PAL_SEAT[color].palace); }   // 0..7
+function palColToX(color, off) { return palPalaceX0(PAL_SEAT[color].palace) + off; }
 
 const PAL_DIRS = [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }];
 
 // ---- state ----
-let palPlay = [];                 // spheres on the building
+let palPlay = [];                 // spheres on the buildings
 let palTurn = 'W';
 let palSel = null;                // {kind:'stone', id} | {kind:'pool'} | null
 let palWinner = null;
-let palWinReason = null;          // 'smash' | 'stuck' — how the game was won
-let palLastPush = null;           // {id, back:{x,y}} — a caromed sphere may not be shoved straight back next move
+let palWinReason = null;          // 'smash' | 'stuck'
+let palLastPush = null;           // {id, back:{x,y}} — no immediate push-back
 let palNextId = 1;
-let palPool = { W: palFullReserve(), B: palFullReserve() };  // per-column: true = reserve still off-board
-let palTierHeights = PAL_TIER_START.slice();
+let palPool = { W: palFullReserve(), R: palFullReserve(), U: palFullReserve(), B: palFullReserve() };
+let palTierHeights = { A: PAL_TIER_START.slice(), B: PAL_TIER_START.slice() };
+let palAlive = { W: true, R: true, U: true, B: true };
 let palFreeMode = false;          // sandbox: ignore turns, move any sphere
-let palAI = 'B';                  // null | 'B' — colour the computer plays (human is White); ON by default
-let palAIBusy = false;            // a computer move is scheduled/running
-let palAIActing = false;          // the computer is driving a real move right now
+let palAISet = { W: false, R: true, U: true, B: true };   // human is White; rest computer by default
+let palAIBusy = false;
+let palAIActing = false;
 
-function palKey(x, y) { return x + ',' + y; }
 function palStoneAt(x, y) { return palPlay.find(function (s) { return s.x === x && s.y === y; }) || null; }
 function palBoardCount(c) { return palPlay.filter(function (s) { return s.color === c; }).length; }
-function palFullReserve() { const a = []; for (let x = 0; x < PAL_W; x++) a.push(true); return a; }
+function palFullReserve() { const a = []; for (let x = 0; x < PAL_HALF; x++) a.push(true); return a; }
 function palPoolCount(c) { return palPool[c].filter(Boolean).length; }
 function palTotal(c) { return palPoolCount(c) + palBoardCount(c); }
+function palAliveList() { return PAL_PLAYERS.filter(function (c) { return palAlive[c]; }); }
 
 function palClear() { palStartPlay(); }
-
 function palSetFree(on) { palFreeMode = !!on; palSel = null; refreshPal(); }
 
 function palStartPlay() {
     palPlay = []; palNextId = 1; palWinner = null; palWinReason = null; palLastPush = null;
-    palPool = { W: palFullReserve(), B: palFullReserve() };
-    palTierHeights = PAL_TIER_START.slice();
+    palPool = { W: palFullReserve(), R: palFullReserve(), U: palFullReserve(), B: palFullReserve() };
+    palTierHeights = { A: PAL_TIER_START.slice(), B: PAL_TIER_START.slice() };
+    palAlive = { W: true, R: true, U: true, B: true };
     palTurn = 'W'; palSel = null;
     const box = document.getElementById('message-box');
     if (box) box.classList.remove('visible');
     refreshPal();
+    if (palIsAITurn()) palAIKick();
 }
 
 // ---- LEVEL CONTROL ----
-function palSetTier(band, delta) {
+// A band is identified by its palace ('A'|'B') and index (0..4).
+function palSetTier(palace, band, delta) {
     if (palWinner) return;
-    if (palIsAITurn() && !palAIActing) return;   // human can't work levels on the computer's turn
-    if (band < 0 || band >= palTierHeights.length) return;
-    const next = palTierHeights[band] + delta;
+    if (palIsAITurn() && !palAIActing) return;   // humans can't work levels on a computer's turn
+    if (band < 0 || band >= PAL_BANDS) return;
+    const next = palTierHeights[palace][band] + delta;
     if (next < PAL_TIER_MIN || next > PAL_TIER_MAX) return;
 
-    // In real play a band only answers to a player who has a sphere standing on
-    // it, and working the level control spends the turn (it IS your action).
-    // Free Move lifts both restrictions.
+    // A band only answers to a player standing a sphere on it, and working the
+    // control spends the turn. Free Move lifts both restrictions.
     if (!palFreeMode) {
-        const owns = palPlay.some(function (s) { return s.color === palTurn && palBand(s.y) === band; });
+        const owns = palPlay.some(function (s) {
+            return s.color === palTurn && palPalaceOf(s.x) === palace && palBand(s.y) === band;
+        });
         if (!owns) { flashPal('You need a sphere on that band to work its level'); return; }
     }
 
-    palTierHeights[band] = next;
+    palTierHeights[palace][band] = next;
     palPlay.forEach(function (s) { s.k = palLevel(s.x, s.y); });   // spheres ride the band
     palSel = null;
     palLastPush = null;
     palResolveHadesAnimated(palTurn);                             // a raised wall can Hades a group
 
     if (palFreeMode) { refreshPal(); return; }
-    palWinner = palCheckWin();
-    palAfterMove();                                                // costs the turn
+    palAfterMove();
 }
 
 // ---- targets ----
-// Resolve one committed roll of sphere `s` in direction `d`. The roll is the
-// ONLY way a sphere moves — a single committed slide, resolved by the terrain:
-//   flat            keep rolling
-//   1 up (staged)   hop; only as a first move from the pane below the step
-//   2+ up / wall    stop before it
-//   1/2+ down       drop and keep rolling / hard-drop and stay
-//   drop onto sphere SMASH it, land on its pane
-// CAROM: roll into a sphere on the same tier and it is shoved exactly ONE pane
-//   further along (a clean push, not a slide). Shove it off a side edge and it
-//   dies. A sphere with anything behind it (a sphere, a step, a wall) won't budge.
-// EDGES: the two long SIDE edges (x) are a sheer, lethal drop — roll off and the
-//   sphere falls and shatters. The two ENTRANCE edges (y, the pool sides) have a
-//   low lip: a sphere rolled toward its own baseline just stops there, safe.
-//
-// Returns null (nothing changes — illegal) or a consequence:
-//   { type,   // 'roll' | 'hop' | 'smash' | 'fall' | 'carom'
-//     render: {x,y},                    // where to draw the target marker
-//     moves:  [{id,x,y}],               // spheres repositioned
-//     kills:  [{id,mode,x,y,k,dx,dy}] } // spheres destroyed (mode 'smash'|'fall')
+// Resolve one committed roll of sphere `s` in direction `d`. Identical terrain
+// logic to the single-palace game — the seam between the two palaces is just
+// more terrain now, since palInBounds spans the whole 16-wide board and palLevel
+// returns the neighbour palace's height. Only the two OUTER x edges are lethal.
 function palRollInDir(s, d) {
     const moves = [];
     const kills = [];
@@ -143,7 +139,7 @@ function palRollInDir(s, d) {
         const nx = cx + d.dx, ny = cy + d.dy;
 
         if (!palInBounds(nx, ny)) {                            // reached an edge
-            if (nx < 0 || nx >= PAL_W) {                       // side edge — sheer lethal drop
+            if (nx < 0 || nx >= PAL_W) {                       // OUTER side edge — sheer lethal drop
                 kills.push({ id: s.id, mode: 'fall', x: cx, y: cy, k: lv, dx: d.dx, dy: d.dy });
                 sFell = true;
             } else {
@@ -158,16 +154,16 @@ function palRollInDir(s, d) {
         if (nlv === lv) {
             if (occ) {                                        // CAROM — shove it one pane along
                 const px = nx + d.dx, py = ny + d.dy;
-                if (px < 0 || px >= PAL_W) {                  // shoved over a side edge — it dies
+                if (px < 0 || px >= PAL_W) {                  // shoved over an outer side edge — it dies
                     kills.push({ id: occ.id, mode: 'fall', x: nx, y: ny, k: nlv, dx: d.dx, dy: d.dy });
                     moves.push({ id: s.id, x: nx, y: ny });   // striker takes the vacated pane
                 } else if (!palInBounds(px, py)) {            // shoved against the pool-side lip — it holds
                     stopBefore();
                 } else if (palLevel(px, py) === nlv && !palStoneAt(px, py)) {
                     if (palLastPush && occ.id === palLastPush.id && px === palLastPush.back.x && py === palLastPush.back.y) {
-                        stopBefore();                         // no immediate push-back — it just came from that pane
+                        stopBefore();                         // no immediate push-back
                     } else {
-                        moves.push({ id: occ.id, x: px, y: py });  // clean push onto an empty same-tier pane
+                        moves.push({ id: occ.id, x: px, y: py });
                         moves.push({ id: s.id, x: nx, y: ny });
                         pushBack = { id: occ.id, back: { x: nx, y: ny } };
                     }
@@ -184,7 +180,7 @@ function palRollInDir(s, d) {
             else stopBefore();
             break;
         }
-        if (nlv >= lv + 2) { stopBefore(); break; }           // wall
+        if (nlv >= lv + 2) { stopBefore(); break; }           // wall (even across the seam)
 
         if (nlv === lv - 1) {
             if (occ) {                                        // drop one onto a sphere — smash
@@ -201,14 +197,14 @@ function palRollInDir(s, d) {
         break;
     }
 
-    if (!moves.length && !kills.length) return null;          // nothing changed — not a legal roll
+    if (!moves.length && !kills.length) return null;
 
     const sMove = moves.find(function (m) { return m.id === s.id; });
     let type = 'roll';
     if (didHop) type = 'hop';
     else if (sFell) type = 'fall';
     else if (kills.some(function (k) { return k.mode === 'smash'; })) type = 'smash';
-    else if (kills.length) type = 'carom';                    // s lives but shoved a sphere off the rim
+    else if (kills.length) type = 'carom';
 
     let render;
     if (sMove) render = { x: sMove.x, y: sMove.y };
@@ -231,10 +227,11 @@ function palStoneTargets(s) {
 function palPlaceTargets(color) {
     const out = [];
     const y = palEntranceRow(color);
-    for (let x = 0; x < PAL_W; x++) {
-        if (!palPool[color][x]) continue;     // this column's reserve is already deployed
+    const cols = palSeatCols(color);
+    for (let x = cols[0]; x <= cols[1]; x++) {
+        if (!palPool[color][palColOffset(color, x)]) continue;   // that reserve is already deployed
         if (palStoneAt(x, y)) continue;
-        if (palLevel(x, y) !== 1) continue;   // enter only where your band is at ground height
+        if (palLevel(x, y) !== 1) continue;                      // enter only where your band is at ground height
         out.push({ x: x, y: y, type: 'place' });
     }
     return out;
@@ -250,11 +247,14 @@ function palLegalForSelected() {
 function palHasAnyAction(color) {
     if (palPoolCount(color) > 0 && palPlaceTargets(color).length) return true;
     if (palPlay.some(function (s) { return s.color === color && palStoneTargets(s).length; })) return true;
-    // working the level control is also an action: any band this colour stands on
-    // can move at least one way (heights live between MIN and MAX).
-    for (let b = 0; b < palTierHeights.length; b++) {
-        if ((palTierHeights[b] < PAL_TIER_MAX || palTierHeights[b] > PAL_TIER_MIN) &&
-            palPlay.some(function (s) { return s.color === color && palBand(s.y) === b; })) return true;
+    // working a level control is also an action: any band this colour stands on that can still move.
+    for (let bi = 0; bi < PAL_BANDS; bi++) {
+        for (let pi = 0; pi < 2; pi++) {
+            const palace = pi === 0 ? 'A' : 'B';
+            const h = palTierHeights[palace][bi];
+            if ((h < PAL_TIER_MAX || h > PAL_TIER_MIN) &&
+                palPlay.some(function (s) { return s.color === color && palPalaceOf(s.x) === palace && palBand(s.y) === bi; })) return true;
+        }
     }
     return false;
 }
@@ -265,7 +265,7 @@ function palPlayTapStone(id) {
     const s = palPlay.find(function (p) { return p.id === id; });
     if (!s) return;
     if (palFreeMode) palTurn = s.color;
-    if (s.color !== palTurn) { flashPal((palTurn === 'W' ? 'White' : 'Black') + ' to move'); return; }
+    if (s.color !== palTurn) { flashPal(PAL_SEAT[palTurn].name + ' to move'); return; }
     palSel = (palSel && palSel.kind === 'stone' && palSel.id === id) ? null : { kind: 'stone', id: id };
     refreshPal();
 }
@@ -273,7 +273,7 @@ function palPlayTapStone(id) {
 function palTapPool(color) {
     if (palWinner || palIsAITurn()) return;
     if (palFreeMode) palTurn = color;
-    if (color !== palTurn) { flashPal((palTurn === 'W' ? 'White' : 'Black') + ' to move'); return; }
+    if (color !== palTurn) { flashPal(PAL_SEAT[palTurn].name + ' to move'); return; }
     if (palPoolCount(color) <= 0) { flashPal('Pool is empty'); return; }
     const same = palSel && palSel.kind === 'pool';
     palSel = same ? null : { kind: 'pool' };
@@ -286,13 +286,12 @@ function palPlayTapTarget(t) {
     if (t.type === 'place') {
         const legal = palPlaceTargets(palTurn).some(function (q) { return q.x === t.x && q.y === t.y; });
         if (!legal) return;
-        palPool[palTurn][t.x] = false;   // that column's reserve is now on the board
+        palPool[palTurn][palColOffset(palTurn, t.x)] = false;
         palPlay.push({ id: palNextId++, color: palTurn, x: t.x, y: t.y, k: palLevel(t.x, t.y) });
         if (window.palaceSync3D) window.palaceSync3D();
         if (window.palaceAnimPlace) window.palaceAnimPlace(palNextId - 1, t.x, t.y);
         palLastPush = null;
         palResolveHadesAnimated(palTurn);
-        palWinner = palCheckWin();
         palAfterMove();
         return;
     }
@@ -307,12 +306,9 @@ function palPlayTapTarget(t) {
     palApplyRoll(r);
     palLastPush = r.pushBack || null;
     palResolveHadesAnimated(palTurn);
-    palWinner = palCheckWin();
     palAfterMove();
 }
 
-// Commit a resolved roll: relocate every moved sphere, destroy every killed one,
-// and fire the matching animations (snapshot original positions first).
 function palApplyRoll(r) {
     const from = {};
     palPlay.forEach(function (p) { from[p.id] = { x: p.x, y: p.y, k: p.k }; });
@@ -328,8 +324,6 @@ function palApplyRoll(r) {
 
     r.kills.forEach(function (k) {
         if (k.mode === 'smash' && window.palaceAnimSmash) window.palaceAnimSmash(k.id, k.x, k.y, k.k);
-        // fall starts from the RIM pane the sphere tipped over (k.x,k.y), not its origin,
-        // so it sails outward off the edge instead of dropping in place mid-board.
         else if (k.mode === 'fall' && window.palaceAnimFallOff) window.palaceAnimFallOff(k.id, { x: k.x, y: k.y, k: k.k }, k.dx, k.dy);
     });
     r.moves.forEach(function (m) {
@@ -339,11 +333,6 @@ function palApplyRoll(r) {
 }
 
 // ---- HADES (surround capture) ----
-// A connected group of same-colour spheres with NO liberty is removed. A liberty
-// is an orthogonally-adjacent empty pane the group could still move onto; the two
-// things that seal it are enemy spheres and impassable boundaries — the board's
-// edge, or a HEIGHTENED wall two-plus levels up. Diagonals never count, and the
-// capture is not limited to a single sphere.
 function palDeadGroupIds(color) {
     const seen = {};
     const dead = [];
@@ -360,9 +349,9 @@ function palDeadGroupIds(color) {
                 const occ = palStoneAt(nx, ny);
                 if (occ) {
                     if (occ.color === color && !seen[occ.id]) { seen[occ.id] = true; stack.push(occ); }
-                    continue;                                     // enemy, or an already-counted friend — no liberty
+                    continue;                                     // enemy / counted friend — no liberty here
                 }
-                if (palLevel(nx, ny) < slv + 2) hasLiberty = true;  // empty & reachable (a 2+ wall seals)
+                if (palLevel(nx, ny) < slv + 2) hasLiberty = true;  // empty & reachable (2+ wall seals)
             }
         }
         if (!hasLiberty) group.forEach(function (s) { dead.push(s.id); });
@@ -370,11 +359,11 @@ function palDeadGroupIds(color) {
     return dead;
 }
 
-// Resolve captures after `mover` acts: the opponent's suffocated groups fall
-// first, then the mover's own (self-surround). Returns the removed spheres.
+// Opponents' suffocated groups fall first, then the mover's own (self-surround).
 function palResolveHades(mover) {
     const removed = [];
-    [mover === 'W' ? 'B' : 'W', mover].forEach(function (color) {
+    const order = PAL_PLAYERS.filter(function (c) { return c !== mover; }).concat([mover]);
+    order.forEach(function (color) {
         palDeadGroupIds(color).forEach(function (id) {
             const idx = palPlay.findIndex(function (p) { return p.id === id; });
             if (idx >= 0) { const s = palPlay[idx]; removed.push({ id: s.id, x: s.x, y: s.y, k: s.k }); palPlay.splice(idx, 1); }
@@ -388,25 +377,40 @@ function palResolveHadesAnimated(mover) {
     });
 }
 
-function palCheckWin() {
-    const wDead = palTotal('W') < PAL_LOSE_BELOW;
-    const bDead = palTotal('B') < PAL_LOSE_BELOW;
-    let w = null;
-    if (wDead && !bDead) w = 'B';
-    else if (bDead && !wDead) w = 'W';
-    if (w) palWinReason = 'smash';
-    return w;
+// ---- elimination & win ----
+// Any seat whose total falls below the threshold is knocked out; last one standing wins.
+function palUpdateElimination() {
+    PAL_PLAYERS.forEach(function (c) {
+        if (palAlive[c] && palTotal(c) < PAL_LOSE_BELOW) palAlive[c] = false;
+    });
+    const living = palAliveList();
+    if (living.length <= 1) { palWinner = living[0] || null; palWinReason = 'smash'; }
+}
+
+function palNextAlive(from) {
+    const i = PAL_PLAYERS.indexOf(from);
+    for (let s = 1; s <= PAL_PLAYERS.length; s++) {
+        const c = PAL_PLAYERS[(i + s) % PAL_PLAYERS.length];
+        if (palAlive[c]) return c;
+    }
+    return from;
 }
 
 function palAfterMove() {
     palSel = null;
+    palUpdateElimination();
     if (palWinner) { refreshPal(); if (window.palaceWin) window.palaceWin(palWinner); return; }
     if (palFreeMode) { refreshPal(); return; }
-    palTurn = palTurn === 'W' ? 'B' : 'W';
-    // A player who cannot make any legal move on their turn LOSES.
-    if (!palHasAnyAction(palTurn)) {
-        palWinner = palTurn === 'W' ? 'B' : 'W';
-        palWinReason = 'stuck';
+
+    // advance to the next living seat that actually has a move; a stuck seat is skipped.
+    let next = palNextAlive(palTurn);
+    let guard = 0;
+    while (!palHasAnyAction(next) && guard < PAL_PLAYERS.length) { next = palNextAlive(next); guard++; }
+    palTurn = next;
+    if (!palHasAnyAction(palTurn)) {                 // nobody can move — settle on material
+        const living = palAliveList();
+        living.sort(function (a, b) { return palTotal(b) - palTotal(a); });
+        palWinner = living[0] || null; palWinReason = 'stuck';
         refreshPal();
         if (window.palaceWin) window.palaceWin(palWinner);
         return;
@@ -416,24 +420,24 @@ function palAfterMove() {
 }
 
 // ============================================
-// COMPUTER OPPONENT  (plays Black; human is White)
+// COMPUTER OPPONENTS
 // ============================================
-function palIsAITurn() { return !!palAI && !palFreeMode && !palWinner && palTurn === palAI; }
+function palIsAITurn() { return !palFreeMode && !palWinner && !!palAISet[palTurn]; }
 
-function palSetAI(on) {
-    palAI = on ? 'B' : null;
+function palSetAI(allComputer) {
+    // toggle every non-White seat between computer and human
+    palAISet = { W: false, R: !!allComputer, U: !!allComputer, B: !!allComputer };
     palAIBusy = false;
     refreshPal();
-    if (palIsAITurn()) palAIKick();       // it may already be the computer's turn
+    if (palIsAITurn()) palAIKick();
 }
 
 function palAIKick() {
     if (palAIBusy || !palIsAITurn()) return;
     palAIBusy = true;
-    setTimeout(function () { palAIBusy = false; palAIMove(); }, 620);   // let the human's move settle
+    setTimeout(function () { palAIBusy = false; palAIMove(); }, 560);
 }
 
-// --- every legal move for a colour: {kind:'place'|'roll'|'tier', ...} ---
 function palGenMoves(color) {
     const out = [];
     palPlaceTargets(color).forEach(function (t) { out.push({ kind: 'place', x: t.x, y: t.y }); });
@@ -441,35 +445,36 @@ function palGenMoves(color) {
         if (s.color !== color) return;
         palStoneTargets(s).forEach(function (t) { out.push({ kind: 'roll', id: s.id, dx: t.dx, dy: t.dy }); });
     });
-    for (let b = 0; b < palTierHeights.length; b++) {
-        if (!palPlay.some(function (s) { return s.color === color && palBand(s.y) === b; })) continue;
-        if (palTierHeights[b] < PAL_TIER_MAX) out.push({ kind: 'tier', band: b, delta: 1 });
-        if (palTierHeights[b] > PAL_TIER_MIN) out.push({ kind: 'tier', band: b, delta: -1 });
-    }
+    ['A', 'B'].forEach(function (palace) {
+        for (let b = 0; b < PAL_BANDS; b++) {
+            if (!palPlay.some(function (s) { return s.color === color && palPalaceOf(s.x) === palace && palBand(s.y) === b; })) continue;
+            if (palTierHeights[palace][b] < PAL_TIER_MAX) out.push({ kind: 'tier', palace: palace, band: b, delta: 1 });
+            if (palTierHeights[palace][b] > PAL_TIER_MIN) out.push({ kind: 'tier', palace: palace, band: b, delta: -1 });
+        }
+    });
     return out;
 }
 
-// --- snapshot / restore for search (no animation, no turn flip) ---
 function palSnapshot() {
     return {
         play: palPlay.map(function (p) { return { id: p.id, color: p.color, x: p.x, y: p.y, k: p.k }; }),
-        tiers: palTierHeights.slice(),
-        pool: { W: palPool.W.slice(), B: palPool.B.slice() },
+        tiers: { A: palTierHeights.A.slice(), B: palTierHeights.B.slice() },
+        pool: { W: palPool.W.slice(), R: palPool.R.slice(), U: palPool.U.slice(), B: palPool.B.slice() },
         turn: palTurn, nextId: palNextId
     };
 }
 function palRestore(s) {
     palPlay = s.play.map(function (p) { return { id: p.id, color: p.color, x: p.x, y: p.y, k: p.k }; });
-    palTierHeights = s.tiers.slice();
-    palPool = { W: s.pool.W.slice(), B: s.pool.B.slice() };
+    palTierHeights = { A: s.tiers.A.slice(), B: s.tiers.B.slice() };
+    palPool = { W: s.pool.W.slice(), R: s.pool.R.slice(), U: s.pool.U.slice(), B: s.pool.B.slice() };
     palTurn = s.turn; palNextId = s.nextId;
 }
 function palSimApply(m, color) {
     if (m.kind === 'place') {
-        palPool[color][m.x] = false;
+        palPool[color][palColOffset(color, m.x)] = false;
         palPlay.push({ id: palNextId++, color: color, x: m.x, y: m.y, k: palLevel(m.x, m.y) });
     } else if (m.kind === 'tier') {
-        palTierHeights[m.band] += m.delta;
+        palTierHeights[m.palace][m.band] += m.delta;
         palPlay.forEach(function (s) { s.k = palLevel(s.x, s.y); });
     } else {
         const s = palPlay.find(function (p) { return p.id === m.id; });
@@ -481,17 +486,23 @@ function palSimApply(m, color) {
             }
         }
     }
-    palResolveHades(color);          // captures (roll- or surround-based) resolve inside the search too
+    palResolveHades(color);
 }
 
-// net spheres a move removes: +1 per enemy lost, -1 per own lost — full sim so it
-// captures roll-kills, carom-off-the-rim AND Hades surrounds.
+function palMaxOther(color) {
+    let best = 0;
+    PAL_PLAYERS.forEach(function (c) { if (c !== color && palAlive[c]) best = Math.max(best, palTotal(c)); });
+    return best;
+}
+// net spheres a move removes from rivals, minus own losses — full sim (roll-kills,
+// carom-off-the-rim and Hades surrounds all counted).
 function palMoveSwing(m, color) {
-    const opp = color === 'W' ? 'B' : 'W';
     const snap = palSnapshot();
-    const oppBefore = palTotal(opp), ownBefore = palTotal(color);
+    let oppBefore = 0; PAL_PLAYERS.forEach(function (c) { if (c !== color) oppBefore += palTotal(c); });
+    const ownBefore = palTotal(color);
     palSimApply(m, color);
-    const swing = (oppBefore - palTotal(opp)) - (ownBefore - palTotal(color));
+    let oppAfter = 0; PAL_PLAYERS.forEach(function (c) { if (c !== color) oppAfter += palTotal(c); });
+    const swing = (oppBefore - oppAfter) - (ownBefore - palTotal(color));
     palRestore(snap);
     return swing;
 }
@@ -501,31 +512,29 @@ function palBestSwing(color) {
     return best;
 }
 
-// static value of the position for `color` (material dominates)
 function palEval(color) {
-    const opp = color === 'W' ? 'B' : 'W';
-    let sc = 1000 * (palTotal(color) - palTotal(opp));
+    let sc = 1000 * (palTotal(color) - palMaxOther(color));
     palPlay.forEach(function (s) {
         const h = palLevel(s.x, s.y);
-        const rim = (s.x === 0 || s.x === PAL_W - 1 || s.y === 0 || s.y === PAL_D - 1);
-        if (s.color === color) sc += 6 + h * 2 - (rim ? 5 : 0);   // deploy, gain height, keep off the rim
-        else sc += -(h * 2) + (rim ? 5 : 0);                      // enemy height is a threat; enemy on the rim, an opening
+        const rim = (s.x === 0 || s.x === PAL_W - 1);     // only the two outer edges are lethal now
+        if (s.color === color) sc += 6 + h * 2 - (rim ? 5 : 0);
+        else sc += -(h * 2) + (rim ? 5 : 0);
     });
     return sc;
 }
 
 function palAIMove() {
     if (!palIsAITurn()) return;
-    const color = palAI, opp = color === 'W' ? 'B' : 'W';
+    const color = palTurn;
     const moves = palGenMoves(color);
     if (!moves.length) { palAfterMove(); return; }
 
     const snap = palSnapshot();
+    const nextSeat = palNextAlive(color);
     let best = null, bestVal = -Infinity;
     moves.forEach(function (m) {
         palSimApply(m, color);
-        // my resulting value, minus the material the opponent could grab in reply (don't hang pieces)
-        const val = palEval(color) - 1000 * palBestSwing(opp) + Math.random() * 5;
+        const val = palEval(color) - 1000 * palBestSwing(nextSeat) + Math.random() * 5;   // don't hang material
         palRestore(snap);
         if (val > bestVal) { bestVal = val; best = m; }
     });
@@ -533,19 +542,17 @@ function palAIMove() {
     palAIExecute(best);
 }
 
-// run the chosen move through the REAL animated path
 function palAIExecute(m) {
     if (!m) { palAfterMove(); return; }
     palAIActing = true;
-    if (m.kind === 'tier') { palSetTier(m.band, m.delta); palAIActing = false; return; }
+    if (m.kind === 'tier') { palSetTier(m.palace, m.band, m.delta); palAIActing = false; return; }
     if (m.kind === 'place') {
-        palPool[palTurn][m.x] = false;
+        palPool[palTurn][palColOffset(palTurn, m.x)] = false;
         palPlay.push({ id: palNextId++, color: palTurn, x: m.x, y: m.y, k: palLevel(m.x, m.y) });
         if (window.palaceSync3D) window.palaceSync3D();
         if (window.palaceAnimPlace) window.palaceAnimPlace(palNextId - 1, m.x, m.y);
         palLastPush = null;
         palResolveHadesAnimated(palTurn);
-        palWinner = palCheckWin();
         palAfterMove(); palAIActing = false; return;
     }
     const s = palPlay.find(function (p) { return p.id === m.id; });
@@ -555,7 +562,6 @@ function palAIExecute(m) {
     palApplyRoll(r);
     palLastPush = r.pushBack || null;
     palResolveHadesAnimated(palTurn);
-    palWinner = palCheckWin();
     palAfterMove();
     palAIActing = false;
 }
@@ -563,66 +569,68 @@ function palAIExecute(m) {
 // ---- state out ----
 function getPalState() {
     const targets = (palSel && !palWinner) ? palLegalForSelected() : [];
+    const total = {}; PAL_PLAYERS.forEach(function (c) { total[c] = palTotal(c); });
     return {
         turn: palTurn, winner: palWinner, winReason: palWinReason,
+        players: PAL_PLAYERS.slice(), seat: PAL_SEAT, alive: Object.assign({}, palAlive),
         selected: palSel,
         stones: palPlay.map(function (p) { return { id: p.id, color: p.color, x: p.x, y: p.y, k: p.k }; }),
-        pool: { W: palPool.W.slice(), B: palPool.B.slice() },
-        total: { W: palTotal('W'), B: palTotal('B') },
-        tiers: palTierHeights.slice(),
+        pool: { W: palPool.W.slice(), R: palPool.R.slice(), U: palPool.U.slice(), B: palPool.B.slice() },
+        total: total,
+        tiers: { A: palTierHeights.A.slice(), B: palTierHeights.B.slice() },
         freeMode: palFreeMode,
+        aiTurn: palIsAITurn(),
         targets: targets,
-        W: PAL_W, D: PAL_D
+        W: PAL_W, D: PAL_D, HALF: PAL_HALF
     };
 }
 
 function refreshPal() {
     if (window.palaceSync3D) window.palaceSync3D();
 
-    const ws = document.getElementById('w-score');
-    if (ws) ws.textContent = palTotal('W');
-    const bs = document.getElementById('b-score');
-    if (bs) bs.textContent = palTotal('B');
+    PAL_PLAYERS.forEach(function (c) {
+        const el = document.getElementById('score-' + c);
+        if (el) el.textContent = palTotal(c);
+        const hud = document.getElementById('hud-item-' + c);
+        if (hud) {
+            hud.classList.toggle('dead', !palAlive[c]);
+            hud.classList.toggle('active-turn', !palWinner && palTurn === c);
+        }
+        const cnt = document.getElementById('hud-' + c + '-count');
+        if (cnt) cnt.textContent = palTotal(c);
+    });
 
-    for (let i = 0; i < palTierHeights.length; i++) {
-        const el = document.getElementById('tier-val-' + i);
-        if (el) el.textContent = palTierHeights[i];
-    }
-
-    const btnStone = document.getElementById('btn-place-stone');
-    if (btnStone) {
-        btnStone.style.display = (!palWinner && palPoolCount(palTurn) > 0) ? '' : 'none';
-        btnStone.classList.toggle('active', !!(palSel && palSel.kind === 'pool'));
-    }
+    ['A', 'B'].forEach(function (palace) {
+        for (let i = 0; i < PAL_BANDS; i++) {
+            const el = document.getElementById('tier-' + palace + '-' + i);
+            if (el) el.textContent = palTierHeights[palace][i];
+        }
+    });
 
     const ind = document.getElementById('player-indicator');
     const nm = document.getElementById('player-name');
     const prompt = document.getElementById('action-prompt');
     if (palWinner) {
-        if (ind) ind.className = 'player-indicator ' + (palWinner === 'W' ? 'white' : 'black');
-        if (nm) nm.textContent = (palWinner === 'W' ? 'White' : 'Black') + ' wins!';
+        if (ind) ind.className = 'player-indicator ' + palColorClass(palWinner);
+        if (nm) nm.textContent = PAL_SEAT[palWinner].name + ' wins!';
         if (prompt) {
-            const loser = (palWinner === 'W' ? 'Black' : 'White');
             prompt.textContent = palWinReason === 'stuck'
-                ? loser + ' has no legal move'
-                : loser + ' is smashed below ' + PAL_LOSE_BELOW + ' spheres';
+                ? 'No moves left — ' + PAL_SEAT[palWinner].name + ' holds the most'
+                : PAL_SEAT[palWinner].name + ' is the last palace standing';
         }
     } else {
-        if (ind) ind.className = 'player-indicator ' + (palTurn === 'W' ? 'white' : 'black');
-        if (nm) nm.textContent = (palIsAITurn() ? 'Computer' : (palTurn === 'W' ? 'White' : 'Black')) + ' — ' + palTotal(palTurn) + ' spheres';
+        if (ind) ind.className = 'player-indicator ' + palColorClass(palTurn);
+        if (nm) nm.textContent = (palIsAITurn() ? 'Computer' : PAL_SEAT[palTurn].name) + ' — ' + palTotal(palTurn) + ' spheres';
         if (prompt) {
-            if (palIsAITurn()) {
-                prompt.textContent = 'Computer is thinking…';
-            } else if (palSel && palSel.kind === 'pool') {
-                prompt.textContent = 'Choose a pane on your entrance row';
-            } else if (palSel && palSel.kind === 'stone') {
-                prompt.textContent = 'Roll to slide or carom — red means a sphere goes over the rim';
-            } else {
-                prompt.textContent = 'Tap a sphere to roll, or place from your pool. Smash foes below 4 to win.';
-            }
+            if (palIsAITurn()) prompt.textContent = 'Computer is thinking…';
+            else if (palSel && palSel.kind === 'pool') prompt.textContent = 'Choose a pane on your entrance row';
+            else if (palSel && palSel.kind === 'stone') prompt.textContent = 'Roll to slide or carom — red means a sphere goes over the rim';
+            else prompt.textContent = 'Tap a sphere to roll, or place from your pool. Break rivals below 4 to win.';
         }
     }
 }
+
+function palColorClass(c) { return { W: 'white', B: 'black', R: 'red', U: 'blue' }[c]; }
 
 function flashPal(msg) {
     const el = document.getElementById('game-message');
@@ -637,10 +645,16 @@ window.getPalState = getPalState;
 window.palLevel = palLevel;
 window.palIsApex = palIsApex;
 window.palBandHeight = palBandHeight;
+window.palPalaceOf = palPalaceOf;
 window.PAL_TIER_MIN = PAL_TIER_MIN;
 window.PAL_TIER_MAX = PAL_TIER_MAX;
-window.PAL_BANDS = PAL_TIER_START.length;
+window.PAL_BANDS = PAL_BANDS;
+window.PAL_HALF = PAL_HALF;
+window.PAL_PLAYERS = PAL_PLAYERS;
+window.PAL_SEAT = PAL_SEAT;
 window.palEntranceRow = palEntranceRow;
+window.palSeatCols = palSeatCols;
+window.palColToX = palColToX;
 window.palClear = palClear;
 window.palSetFree = palSetFree;
 window.palSetAI = palSetAI;

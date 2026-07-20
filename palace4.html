@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Palace (4-Player) — Seven Wonders</title>
+    <meta name="description" content="Twin Palaces — four seats fight across two joined Crystal Palaces, each with its own elevators">
+    <link rel="stylesheet" href="palace-style.css">
+    <style>
+        /* Four-seat HUD */
+        .stone-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+        .stone-dot.white { background: #f3efe6; }
+        .stone-dot.black { background: #232323; }
+        .stone-dot.red { background: #c14a3d; }
+        .stone-dot.blue { background: #4d7ec8; }
+        .stone-hud {
+            position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+            max-width: 92vw; z-index: 40; pointer-events: none;
+        }
+        .stone-hud-item {
+            display: flex; align-items: center; gap: 3px;
+            background: rgba(28, 24, 16, 0.82); border: 1px solid rgba(197, 160, 89, 0.35);
+            border-radius: 20px; padding: 5px 12px; font-size: 0.82em; color: #efe7d4;
+            transition: opacity 0.25s, border-color 0.25s, box-shadow 0.25s;
+        }
+        .stone-hud-item.active-turn { border-color: var(--gold, #C5A059); box-shadow: 0 0 14px rgba(197, 160, 89, 0.5); }
+        .stone-hud-item.dead { opacity: 0.32; text-decoration: line-through; }
+        .stone-hud-item .seat-label { opacity: 0.6; font-size: 0.85em; margin-left: 2px; }
+
+        .tier-group { padding: 2px 0 6px; }
+        .tier-group h4 { text-align: center; margin: 4px 0; font-size: 0.72em; letter-spacing: 1px; opacity: 0.7; color: #d4cfc4; font-weight: 600; }
+        .tier-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+        .tier-row span.lbl { font-size: 0.78em; color: #d4cfc4; }
+        .action-prompt {
+            position: fixed; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); left: 50%;
+            transform: translateX(-50%); background: rgba(28, 24, 16, 0.82);
+            border: 1px solid rgba(197, 160, 89, 0.3); border-radius: 18px;
+            padding: 8px 18px; color: #efe7d4; font-size: 0.82em; max-width: 90vw;
+            text-align: center; z-index: 40; pointer-events: none;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="camera-pan.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+</head>
+
+<body class="view-3d">
+    <div id="game-container">
+        <div id="canvas3d" class="canvas-container"></div>
+    </div>
+
+    <!-- Four-seat HUD -->
+    <div id="stone-hud" class="stone-hud">
+        <div class="stone-hud-item" id="hud-item-W"><span class="stone-dot white"></span><span id="hud-W-count">8</span><span class="seat-label">A·S</span></div>
+        <div class="stone-hud-item" id="hud-item-R"><span class="stone-dot red"></span><span id="hud-R-count">8</span><span class="seat-label">B·S</span></div>
+        <div class="stone-hud-item" id="hud-item-U"><span class="stone-dot blue"></span><span id="hud-U-count">8</span><span class="seat-label">B·N</span></div>
+        <div class="stone-hud-item" id="hud-item-B"><span class="stone-dot black"></span><span id="hud-B-count">8</span><span class="seat-label">A·N</span></div>
+    </div>
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <a href="index.html?menu=new" class="top-bar-btn top-bar-link">← Menu</a>
+        <button id="menu-toggle" class="top-bar-btn menu-toggle-btn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+
+    <!-- Side Menu -->
+    <div id="side-menu" class="side-menu">
+        <div class="menu-content">
+            <h1 class="game-title">PALACE</h1>
+            <p class="game-subtitle" style="text-align:center;margin-top:-10px;opacity:0.7;color:#d4cfc4;">Twin Palaces <span style="font-size:0.7em;border:1px solid rgba(197,160,89,0.5);border-radius:4px;padding:1px 6px;margin-left:6px;color:#C5A059;">4-Player</span></p>
+
+            <div class="player-info">
+                <div class="current-player-display">
+                    <div id="player-indicator" class="player-indicator white"></div>
+                    <span id="player-name">White — 8 spheres</span>
+                </div>
+            </div>
+
+            <div class="score-display" style="flex-wrap:wrap;">
+                <div class="score-item"><span class="score-label">White</span> <span id="score-W" class="score-value">8</span></div>
+                <div class="score-item"><span class="score-label">Red</span> <span id="score-R" class="score-value">8</span></div>
+                <div class="score-item"><span class="score-label">Blue</span> <span id="score-U" class="score-value">8</span></div>
+                <div class="score-item"><span class="score-label">Black</span> <span id="score-B" class="score-value">8</span></div>
+            </div>
+
+            <div class="menu-divider"></div>
+
+            <div style="padding:4px 0 8px;">
+                <p style="text-align:center;margin:0 0 6px;font-size:0.8em;letter-spacing:1px;opacity:0.7;color:#d4cfc4;">LEVEL CONTROL</p>
+                <div class="tier-group" id="tier-A">
+                    <h4>PALACE A · West (White / Black)</h4>
+                    <div class="tier-row"><span class="lbl">South Front</span><span><button class="tier-btn" data-palace="A" data-band="0" data-d="-1" style="width:26px;">▼</button> <span id="tier-A-0" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">1</span> <button class="tier-btn" data-palace="A" data-band="0" data-d="1" style="width:26px;">▲</button></span></div>
+                    <div class="tier-row"><span class="lbl">South Mid</span><span><button class="tier-btn" data-palace="A" data-band="1" data-d="-1" style="width:26px;">▼</button> <span id="tier-A-1" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">2</span> <button class="tier-btn" data-palace="A" data-band="1" data-d="1" style="width:26px;">▲</button></span></div>
+                    <div class="tier-row"><span class="lbl">Summit</span><span><button class="tier-btn" data-palace="A" data-band="2" data-d="-1" style="width:26px;">▼</button> <span id="tier-A-2" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">3</span> <button class="tier-btn" data-palace="A" data-band="2" data-d="1" style="width:26px;">▲</button></span></div>
+                    <div class="tier-row"><span class="lbl">North Mid</span><span><button class="tier-btn" data-palace="A" data-band="3" data-d="-1" style="width:26px;">▼</button> <span id="tier-A-3" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">2</span> <button class="tier-btn" data-palace="A" data-band="3" data-d="1" style="width:26px;">▲</button></span></div>
+                    <div class="tier-row"><span class="lbl">North Front</span><span><button class="tier-btn" data-palace="A" data-band="4" data-d="-1" style="width:26px;">▼</button> <span id="tier-A-4" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">1</span> <button class="tier-btn" data-palace="A" data-band="4" data-d="1" style="width:26px;">▲</button></span></div>
+                </div>
+                <div class="tier-group" id="tier-B">
+                    <h4>PALACE B · East (Red / Blue)</h4>
+                    <div class="tier-row"><span class="lbl">South Front</span><span><button class="tier-btn" data-palace="B" data-band="0" data-d="-1" style="width:26px;">▼</button> <span id="tier-B-0" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">1</span> <button class="tier-btn" data-palace="B" data-band="0" data-d="1" style="width:26px;">▲</button></span></div>
+                    <div class="tier-row"><span class="lbl">South Mid</span><span><button class="tier-btn" data-palace="B" data-band="1" data-d="-1" style="width:26px;">▼</button> <span id="tier-B-1" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">2</span> <button class="tier-btn" data-palace="B" data-band="1" data-d="1" style="width:26px;">▲</button></span></div>
+                    <div class="tier-row"><span class="lbl">Summit</span><span><button class="tier-btn" data-palace="B" data-band="2" data-d="-1" style="width:26px;">▼</button> <span id="tier-B-2" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">3</span> <button class="tier-btn" data-palace="B" data-band="2" data-d="1" style="width:26px;">▲</button></span></div>
+                    <div class="tier-row"><span class="lbl">North Mid</span><span><button class="tier-btn" data-palace="B" data-band="3" data-d="-1" style="width:26px;">▼</button> <span id="tier-B-3" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">2</span> <button class="tier-btn" data-palace="B" data-band="3" data-d="1" style="width:26px;">▲</button></span></div>
+                    <div class="tier-row"><span class="lbl">North Front</span><span><button class="tier-btn" data-palace="B" data-band="4" data-d="-1" style="width:26px;">▼</button> <span id="tier-B-4" style="display:inline-block;width:14px;text-align:center;color:#E7C24A;">1</span> <button class="tier-btn" data-palace="B" data-band="4" data-d="1" style="width:26px;">▲</button></span></div>
+                </div>
+            </div>
+
+            <button id="players-btn" class="menu-btn">Players: 4</button>
+            <button id="clear-btn" class="menu-btn">New Game</button>
+            <button id="ai-btn" class="menu-btn">Opponents: Computer</button>
+            <button id="free-btn" class="menu-btn">Free Move: Off</button>
+            <button id="rules-btn" class="menu-btn">About</button>
+            <button id="close-menu-btn" class="menu-btn">Close Menu</button>
+
+            <div class="menu-footer">
+                <p>Design: Simon Allmer</p>
+                <p>Two Crystal Palaces, joined · 4-Player</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="action-prompt" class="action-prompt">Tap a sphere to roll, or place from your pool. Break rivals below 4 to win.</div>
+
+    <!-- Game Message -->
+    <div id="game-message" class="game-message hidden"></div>
+
+    <!-- Win Overlay -->
+    <div id="message-box" class="message-overlay" onclick="this.classList.remove('visible')">
+        <div class="message-content" onclick="event.stopPropagation()">
+            <h2 id="message-title" class="message-title"></h2>
+            <p id="message-text" class="message-text"></p>
+            <div class="modal-buttons">
+                <button onclick="location.reload()" class="modal-btn">Play Again</button>
+                <a href="index.html?menu=new" class="modal-btn secondary">Menu</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="rules-modal" class="rules-modal" style="display:none;">
+        <div class="rules-overlay" id="rules-overlay" onclick="document.getElementById('rules-modal').style.display='none'"></div>
+        <div class="rules-content">
+            <h2>Palace — “Twin Palaces” (4-Player)</h2>
+            <div class="rules-body">
+                <p><strong>THE BOARD</strong><br>Two Crystal Palaces are joined along their long edge into one field. <strong>Palace A</strong> (west) and <strong>Palace B</strong> (east) each keep their own five glass bands, heights 1–3, and their own elevators worked from their outer edge. Four seats hold the four ends — <strong>White</strong> (A-south) and <strong>Black</strong> (A-north) share Palace A; <strong>Red</strong> (B-south) and <strong>Blue</strong> (B-north) share Palace B. You play White; the rest are computer-led.</p>
+                <p><strong>GOAL</strong><br>Break every rival below <strong>four</strong> spheres (board + reserve). The last palace still standing wins.</p>
+                <p><strong>THE SEAM</strong><br>Because the palaces are attached, the old lethal side edge between them is now <strong>live terrain</strong>. Roll across the seam and the neighbour's band decides it: level ground rolls straight through, a step you can hop, a <strong>two-plus wall stops you dead</strong>, a drop sends you rolling down into their palace. You only fall — and shatter — off the two <strong>outer</strong> long edges.</p>
+                <p><strong>ROLL</strong><br>One action per turn: PLACE a sphere onto a free level-1 pane on your entrance row, or ROLL one sphere — a committed straight slide resolved by the terrain (flat keeps rolling, one-up hops if staged, two-plus is a wall, one-down keeps rolling, two-plus is a hard drop). Roll off an outer edge and the sphere is gone.</p>
+                <p><strong>CAROM & SMASH</strong><br>Roll into a sphere on the same tier to shove it one pane along — over an outer rim it dies. Drop onto any sphere and it is smashed and removed; you take its pane. Beware smashing your own.</p>
+                <p><strong>ELEVATORS</strong><br>A band answers to any seat standing a sphere on it — so roll into the enemy palace and you can seize their elevators. Raise a band by two to wall an attacker out at the seam; lower the ground to turn a rival's flat roll into a fatal drop off the far edge.</p>
+            </div>
+            <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
+        </div>
+    </div>
+
+    <script>window.is3DView = true;</script>
+    <script src="palace4-game.js"></script>
+    <script src="palace4-3d.js"></script>
+    <script>
+        const menuToggle = document.getElementById('menu-toggle');
+        const sideMenu = document.getElementById('side-menu');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+        const rulesBtn = document.getElementById('rules-btn');
+        const rulesModal = document.getElementById('rules-modal');
+        const rulesCloseBtn = document.getElementById('rules-close-btn');
+
+        function toggleMenu() {
+            menuToggle.classList.toggle('active');
+            sideMenu.classList.toggle('open');
+        }
+        menuToggle.addEventListener('click', toggleMenu);
+        closeMenuBtn.addEventListener('click', toggleMenu);
+        rulesBtn.addEventListener('click', () => {
+            rulesModal.style.display = 'flex';
+            if (sideMenu.classList.contains('open')) toggleMenu();
+        });
+        rulesCloseBtn.addEventListener('click', () => rulesModal.style.display = 'none');
+
+        // Player-count selector — back to the standard 2-player Palace.
+        document.getElementById('players-btn').addEventListener('click', () => {
+            window.location.href = 'palace.html';
+        });
+
+        document.getElementById('clear-btn').addEventListener('click', () => { window.palClear(); if (sideMenu.classList.contains('open')) toggleMenu(); });
+        document.getElementById('free-btn').addEventListener('click', function () {
+            const on = this.textContent.includes('Off');
+            window.palSetFree(on);
+            this.textContent = 'Free Move: ' + (on ? 'On' : 'Off');
+        });
+        document.getElementById('ai-btn').addEventListener('click', function () {
+            const on = this.textContent.includes('Human');   // toggling ON = back to computer opponents
+            window.palSetAI(on);
+            this.textContent = 'Opponents: ' + (on ? 'Computer' : 'Human');
+        });
+        document.querySelectorAll('.tier-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                window.palSetTier(btn.dataset.palace, parseInt(btn.dataset.band, 10), parseInt(btn.dataset.d, 10));
+            });
+        });
+        document.addEventListener('keydown', (e) => {
+            const tag = (e.target && e.target.tagName) || '';
+            if (/^(INPUT|TEXTAREA)$/.test(tag)) return;
+            const k = e.key.toLowerCase();
+            if (k === 'r') { window.palClear(); }
+            else if (k === 'p') { window.palTapPool(window.getPalState().turn); }
+        });
+
+        // Pin the bottom prompt above mobile Safari's toolbar.
+        (function () {
+            const prompt = document.querySelector('.action-prompt');
+            function pin() {
+                let hiddenBelow = 0;
+                const vv = window.visualViewport;
+                if (vv) hiddenBelow = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+                if (prompt) prompt.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + 20) + 'px)';
+            }
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', pin);
+                window.visualViewport.addEventListener('scroll', pin);
+            }
+            window.addEventListener('resize', pin);
+            window.addEventListener('orientationchange', pin);
+            window.addEventListener('load', pin);
+            pin();
+            setTimeout(pin, 300);
+        })();
+    </script>
+    <script src="global-keys.js"></script>
+</body>
+
+</html>

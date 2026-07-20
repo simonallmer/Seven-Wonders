@@ -5,8 +5,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Great Wall - Seven Wonders</title>
-    <meta name="description" content="Play Great Wall, an ancient strategy game from the Seven Wonders series">
+    <meta name="description" content="Great Wall (4-player) — four armies meet where two walls cross, from the Seven Wonders series">
     <link rel="stylesheet" href="great_wall-style.css">
+    <style>
+        /* Four-army HUD */
+        .stone-dot.red { background: #c14a3d; }
+        .stone-dot.blue { background: #4d7ec8; }
+        .count-stone.red { background: #b34032; box-shadow: 0 0 8px rgba(193, 74, 61, 0.35); }
+        .count-stone.blue { background: #4d7ec8; box-shadow: 0 0 8px rgba(77, 126, 200, 0.35); }
+        .stone-hud { flex-wrap: wrap; max-width: 92vw; justify-content: center; }
+        .stone-hud-item { transition: opacity 0.25s, border-color 0.25s, box-shadow 0.25s; }
+        .stone-hud-item.active-turn { border-color: var(--gold); box-shadow: 0 0 14px rgba(197, 160, 89, 0.45); }
+        .stone-hud-item.dead { opacity: 0.32; text-decoration: line-through; }
+        .count-item.dead { opacity: 0.35; }
+        .stone-counts-display { flex-wrap: wrap; }
+    </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="camera-pan.js"></script>
@@ -19,15 +32,23 @@
         <div id="canvas3d" class="canvas-container"></div>
     </div>
 
-    <!-- Stone Count HUD (always visible) -->
+    <!-- Force HUD (always visible) -->
     <div id="stone-hud" class="stone-hud">
-        <div class="stone-hud-item">
+        <div class="stone-hud-item" id="hud-item-W">
             <span class="stone-dot white"></span>
-            <span id="hud-w-count">0</span><span class="hud-reserve">+<span id="hud-w-res">10</span></span>
+            <span id="hud-W-count">0</span><span class="hud-reserve">+<span id="hud-W-res">10</span></span>
         </div>
-        <div class="stone-hud-item">
+        <div class="stone-hud-item" id="hud-item-R">
+            <span class="stone-dot red"></span>
+            <span id="hud-R-count">0</span><span class="hud-reserve">+<span id="hud-R-res">10</span></span>
+        </div>
+        <div class="stone-hud-item" id="hud-item-B">
             <span class="stone-dot black"></span>
-            <span id="hud-b-count">0</span><span class="hud-reserve">+<span id="hud-b-res">10</span></span>
+            <span id="hud-B-count">0</span><span class="hud-reserve">+<span id="hud-B-res">10</span></span>
+        </div>
+        <div class="stone-hud-item" id="hud-item-U">
+            <span class="stone-dot blue"></span>
+            <span id="hud-U-count">0</span><span class="hud-reserve">+<span id="hud-U-res">10</span></span>
         </div>
     </div>
 
@@ -54,22 +75,28 @@
             </div>
 
             <div class="stone-counts-display">
-                <div class="count-item">
+                <div class="count-item" id="count-item-W">
                     <div class="count-stone white"></div>
-                    <span id="w-board-hud">0</span>
-                    <span class="res">+<span id="w-res-hud">10</span> reserve</span>
+                    <span id="hud2-W">South</span>
                 </div>
-                <div class="count-item">
+                <div class="count-item" id="count-item-R">
+                    <div class="count-stone red"></div>
+                    <span>West</span>
+                </div>
+                <div class="count-item" id="count-item-B">
                     <div class="count-stone black"></div>
-                    <span id="b-board-hud">0</span>
-                    <span class="res">+<span id="b-res-hud">10</span> reserve</span>
+                    <span>North</span>
+                </div>
+                <div class="count-item" id="count-item-U">
+                    <div class="count-stone blue"></div>
+                    <span>East</span>
                 </div>
             </div>
 
             <div class="menu-divider"></div>
 
-            <button id="players-btn" class="menu-btn">Players: 2</button>
-            <button id="opponent-btn" class="menu-btn">Opponent: Computer</button>
+            <button id="players-btn" class="menu-btn">Players: 4</button>
+            <button id="opponent-btn" class="menu-btn">Opponents: Computer</button>
             <button id="facing-btn" class="menu-btn">Enemy Facing: Visible</button>
             <button id="rules-btn" class="menu-btn">Rules</button>
             <button id="reset-button" class="menu-btn">Reset Game</button>
@@ -77,7 +104,7 @@
 
             <div class="menu-footer">
                 <p>Design: Simon Allmer</p>
-                <p>3D Mode Active</p>
+                <p>4-Player · 3D Mode</p>
             </div>
         </div>
     </div>
@@ -89,7 +116,6 @@
         <button id="act-shoot" class="action-chip">Shoot</button>
         <button id="act-spin" class="action-chip">Spin</button>
     </div>
-
 
     <!-- Game Message -->
     <div id="game-message" class="game-message hidden"></div>
@@ -110,23 +136,24 @@
     <div id="rules-modal" class="rules-modal" style="display:none;">
         <div class="rules-overlay" id="rules-overlay" onclick="document.getElementById('rules-modal').style.display='none'"></div>
         <div class="rules-content">
-            <h2>Great Wall Rules</h2>
+            <h2>Great Wall — 4 Players</h2>
             <div class="rules-body">
-                <p><strong>GOAL</strong><br>Reduce the enemy army below four warriors. Fallen warriors never return.</p>
-                <p><strong>PLACE</strong><br>Deploy a warrior from reserve onto a field within two clear steps of your supply chain — the chain runs from your Legendary Field ✦ through friendly warriors.</p>
+                <p><strong>THE BOARD</strong><br>Two Great Walls meet in a cross. Four armies hold the four arms — White (south), Red (west), Black (north), Blue (east) — and fight for the central crossing. You play White; the rest are computer-led.</p>
+                <p><strong>GOAL</strong><br>Drive every rival army below four warriors. Last army holding the wall wins.</p>
+                <p><strong>PLACE</strong><br>Deploy a warrior from reserve onto a field within two clear steps of your supply chain — the chain runs from your Legendary Field ✦ at your arm's tip through friendly warriors.</p>
                 <p><strong>MOVE</strong><br>Step up to two fields in any direction, then choose a new facing. Standing still to rotate is allowed.</p>
-                <p><strong>SHOOT</strong><br>Fire an arrow along your facing. It fells the first vulnerable warrior and chain-fires onward in the victim's facing; shields reflect head-on shots and deflect angled ones. Friendly fire is real.</p>
+                <p><strong>SHOOT</strong><br>Fire an arrow along your facing. It fells the first vulnerable warrior and chain-fires onward in the victim's facing; shields reflect head-on shots and deflect angled ones. Friendly fire is real — and so is felling a third army's warrior.</p>
                 <p><strong>SPIN</strong><br>Strike all eight surrounding fields at once, then choose a new facing. Shields still protect.</p>
-                <p><strong>SHIELD</strong><br>Each warrior's shield guards its three rear directions — the back and both rear flanks. Attacks from anywhere else are lethal.</p>
-                <p><strong>SUPPLY</strong><br>If an enemy stands on your Legendary Field ✦, your supply is cut: no reinforcements until it is removed.</p>
+                <p><strong>SHIELD</strong><br>Each warrior's shield guards its three rear directions. Attacks from anywhere else are lethal.</p>
+                <p><strong>SUPPLY</strong><br>If an enemy stands on your Legendary Field ✦, your supply is cut: no reinforcements until it is retaken.</p>
             </div>
             <button class="action-btn rules-close-btn" id="rules-close-btn">Close</button>
         </div>
     </div>
 
     <script>window.is3DView = true;</script>
-    <script src="great_wall-game.js"></script>
-    <script src="great_wall-3d.js"></script>
+    <script src="great_wall4-game.js"></script>
+    <script src="great_wall4-3d.js"></script>
     <script>
         const menuToggle = document.getElementById('menu-toggle');
         const sideMenu = document.getElementById('side-menu');
@@ -152,18 +179,13 @@
         });
         rulesCloseBtn.addEventListener('click', () => rulesModal.style.display = 'none');
 
-        // Player-count selector — switch to the 4-player Great Wall (the crossing).
+        // Player-count selector — switch to the standard 2-player Great Wall.
         document.getElementById('players-btn').addEventListener('click', () => {
-            window.location.href = 'great_wall4.html';
+            window.location.href = 'great_wall.html';
         });
 
-        // Pin the bottom UI to the VISIBLE viewport. On mobile Safari a `position:fixed;
-        // bottom` bar anchors to the layout viewport — CSS `env(safe-area-inset-bottom)` handles it now.
         (function () {
             const bar = document.querySelector('.action-bar');
-            // On tablets & phones, the browser's bottom toolbar/address bar overlaps a
-            // fixed bottom:12px bar (safe-area-inset-bottom is 0), cutting off the movement
-            // menu. Lift it well into the lower third to clear the chrome; desktop stays low.
             const isTouch = window.matchMedia('(pointer: coarse)').matches;
             const baseGap = isTouch ? 100 : 12;
             function pin() {

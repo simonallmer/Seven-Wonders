@@ -59,6 +59,7 @@
                 </div>
             </div>
 
+            <button id="players-btn" class="menu-btn">Players: 2</button>
             <button id="clear-btn" class="menu-btn">New Game</button>
             <button id="ai-btn" class="menu-btn">Computer: On</button>
             <button id="free-btn" class="menu-btn">Free Move: Off</button>
@@ -134,6 +135,9 @@
         });
         rulesCloseBtn.addEventListener('click', () => rulesModal.style.display = 'none');
 
+        document.getElementById('players-btn').addEventListener('click', () => {
+            window.location.href = 'palace4.html';
+        });
         document.getElementById('clear-btn').addEventListener('click', () => { window.palClear(); if (sideMenu.classList.contains('open')) toggleMenu(); });
         document.getElementById('free-btn').addEventListener('click', function () {
             const on = this.textContent.includes('Off');

@@ -1,6 +1,12 @@
 // TOWER GAME - Seven Wonders Series
 // Game Design: Simon Allmer
 // Inspiration: the Porcelain Tower of Nanjing.
+//
+// Supports 2 or 4 players on the same octagonal tower. In the 4-player game the
+// four builders (White, Red, Blue, Black) share the eight-slot rings and fight
+// for control; a chain strikes ANY adjacent enemy colour. Reduce a rival to no
+// tiles at all (board + pool) and they are out; the last builder standing wins,
+// or take the classic control victory (a full ring, or two full columns).
 
 // ============================================
 // CONSTANTS
@@ -12,25 +18,37 @@ var POOL_START = 12;
 window.TOWER_LEVELS = LEVELS;
 window.TOWER_SLOTS = SLOTS;
 
+// seats — turn order runs W, R, U, B around the ring
+var TOWER_COLORS = {
+    W: { name: 'White', hex: 0xffffff },
+    R: { name: 'Red', hex: 0xc0392b },
+    U: { name: 'Blue', hex: 0x2a5db0 },
+    B: { name: 'Black', hex: 0x1a1a1a }
+};
+var TURN_ORDER = { 2: ['W', 'B'], 4: ['W', 'R', 'U', 'B'] };
+
 // ============================================
 // GAME STATE
 // ============================================
-// board[level][slot] = null | { owner:'W'|'B', num:1|2|3 }
+// board[level][slot] = null | { owner:'W'|'R'|'U'|'B', num:1|2|3 }
 var board = [];
-var pool = { W: POOL_START, B: POOL_START };
+var playerCount = 2;
+var PLAYERS = TURN_ORDER[2].slice();
+var pool = {};
 var turn = 'W';
 var mode = 'place';        // 'place' | 'move' | 'levelup' | 'attack' | 'bonus'
-var selected = null;       // { level, slot } — move source / attacker / bonus source
+var selected = null;       // { level, slot }
 var attackTargets = [];    // [{ tiles:[{level,slot}], yourSum, enemySum, win }]
-var bonusActive = false;   // true while resolving the 3->1 bonus move
+var bonusActive = false;
 var busy = false;
 var gameOver = false;
-var isVsComputer = true;
+var isVsComputer = true;   // 2-player: is Black a computer? (4-player: every non-White seat is)
 
 window.getTowerState = function () {
     return {
         board: board, pool: pool, turn: turn, mode: mode, selected: selected,
-        attackTargets: attackTargets, bonusActive: bonusActive, busy: busy, gameOver: gameOver
+        attackTargets: attackTargets, bonusActive: bonusActive, busy: busy, gameOver: gameOver,
+        players: PLAYERS.slice(), playerCount: playerCount, colors: TOWER_COLORS
     };
 };
 
@@ -39,12 +57,9 @@ window.getTowerState = function () {
 // ============================================
 var statusIndicator = document.getElementById('player-indicator');
 var statusName = document.getElementById('player-name');
-var wBoardHud = document.getElementById('w-board-hud');
-var bBoardHud = document.getElementById('b-board-hud');
-var wResHud = document.getElementById('w-res-hud');
-var bResHud = document.getElementById('b-res-hud');
 var resetButton = document.getElementById('reset-button');
 var opponentButton = document.getElementById('opponent-btn');
+var playersButton = document.getElementById('players-btn');
 var messageBox = document.getElementById('message-box');
 var messageTitle = document.getElementById('message-title');
 var messageText = document.getElementById('message-text');
@@ -60,8 +75,33 @@ function showMessage(text, duration) {
     window.msgTimeout = setTimeout(function () { gameMessage.classList.add('hidden'); }, duration);
 }
 function setPrompt(t) { if (actionPrompt) actionPrompt.textContent = t || ''; }
-function colorName(c) { return c === 'W' ? 'White' : 'Black'; }
-function opp(c) { return c === 'W' ? 'B' : 'W'; }
+function colorName(c) { return TOWER_COLORS[c] ? TOWER_COLORS[c].name : c; }
+
+// ============================================
+// PLAYERS / SEATS
+// ============================================
+function isComputer(c) {
+    if (c === 'W') return false;                 // the human always plays White
+    if (playerCount === 2) return isVsComputer;  // Black is optionally a computer
+    return true;                                 // 4-player: Red/Blue/Black are computers
+}
+function isOut(c) { return countOnBoard(c) === 0 && pool[c] === 0; }
+function hasAction(c) {
+    if (countOnBoard(c) > 0) return true;        // a tile can always level up
+    return pool[c] > 0 && placeableSlots(c).length > 0;
+}
+function nextTurn(from) {
+    var i = PLAYERS.indexOf(from);
+    for (var k = 1; k <= PLAYERS.length; k++) {
+        var c = PLAYERS[(i + k) % PLAYERS.length];
+        if (!isOut(c) && hasAction(c)) return c;
+    }
+    for (var j = 1; j <= PLAYERS.length; j++) {  // fallback: any seat still in the game
+        var c2 = PLAYERS[(i + j) % PLAYERS.length];
+        if (!isOut(c2)) return c2;
+    }
+    return from;
+}
 
 // ============================================
 // BOARD HELPERS
@@ -89,18 +129,15 @@ window.towerNeighbors = neighbors;
 // ============================================
 // CHAINS / ATTACK
 // ============================================
-// Contiguous run of `color` along the ring of level L that includes slot S (wrapping).
 function ringChain(L, S, color) {
     var t = tileAt(L, S);
     if (!t || t.owner !== color) return [];
     var set = [{ level: L, slot: S }];
-    // extend forward
     var k = (S + 1) % SLOTS, guard = 0;
     while (k !== S && guard++ < SLOTS) {
         var tt = tileAt(L, k);
         if (tt && tt.owner === color) { set.push({ level: L, slot: k }); k = (k + 1) % SLOTS; } else break;
     }
-    // extend backward
     k = (S + SLOTS - 1) % SLOTS; guard = 0;
     while (k !== S && guard++ < SLOTS) {
         var tt2 = tileAt(L, k);
@@ -110,7 +147,6 @@ function ringChain(L, S, color) {
     }
     return set;
 }
-// Contiguous run of `color` along column S that includes level L.
 function colChain(L, S, color) {
     var t = tileAt(L, S);
     if (!t || t.owner !== color) return [];
@@ -121,29 +157,24 @@ function colChain(L, S, color) {
 }
 function sumOf(set) { return set.reduce(function (a, p) { var t = tileAt(p.level, p.slot); return a + (t ? t.num : 0); }, 0); }
 
-// All enemy chains a given attacker can strike (both axes, both ends).
+// All enemy chains a given attacker can strike (both axes, both ends). In the
+// 4-player game "enemy" is any colour that is not the mover's — the beyond tile's
+// own colour defines the chain that would be captured.
 function computeAttackTargets(L, S) {
-    var me = turn, foe = opp(turn);
+    var me = turn;
     var targets = [];
 
     // ---- Horizontal (ring) ----
     var hChain = ringChain(L, S, me);
     if (hChain.length > 0 && hChain.length < SLOTS) {
-        // ends: slots just beyond the arc on each side
         var slotsInChain = hChain.map(function (p) { return p.slot; });
-        // forward end
         [1, -1].forEach(function (dir) {
-            // find the boundary slot of the arc in this direction
-            var edge = S;
-            // walk along chain in `dir` to the last chain slot
-            var step = ((dir % SLOTS) + SLOTS) % SLOTS;
             var k = S, guard = 0;
             while (slotsInChain.indexOf((k + dir + SLOTS) % SLOTS) !== -1 && guard++ < SLOTS) k = (k + dir + SLOTS) % SLOTS;
             var beyond = (k + dir + SLOTS) % SLOTS;
             var bt = tileAt(L, beyond);
-            if (bt && bt.owner === foe) {
-                var enemy = ringChain(L, beyond, foe);
-                addTarget(targets, hChain, enemy);
+            if (bt && bt.owner !== me) {
+                addTarget(targets, hChain, ringChain(L, beyond, bt.owner));
             }
         });
     }
@@ -157,9 +188,8 @@ function computeAttackTargets(L, S) {
         [{ l: topL + 1 }, { l: botL - 1 }].forEach(function (e) {
             if (!inLevel(e.l)) return;
             var bt = tileAt(e.l, S);
-            if (bt && bt.owner === foe) {
-                var enemy = colChain(e.l, S, foe);
-                addTarget(targets, vChain, enemy);
+            if (bt && bt.owner !== me) {
+                addTarget(targets, vChain, colChain(e.l, S, bt.owner));
             }
         });
     }
@@ -200,13 +230,24 @@ function countOnBoard(color) {
     for (var l = 0; l < LEVELS; l++) for (var s = 0; s < SLOTS; s++) { var t = tileAt(l, s); if (t && t.owner === color) n++; }
     return n;
 }
+function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+
 function drawBoard() {
-    if (wBoardHud) wBoardHud.textContent = countOnBoard('W');
-    if (bBoardHud) bBoardHud.textContent = countOnBoard('B');
-    if (wResHud) wResHud.textContent = pool.W;
-    if (bResHud) bResHud.textContent = pool.B;
+    // per-seat counts (top HUD + menu) and turn-state styling
+    ['W', 'R', 'U', 'B'].forEach(function (c) {
+        var inGame = PLAYERS.indexOf(c) !== -1;
+        setText('hud-' + c, countOnBoard(c));
+        setText('res-' + c, pool[c] != null ? pool[c] : 0);
+        var item = document.getElementById('hud-item-' + c);
+        if (item) {
+            item.style.display = inGame ? '' : 'none';
+            item.classList.toggle('active-turn', !gameOver && turn === c);
+            item.classList.toggle('dead', inGame && isOut(c));
+        }
+    });
+
     if (statusName) statusName.textContent = colorName(turn) + "'s Turn";
-    if (statusIndicator) statusIndicator.style.backgroundColor = turn === 'W' ? '#ffffff' : '#1a1a1a';
+    if (statusIndicator) statusIndicator.style.backgroundColor = '#' + TOWER_COLORS[turn].hex.toString(16).padStart(6, '0');
 
     var hasOwn = !gameOver && countOnBoard(turn) > 0;
     var canPlace = !gameOver && pool[turn] > 0 && placeableSlots(turn).length > 0;
@@ -223,10 +264,6 @@ function setChip(id, enabled) {
     el.disabled = !enabled || busy;
     el.classList.toggle('active', id === 'act-' + (mode === 'bonus' ? 'levelup' : mode) && !gameOver);
 }
-function hasEmptySlot() {
-    for (var l = 0; l < LEVELS; l++) for (var s = 0; s < SLOTS; s++) if (!tileAt(l, s)) return true;
-    return false;
-}
 function playerLevels(color) {
     var levels = [];
     for (var L = 0; L < LEVELS; L++) {
@@ -236,11 +273,9 @@ function playerLevels(color) {
 }
 function canPlaceOn(color, L) {
     if (L === 0) return true;
-    var levels = playerLevels(color);
-    // Must have presence on the level BELOW to place here
-    // (Current presence on L itself is not enough — you climb from below)
-    return levels.indexOf(L - 1) !== -1;
+    return playerLevels(color).indexOf(L - 1) !== -1;   // climb from the level below
 }
+window.towerCanPlaceOn = canPlaceOn;
 function placeableSlots(color) {
     var out = [];
     for (var l = 0; l < LEVELS; l++) {
@@ -251,11 +286,8 @@ function placeableSlots(color) {
 }
 function canMoveTo(from, to) {
     if (to.slot === from.slot && to.level < from.level) {
-        // Gravity fall: all intermediate cells must be empty
-        for (var l = from.level - 1; l > to.level; l--) {
-            if (tileAt(l, to.slot)) return false;
-        }
-        return true; // destination may be empty or enemy (gravity attack handled by caller)
+        for (var l = from.level - 1; l > to.level; l--) if (tileAt(l, to.slot)) return false;
+        return true;
     }
     return isAdjacent(from, to);
 }
@@ -268,23 +300,18 @@ function setMode(m) {
     mode = m;
     selected = null;
     attackTargets = [];
-    if (m === 'place') setPrompt(pool[turn] > 0 ? '' : '');
-    if (m === 'move') setPrompt('');
-    if (m === 'levelup') setPrompt('');
+    setPrompt('');
     drawBoard();
 }
-
-// Select one of your tiles as mover/attacker, and light up its reachable enemy chains.
 function selectMover(l, s) {
     selected = { level: l, slot: s };
     attackTargets = computeAttackTargets(l, s);
     setPrompt('');
     drawBoard();
 }
-
-// Entry point from the 3D view: a slot (level,slot) was tapped.
 function onSlotTap(l, s) {
     if (busy || gameOver) return;
+    if (isComputer(turn)) return;                // ignore taps on a computer's turn
     var t = tileAt(l, s);
 
     if (bonusActive) { handleBonus(l, s, t); return; }
@@ -299,32 +326,19 @@ function onSlotTap(l, s) {
     if (mode === 'move') {
         if (selected) {
             if (selected.level === l && selected.slot === s) { selected = null; attackTargets = []; drawBoard(); return; }
-            // tapping an enemy chain = attack
             var tgt = attackTargets.find(function (g) { return g.tiles.some(function (p) { return p.level === l && p.slot === s; }); });
             if (tgt) { doAttack(tgt); return; }
-            // Gravity fall/jump (same column, going down) — can land on empty or enemy
             if (s === selected.slot && l < selected.level) {
                 if (canMoveTo(selected, { level: l, slot: s })) {
                     if (t) {
-                        if (t.owner !== turn) {
-                            doGravityAttack(selected, { level: l, slot: s });
-                            return;
-                        } else {
-                            showMessage('Cannot fall onto your own tile.');
-                            return;
-                        }
+                        if (t.owner !== turn) { doGravityAttack(selected, { level: l, slot: s }); return; }
+                        showMessage('Cannot fall onto your own tile.'); return;
                     }
-                    // Empty destination — normal gravity move
-                    doMove(selected, { level: l, slot: s }, false);
-                    return;
-                } else {
-                    showMessage('Path is blocked by another tile.');
-                    return;
+                    doMove(selected, { level: l, slot: s }, false); return;
                 }
+                showMessage('Path is blocked by another tile.'); return;
             }
-            // empty adjacent = move
             if (!t && canMoveTo(selected, { level: l, slot: s })) { doMove(selected, { level: l, slot: s }, false); return; }
-            // another of your tiles = re-aim
             if (t && t.owner === turn) { selectMover(l, s); return; }
             showMessage('Tap an empty adjacent slot to move, or a highlighted enemy chain to attack.'); return;
         }
@@ -412,15 +426,13 @@ function doGravityAttack(from, to) {
     var attacker = board[from.level][from.slot];
     var defender = board[to.level][to.slot];
     if (!attacker || !defender) { showMessage('Invalid attack.'); return; }
-    var atkNum = attacker.num;
-    var defNum = defender.num;
+    var atkNum = attacker.num, defNum = defender.num;
     if (atkNum < defNum) {
         showMessage('Your tile (' + atkNum + ') is not strong enough to crush the enemy tile (' + defNum + ').');
         return;
     }
     busy = true;
-    // Crush: the falling tile replaces the defender; defender's owner gets its num back to pool
-    pool[defender.owner] += defNum;
+    pool[defender.owner] += defNum;              // defender's spent pips return to its owner
     board[to.level][to.slot] = attacker;
     board[from.level][from.slot] = null;
     selected = null;
@@ -439,52 +451,78 @@ function doGravityAttack(from, to) {
 function endTurn() {
     selected = null; attackTargets = []; bonusActive = false;
 
+    // classic control victory for whoever just acted
     var w = winInfo(turn);
-    if (w) { return endGame(colorName(turn) + ' Wins!', colorName(turn) + ' controls ' + w + '.'); }
-    var ow = winInfo(opp(turn));
-    if (ow) { return endGame(colorName(opp(turn)) + ' Wins!', colorName(opp(turn)) + ' controls ' + ow + '.'); }
+    if (w) return endGame(colorName(turn) + ' Wins!', colorName(turn) + ' controls ' + w + '.', turn);
 
-    turn = opp(turn);
-    // sensible default mode for the new player
+    // elimination: last builder with any tiles (board or pool) standing
+    var living = PLAYERS.filter(function (c) { return !isOut(c); });
+    if (living.length === 1) {
+        return endGame(colorName(living[0]) + ' Wins!', colorName(living[0]) + ' is the last builder standing on the tower.', living[0]);
+    }
+    if (living.length === 0) return endGame('Draw', 'The tower stands empty.', null);
+
+    // if nobody can act, settle on who holds the most tiles
+    if (!living.some(hasAction)) {
+        var best = living.slice().sort(function (a, b) { return countOnBoard(b) - countOnBoard(a); })[0];
+        return endGame(colorName(best) + ' Wins!', colorName(best) + ' holds the most of the tower — no moves remain.', best);
+    }
+
+    turn = nextTurn(turn);
     mode = (pool[turn] > 0 && placeableSlots(turn).length > 0) ? 'place' : 'move';
     setMode(mode);
 
-    if (!gameOver && isVsComputer && turn === 'B') setTimeout(makeAIMove, 750);
+    if (!gameOver && isComputer(turn)) setTimeout(makeAIMove, 700);
 }
 var winRevealTimer = null;
-function endGame(title, text) {
+function endGame(title, text, winColor) {
     gameOver = true;
     drawBoard();
     if (messageTitle) messageTitle.textContent = title;
     if (messageText) messageText.textContent = text;
-    if (window.towerVictory) window.towerVictory(title.indexOf('White') === 0 ? 'W' : 'B');
-    // let the final move play out before covering the board
+    if (window.towerVictory) window.towerVictory(winColor);
     clearTimeout(winRevealTimer);
-    winRevealTimer = setTimeout(() => {
+    winRevealTimer = setTimeout(function () {
         if (messageBox) messageBox.classList.add('visible');
     }, 1100);
 }
 
 function initGame() {
+    PLAYERS = TURN_ORDER[playerCount].slice();
     board = [];
     for (var l = 0; l < LEVELS; l++) { var row = []; for (var s = 0; s < SLOTS; s++) row.push(null); board.push(row); }
-    pool = { W: POOL_START, B: POOL_START };
+    pool = {};
+    PLAYERS.forEach(function (c) { pool[c] = POOL_START; });
     turn = 'W'; selected = null; attackTargets = []; bonusActive = false; busy = false; gameOver = false;
     clearTimeout(winRevealTimer);
     if (messageBox) messageBox.classList.remove('visible');
     if (window.is3DView && window.towerRebuild) window.towerRebuild();
     setMode('place');
 }
+window.towerInit = initGame;
+
+function setPlayerCount(n) {
+    playerCount = (n === 4) ? 4 : 2;
+    if (playersButton) playersButton.textContent = 'Players: ' + playerCount;
+    if (opponentButton) opponentButton.style.display = playerCount === 2 ? '' : 'none';
+    initGame();
+    showMessage(playerCount + '-player tower');
+}
+window.towerSetPlayers = setPlayerCount;
 
 // ============================================
 // EVENTS
 // ============================================
 if (resetButton) resetButton.addEventListener('click', function () { initGame(); showMessage('The tower is cleared.'); });
 if (opponentButton) opponentButton.addEventListener('click', function () {
+    if (playerCount !== 2) return;
     isVsComputer = !isVsComputer;
     opponentButton.textContent = 'Opponent: ' + (isVsComputer ? 'Computer' : 'Human');
     initGame();
     showMessage(isVsComputer ? 'VS Computer' : 'VS Human');
+});
+if (playersButton) playersButton.addEventListener('click', function () {
+    setPlayerCount(playerCount === 2 ? 4 : 2);
 });
 ['place', 'move', 'levelup'].forEach(function (m) {
     var el = document.getElementById('act-' + m);
@@ -492,26 +530,28 @@ if (opponentButton) opponentButton.addEventListener('click', function () {
 });
 
 // ============================================
-// BASIC AI (Black) — follows the rules, plays for control
+// COMPUTER PLAYERS — each non-human seat plays for control
 // ============================================
 function allTiles(color) {
     var out = [];
     for (var l = 0; l < LEVELS; l++) for (var s = 0; s < SLOTS; s++) { var t = tileAt(l, s); if (t && t.owner === color) out.push({ level: l, slot: s }); }
     return out;
 }
-function emptySlots() {
-    var out = [];
-    for (var l = 0; l < LEVELS; l++) for (var s = 0; s < SLOTS; s++) if (!tileAt(l, s)) out.push({ level: l, slot: s });
-    return out;
+function affinity(slot, me) {
+    var n = 0;
+    for (var s = 0; s < SLOTS; s++) { var t = tileAt(slot.level, s); if (t && t.owner === me) n++; }
+    for (var l = 0; l < LEVELS; l++) { var t2 = tileAt(l, slot.slot); if (t2 && t2.owner === me) n++; }
+    return n;
 }
 function makeAIMove() {
-    if (gameOver || turn !== 'B' || busy) return;
+    if (gameOver || busy || !isComputer(turn)) return;
+    var me = turn;
 
-    // 1. Best capturing attack (horizontal/vertical chain)
+    // 1. Best capturing chain attack
     var best = null;
-    allTiles('B').forEach(function (p) {
+    allTiles(me).forEach(function (p) {
         computeAttackTargets(p.level, p.slot).forEach(function (g) {
-            if (g.win && (!best || g.tiles.length > best.tgt.tiles.length)) best = { from: p, tgt: g, type: 'chain' };
+            if (g.win && (!best || g.tiles.length > best.tgt.tiles.length)) best = { from: p, tgt: g };
         });
     });
     if (best) {
@@ -521,22 +561,21 @@ function makeAIMove() {
         return;
     }
 
-    // 1b. Gravity attack — drop a tile onto an enemy below
+    // 1b. Gravity attack — drop onto an enemy directly below
     var gravBest = null;
-    allTiles('B').forEach(function (p) {
+    allTiles(me).forEach(function (p) {
+        var pt = tileAt(p.level, p.slot);
         for (var gl = p.level - 1; gl >= 0; gl--) {
             var gd = tileAt(gl, p.slot);
             if (gd) {
-                if (gd.owner === 'W' && p.num >= gd.num) {
+                if (gd.owner !== me && pt.num >= gd.num) {
                     var blocked = false;
-                    for (var ck = p.level - 1; ck > gl; ck--) {
-                        if (tileAt(ck, p.slot)) { blocked = true; break; }
-                    }
+                    for (var ck = p.level - 1; ck > gl; ck--) if (tileAt(ck, p.slot)) { blocked = true; break; }
                     if (!blocked && (!gravBest || gd.num > tileAt(gravBest.to.level, gravBest.to.slot).num)) {
                         gravBest = { from: p, to: { level: gl, slot: p.slot } };
                     }
                 }
-                break; // first occupied cell below blocks further check
+                break;
             }
         }
     });
@@ -546,11 +585,11 @@ function makeAIMove() {
         return;
     }
 
-    // 2. Place toward the level/column where Black is strongest
-    if (pool.B > 0) {
-        var empties = placeableSlots('B');
+    // 2. Place toward the level/column where this seat is strongest
+    if (pool[me] > 0) {
+        var empties = placeableSlots(me);
         if (empties.length) {
-            empties.sort(function (a, b) { return blackAffinity(b) - blackAffinity(a); });
+            empties.sort(function (a, b) { return affinity(b, me) - affinity(a, me); });
             var pick = empties[Math.floor(Math.random() * Math.min(3, empties.length))];
             mode = 'place'; drawBoard();
             setTimeout(function () { doPlace(pick.level, pick.slot); }, 300);
@@ -558,8 +597,8 @@ function makeAIMove() {
         }
     }
 
-    // 3. Level up a tile that helps a future attack (prefer reaching 3, or ringing the bonus bell)
-    var mine = allTiles('B');
+    // 3. Level up the strongest tile (may ring the bonus bell)
+    var mine = allTiles(me);
     if (mine.length) {
         mine.sort(function (a, b) { return (tileAt(b.level, b.slot).num) - (tileAt(a.level, a.slot).num); });
         var lu = mine[0];
@@ -572,45 +611,32 @@ function makeAIMove() {
     }
     endTurn();
 }
-function blackAffinity(slot) {
-    // how many Black tiles already share this slot's level + column
-    var n = 0;
-    for (var s = 0; s < SLOTS; s++) { var t = tileAt(slot.level, s); if (t && t.owner === 'B') n++; }
-    for (var l = 0; l < LEVELS; l++) { var t2 = tileAt(l, slot.slot); if (t2 && t2.owner === 'B') n++; }
-    return n;
-}
 function aiBonusMove() {
     if (!bonusActive) return;
-    // Move one of Black's tiles toward a fuller line, else any legal move.
-    var movers = allTiles('B');
+    var me = turn;
+    var movers = allTiles(me);
     for (var i = 0; i < movers.length; i++) {
         var p = movers[i];
+        var pt = tileAt(p.level, p.slot);
         var targets = [];
-        // adjacent empty slots
         neighbors(p.level, p.slot).filter(function (n) { return !tileAt(n.level, n.slot); }).forEach(function (n) { targets.push(n); });
-        // gravity falls to empty
         for (var l = p.level - 1; l >= 0; l--) { if (!tileAt(l, p.slot)) targets.push({ level: l, slot: p.slot }); }
-        // gravity attacks on enemy below
         for (var gl = p.level - 1; gl >= 0; gl--) {
             var gd = tileAt(gl, p.slot);
-            if (gd && gd.owner === 'W' && p.num >= gd.num) {
+            if (gd && gd.owner !== me && pt.num >= gd.num) {
                 var blocked = false;
-                for (var ck = p.level - 1; ck > gl; ck--) { if (tileAt(ck, p.slot)) { blocked = true; break; } }
-                if (!blocked) { targets.push({ level: gl, slot: p.slot, isGravityAttack: true }); }
+                for (var ck = p.level - 1; ck > gl; ck--) if (tileAt(ck, p.slot)) { blocked = true; break; }
+                if (!blocked) targets.push({ level: gl, slot: p.slot, isGravityAttack: true });
                 break;
             }
         }
         if (targets.length) {
             var pick = targets[Math.floor(Math.random() * targets.length)];
-            if (pick.isGravityAttack) {
-                doGravityAttack(p, pick);
-            } else {
-                doMove(p, pick, true);
-            }
+            if (pick.isGravityAttack) doGravityAttack(p, pick);
+            else doMove(p, pick, true);
             return;
         }
     }
-    // nothing movable — just end via a no-op move of the leveled tile's neighbour search failing
     bonusActive = false; endTurn();
 }
 

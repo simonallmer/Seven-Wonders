@@ -836,20 +836,18 @@ function toggleOpenEndsMode() {
     startNewGame(game.numPlayers, null);
 }
 
-document.getElementById('btn-p2').onclick = (e) => startNewGame(2, e.target);
-document.getElementById('btn-p3').onclick = (e) => startNewGame(3, e.target);
-document.getElementById('btn-p4').onclick = (e) => startNewGame(4, e.target);
+// Players: a single button toggling 2 <-> 4 (four houses), matching the other games' menus.
+document.getElementById('players-btn').onclick = () => {
+    startNewGame(game.numPlayers === 2 ? 4 : 2, null);
+};
 document.getElementById('reset-button').onclick = () => startNewGame(game.numPlayers, null);
 document.getElementById('modal-new-game').onclick = () => startNewGame(game.numPlayers, null);
 
 function startNewGame(pCount, btnElem) {
     clearTimeout(winRevealTimer);
     document.getElementById('game-over-modal').classList.add('hidden');
-    if (btnElem) {
-        document.querySelectorAll('#players-menu button').forEach(b => b.classList.remove('active'));
-        btnElem.classList.add('active');
-        document.getElementById('players-btn').innerText = `${pCount} Players`;
-    }
+    const pb = document.getElementById('players-btn');
+    if (pb) pb.innerText = `Players: ${pCount}`;
 
     Object.values(plateMeshes).forEach(m => boardGroup.remove(m));
     Object.values(hWallMeshes).forEach(m => boardGroup.remove(m));
@@ -894,8 +892,14 @@ game.on('onInit', (data) => {
 });
 
 game.on('onTurnStart', (data) => {
+    const hex = '#' + data.player.colorHex.toString(16).padStart(6, '0');
     statusText.innerText = `${data.player.name} to move`;
-    playerColorBox.style.backgroundColor = '#' + data.player.colorHex.toString(16).padStart(6, '0');
+    playerColorBox.style.backgroundColor = hex;
+    // keep the standard menu turn indicator in sync too
+    const menuName = document.getElementById('player-name');
+    const menuDot = document.getElementById('player-indicator');
+    if (menuName) menuName.innerText = `${data.player.name} to move`;
+    if (menuDot) menuDot.style.backgroundColor = hex;
 
     directionArrows.forEach(a => { a.visible = false; a.userData = {}; });
     updateVisuals();
@@ -1199,33 +1203,24 @@ let aiTimeout = null;
 function setOpponentType(type) {
     opponentType = type;
     document.getElementById('opponent-btn').innerText = `Opponent: ${type === 'computer' ? 'Computer' : 'Human'}`;
-
-    document.querySelectorAll('#opponent-menu button').forEach(b => b.classList.remove('active'));
-    const target = document.querySelector(`#opponent-menu button[data-opp="${type}"]`);
-    if (target) target.classList.add('active');
-
     startNewGame(game.numPlayers, null);
 }
 
-document.querySelectorAll('#opponent-menu button').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const opp = btn.dataset.opp;
-        if (opp) setOpponentType(opp);
-    });
+// Opponent: a single toggle button (Computer <-> Human). Only meaningful in
+// 2-player games; with 3+ players every rival is human-controlled hot-seat.
+document.getElementById('opponent-btn').addEventListener('click', () => {
+    if (game.numPlayers > 2) return;   // no computer opponent in multiplayer
+    setOpponentType(opponentType === 'computer' ? 'human' : 'computer');
 });
 
 const _origStartNewGame = startNewGame;
 startNewGame = function(pCount, btnElem) {
     if (aiTimeout) clearTimeout(aiTimeout);
     isAiTurn = false;
-    if (pCount > 2 && opponentType === 'computer') {
-        opponentType = 'human';
-        document.getElementById('opponent-btn').innerText = 'Opponent: Human';
-        document.querySelectorAll('#opponent-menu button').forEach(b => b.classList.remove('active'));
-        const target = document.querySelector('#opponent-menu button[data-opp="human"]');
-        if (target) target.classList.add('active');
-    }
+    // In multiplayer every rival is computer-controlled by default, so the
+    // 2-player Opponent toggle is only shown for a 2-player game.
+    const oppBtn = document.getElementById('opponent-btn');
+    if (oppBtn) oppBtn.style.display = pCount > 2 ? 'none' : '';
     _origStartNewGame(pCount, btnElem);
 };
 
@@ -1349,9 +1344,17 @@ class LibraryAI {
     }
 }
 
+// Player 1 (id 0) is the human. In 2-player the single rival follows the Opponent
+// toggle; in 4-player every rival is a computer by default.
+function isComputerPlayer(id) {
+    if (id === 0) return false;
+    if (game.numPlayers > 2) return true;
+    return opponentType === 'computer';
+}
+
 game.on('onTurnStart', (data) => {
-    if (opponentType === 'computer' && data.player.id === 1 && !game.winner) {
-        if (!ai) ai = new LibraryAI(game, 1);
+    if (!game.winner && isComputerPlayer(data.player.id)) {
+        ai = new LibraryAI(game, data.player.id);
         ai.takeTurn();
     }
 });
