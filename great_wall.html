@@ -165,10 +165,13 @@
             // fixed bottom:12px bar (safe-area-inset-bottom is 0), cutting off the movement
             // menu. Lift it well into the lower third to clear the chrome; desktop stays low.
             const isTouch = window.matchMedia('(pointer: coarse)').matches;
-            const baseGap = isTouch ? 100 : 12;
             function pin() {
                 const vv = window.visualViewport;
                 if (!vv) return;
+                // Portrait touch chrome needs a big lift; landscape is short, so sit low
+                // and let the visible-viewport math handle any bottom toolbar. Desktop stays low.
+                const landscape = window.matchMedia('(orientation: landscape)').matches;
+                const baseGap = isTouch ? (landscape ? 18 : 100) : 12;
                 var hiddenBelow = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
                 if (bar) bar.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + ' + (hiddenBelow + baseGap) + 'px)';
             }

@@ -62,7 +62,10 @@ const matHLChain = new THREE.MeshBasicMaterial({ color: 0xffc14d, transparent: t
 const matArcShield = new THREE.MeshBasicMaterial({ color: 0x2a6db0, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide });
 const matArcVuln = new THREE.MeshBasicMaterial({ color: 0xc0392b, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
 const matArrow = new THREE.MeshBasicMaterial({ color: 0xff5533 });
-const matFacingArrow = new THREE.MeshBasicMaterial({ color: 0xff8844, transparent: true, opacity: 0.85, depthTest: false, side: THREE.DoubleSide });
+// depthTest ON (depthWrite off, like the highlight rings) so the wall/towers occlude
+// the facing chevrons instead of them bleeding through the building. Depth testing does
+// not affect raycasting, so the arrows (and the invisible pad below) stay click targets.
+const matFacingArrow = new THREE.MeshBasicMaterial({ color: 0xff8844, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
 // Transparent (not invisible) so it stays an easy raycast click target — visible:false meshes are skipped by the raycaster.
 const matFacingHit = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
 const matDebrisLight = new THREE.MeshStandardMaterial({ color: 0xd9d0b8, roughness: 0.9 });

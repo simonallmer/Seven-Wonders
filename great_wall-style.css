@@ -502,6 +502,11 @@ body {
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     max-width: 80vw;
     text-align: center;
+    /* Purely informational — must never intercept taps. Without this the banner
+       (z-index 500, above the action bar) stays a live pointer target even when
+       faded out, swallowing clicks on the Place/Move/Shoot/Spin chips on mobile
+       where the bar is lifted into the same band. */
+    pointer-events: none;
 }
 
 .game-message.hidden {
@@ -670,5 +675,21 @@ body {
 @media (pointer: coarse) {
     .action-bar {
         bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
+    }
+}
+
+/* Landscape / wide touch screens are short: a 100px lift wastes the middle of the
+   screen and floats the bar too high. The browser chrome is minimal here (and any
+   that shrinks the visual viewport is already handled by pin()), so sit the bar low
+   and make it more compact. pin() mirrors this gap inline so it wins. */
+@media (pointer: coarse) and (orientation: landscape) {
+    .action-bar {
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+        gap: 6px;
+        padding: 6px 10px;
+    }
+    .action-chip {
+        padding: 8px 18px;
+        font-size: 0.85rem;
     }
 }
