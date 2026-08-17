@@ -903,15 +903,17 @@ function checkLine(line, map, attackerColor) {
         const end = attackerIndices[i + 1];
 
         if (end > start + 1) {
-            let allDifferent = true;
+            // Every field between the two flanking stones must hold an enemy
+            // stone — a single empty field breaks the line, so no Osiris.
+            let unbroken = true;
             for (let k = start + 1; k < end; k++) {
-                if (line[k] === attackerColor) {
-                    allDifferent = false;
+                if (!line[k]) {
+                    unbroken = false;
                     break;
                 }
             }
 
-            if (allDifferent) {
+            if (unbroken) {
                 for (let k = start + 1; k < end; k++) {
                     captured.push(map[k]);
                 }
