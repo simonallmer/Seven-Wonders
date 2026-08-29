@@ -46,6 +46,9 @@ let validMoves = [];
 let gameState = 'SELECT_STONE';
 let lastPush = null;
 let isVsComputer = localStorage.getItem('pyramidVsComputer') === null ? true : localStorage.getItem('pyramidVsComputer') === 'true';
+// Conquest mode: only the victory fields win. Attrition never decides the game —
+// once nobody holds 4 stones any more it is a draw.
+let isConquestMode = localStorage.getItem('pyramidConquestMode') === 'true';
 let isMoveInProgress = false; // Block input during move
 let turnInProgress = false;
 
@@ -125,6 +128,22 @@ function initializeUI() {
         playerCountBtn.textContent = `Players: ${playerCount}`;
         localStorage.setItem('pyramidPlayerCount', playerCount);
         location.reload();
+    });
+
+    const modeBtn = document.getElementById('mode-btn');
+    const updateModeBtn = () => {
+        modeBtn.textContent = isConquestMode ? 'Mode: Conquest' : 'Mode: Standard';
+    };
+    updateModeBtn();
+
+    modeBtn.addEventListener('click', () => {
+        isConquestMode = !isConquestMode;
+        localStorage.setItem('pyramidConquestMode', isConquestMode);
+        updateModeBtn();
+        showMessage(isConquestMode
+            ? 'Conquest: only the victory fields win.'
+            : 'Standard: last player with 4+ stones wins.');
+        updateUI();
     });
 
     opponentBtn.addEventListener('click', () => {
@@ -417,7 +436,7 @@ function checkWinConditions(counts, victoryStones) {
     if (playersBelowFour.length === playerCount) {
         gameState = 'GAME_OVER';
         showGameOver('Draw!', 'All players have fewer than 4 stones.');
-    } else if (playersBelowFour.length === playerCount - 1) {
+    } else if (!isConquestMode && playersBelowFour.length === playerCount - 1) {
         const winner = activePlayers.find(c => !playersBelowFour.includes(c));
         if (winner) {
             gameState = 'GAME_OVER';
