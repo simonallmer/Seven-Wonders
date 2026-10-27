@@ -25,7 +25,7 @@ function getLevels() {
         ];
     } else {
         return [
-            { level: 0, size: 9, playableRim: false },
+            { level: 0, size: 9, playableRim: true },
             { level: 1, size: 7, playableRim: true },
             { level: 2, size: 5, playableRim: true },
             { level: 3, size: 3, playableRim: true },
@@ -49,6 +49,7 @@ let isVsComputer = localStorage.getItem('pyramidVsComputer') === null ? true : l
 // Conquest mode: only the victory fields win. Attrition never decides the game —
 // once nobody holds 4 stones any more it is a draw.
 let isConquestMode = localStorage.getItem('pyramidConquestMode') === 'true';
+let showHints = localStorage.getItem('pyramidShowHints') === null ? true : localStorage.getItem('pyramidShowHints') === 'true';
 let isMoveInProgress = false; // Block input during move
 let turnInProgress = false;
 
@@ -146,6 +147,25 @@ function initializeUI() {
         updateUI();
     });
 
+    const hintsBtn = document.getElementById('hints-btn');
+    const updateHintsBtn = () => {
+        if (hintsBtn) hintsBtn.textContent = showHints ? 'Hints: On' : 'Hints: Off';
+    };
+    updateHintsBtn();
+
+    if (hintsBtn) hintsBtn.addEventListener('click', () => {
+        showHints = !showHints;
+        localStorage.setItem('pyramidShowHints', showHints);
+        updateHintsBtn();
+        if (view3D) {
+            view3D.clearHover();
+            view3D.updateIndicators();
+        }
+        showMessage(showHints
+            ? 'Hints on: possible moves are marked, and lit up on hover.'
+            : 'Hints off: no move markers.');
+    });
+
     opponentBtn.addEventListener('click', () => {
         isVsComputer = !isVsComputer;
         localStorage.setItem('pyramidVsComputer', isVsComputer);
@@ -215,9 +235,13 @@ function updateViewMode() {
     canvas3d.classList.remove('hidden');
     canvas2d.classList.add('hidden');
     if (view3D) {
-        view3D.resize();
-        view3D.running = true;
-        view3D.animate();
+        // The 3D view's method is onResize(), and its render loop is already
+        // running from init() - starting a second one would double the work.
+        view3D.onResize();
+        if (!view3D.running) {
+            view3D.running = true;
+            view3D.animate();
+        }
     }
 }
 
@@ -719,54 +743,39 @@ function executeMove(move) {
     // Animate the move in 3D
     if (is3DMode && view3D && animatedStones.size === 0) {
         const stoneForAnimation = selectedStone;
-        
+        const finish = () => {
+            selectedStone = stoneForAnimation;
+            performMoveLogic(move, fromPiece);
+        };
+        const dir = {
+            dr: Math.sign(move.row - selectedStone.row),
+            dc: Math.sign(move.col - selectedStone.col)
+        };
+
         if (move.type === 'push') {
-            const pushedKey = `${move.level},${move.row},${move.col}`;
-            const pushedMesh = view3D.stoneMeshes.get(pushedKey);
-            
-            if (pushedMesh) {
-                view3D.animateStone(pushedKey, `${move.pushTo.level},${move.pushTo.row},${move.pushTo.col}`, move, () => {
+            if (view3D.stoneMeshes.has(toKey)) {
+                const pushToKey = `${move.pushTo.level},${move.pushTo.row},${move.pushTo.col}`;
+                // A push over the edge drops onto the level below and smashes
+                // whatever stands there.
+                if (move.pushTo.level < move.level) {
+                    view3D.destroyStone(pushToKey, 'smash', dir);
+                }
+                // The stone being shoved moves first, then the pusher follows.
+                view3D.animateStone(toKey, pushToKey, { to: move.pushTo, style: 'push' }, () => {
                     setTimeout(() => {
-                        view3D.animateStone(fromKey, toKey, move, () => {
-                            selectedStone = stoneForAnimation;
-                            performMoveLogic(move, fromPiece);
-                        });
+                        view3D.animateStone(fromKey, toKey, { to: move, style: 'move' }, finish);
                     }, 100);
                 });
             } else {
-                performMoveLogic(move, fromPiece);
+                finish();
             }
-        } else if (move.type === 'smash') {
-            view3D.animateStone(fromKey, toKey, move, () => {
-                selectedStone = stoneForAnimation;
-                performMoveLogic(move, fromPiece);
-            });
-            const smashedKey = `${move.level},${move.row},${move.col}`;
-            const smashedMesh = view3D.stoneMeshes.get(smashedKey);
-            if (smashedMesh) {
-                setTimeout(() => {
-                    if (smashedMesh.parent) view3D.scene.remove(smashedMesh);
-                    view3D.stoneMeshes.delete(smashedKey);
-                }, 350);
-            }
-        } else if (move.type === 'push-fall') {
-            view3D.animateStone(fromKey, toKey, move, () => {
-                selectedStone = stoneForAnimation;
-                performMoveLogic(move, fromPiece);
-            });
-            const pushedKey = `${move.level},${move.row},${move.col}`;
-            const pushedMesh = view3D.stoneMeshes.get(pushedKey);
-            if (pushedMesh) {
-                setTimeout(() => {
-                    if (pushedMesh.parent) view3D.scene.remove(pushedMesh);
-                    view3D.stoneMeshes.delete(pushedKey);
-                }, 350);
-            }
+        } else if (move.type === 'smash' || move.type === 'push-fall') {
+            // The stone standing on the target field is the one that leaves;
+            // the moving stone takes its place.
+            view3D.destroyStone(toKey, move.type === 'smash' ? 'smash' : 'fall', dir);
+            view3D.animateStone(fromKey, toKey, { to: move, style: 'move' }, finish);
         } else {
-            view3D.animateStone(fromKey, toKey, move, () => {
-                selectedStone = stoneForAnimation;
-                performMoveLogic(move, fromPiece);
-            });
+            view3D.animateStone(fromKey, toKey, { to: move, style: 'move' }, finish);
         }
     } else {
         performMoveLogic(move, fromPiece);
@@ -815,7 +824,16 @@ function performMoveLogic(move, fromPiece) {
 }
 
 function checkAndRemoveOsiris() {
-    let stonesToRemove = [];
+    const captured = [];
+    const attackers = [];
+
+    const scanLine = (pieces, map) => {
+        PLAYER_COLORS.slice(0, playerCount).forEach(color => {
+            const result = checkLine(pieces, map, color);
+            captured.push(...result.captured);
+            attackers.push(...result.attackers);
+        });
+    };
 
     LEVELS.forEach(({ level, size }) => {
         const grid = pyramid[level];
@@ -824,20 +842,13 @@ function checkAndRemoveOsiris() {
         for (let r = 0; r < size; r++) {
             const rowMap = [];
             for (let c = 0; c < size; c++) {
-                if (grid[r][c].piece) {
-                    rowMap.push({ level, row: r, col: c });
-                } else {
-                    rowMap.push(null);
-                }
+                rowMap.push({ level, row: r, col: c });
             }
             gridMap.push(rowMap);
         }
 
         for (let r = 0; r < size; r++) {
-            const rowPieces = grid[r].map(cell => cell.piece);
-            PLAYER_COLORS.slice(0, playerCount).forEach(color => {
-                stonesToRemove.push(...checkLine(rowPieces, gridMap[r], color));
-            });
+            scanLine(grid[r].map(cell => cell.piece), gridMap[r]);
         }
 
         for (let c = 0; c < size; c++) {
@@ -847,71 +858,47 @@ function checkAndRemoveOsiris() {
                 colPieces.push(grid[r][c].piece);
                 colMap.push(gridMap[r][c]);
             }
-            PLAYER_COLORS.slice(0, playerCount).forEach(color => {
-                stonesToRemove.push(...checkLine(colPieces, colMap, color));
-            });
+            scanLine(colPieces, colMap);
         }
     });
 
-    if (stonesToRemove.length > 0) {
-        const uniqueStones = [];
+    const dedupe = (list) => {
         const seen = new Set();
-        stonesToRemove.forEach(s => {
-            if (!s) return; // Skip null entries
+        const out = [];
+        list.forEach(s => {
+            if (!s) return;
             const key = `${s.level},${s.row},${s.col}`;
             if (!seen.has(key)) {
                 seen.add(key);
-                uniqueStones.push(s);
+                out.push(s);
             }
         });
+        return out;
+    };
 
-        if (uniqueStones.length > 0) {
-            showMessage(`Osiris! ${uniqueStones.length} stones captured!`);
-        }
-        
-        // Trigger Osiris animation in 3D
-        if (view3D && is3DMode) {
-            view3D.playOsirisAnimation(uniqueStones, () => {
-                // After animation, actually remove the stones
-                uniqueStones.forEach(({ level, row, col }) => {
-                    pyramid[level][row][col].piece = null;
-                });
-                
-                if (view3D) {
-                    uniqueStones.forEach(({ level, row, col }) => {
-                        const key = `${level},${row},${col}`;
-                        const mesh = view3D.stoneMeshes.get(key);
-                        if (mesh) {
-                            view3D.scene.remove(mesh);
-                            view3D.stoneMeshes.delete(key);
-                        }
-                    });
-                }
-                updateUI();
-            });
-        } else {
-            // No 3D animation - just remove
-            uniqueStones.forEach(({ level, row, col }) => {
-                pyramid[level][row][col].piece = null;
-            });
-            
-            if (view3D) {
-                uniqueStones.forEach(({ level, row, col }) => {
-                    const key = `${level},${row},${col}`;
-                    const mesh = view3D.stoneMeshes.get(key);
-                    if (mesh) {
-                        view3D.scene.remove(mesh);
-                        view3D.stoneMeshes.delete(key);
-                    }
-                });
-            }
-            updateUI();
-        }
+    const uniqueStones = dedupe(captured);
+    if (uniqueStones.length === 0) return;
+
+    showMessage(`Osiris! ${uniqueStones.length} stones captured!`);
+
+    // Apply the capture to the board IMMEDIATELY. The turn carries on while
+    // the animation plays, so deferring the removal until the animation ends
+    // let the next player (and the AI) act on stones that were already gone.
+    const meshes = (view3D && is3DMode) ? view3D.detachStones(uniqueStones) : [];
+    uniqueStones.forEach(({ level, row, col }) => {
+        pyramid[level][row][col].piece = null;
+    });
+
+    if (view3D && is3DMode) {
+        view3D.playOsirisAnimation(uniqueStones, dedupe(attackers), meshes);
     }
+
+    updateUI();
 }
 
 function checkLine(line, map, attackerColor) {
     const captured = [];
+    const attackers = [];
     const attackerIndices = [];
     line.forEach((p, i) => {
         if (p === attackerColor) attackerIndices.push(i);
@@ -936,10 +923,34 @@ function checkLine(line, map, attackerColor) {
                 for (let k = start + 1; k < end; k++) {
                     captured.push(map[k]);
                 }
+                attackers.push(map[start], map[end]);
             }
         }
     }
-    return captured;
+    return { captured, attackers };
+}
+
+function capitalize(color) {
+    return color.charAt(0).toUpperCase() + color.slice(1);
+}
+
+function collectMovesFor(color) {
+    const actions = [];
+    pyramid.forEach((grid, level) => {
+        grid.forEach((row, r) => {
+            row.forEach((cell, c) => {
+                if (cell.piece === color) {
+                    const moves = [
+                        ...calculateRunMoves(level, r, c),
+                        ...calculateJumpMoves(level, r, c),
+                        ...calculatePushMoves(level, r, c)
+                    ];
+                    moves.forEach(move => actions.push({ stone: { level, row: r, col: c }, move }));
+                }
+            });
+        });
+    });
+    return actions;
 }
 
 function endTurn() {
@@ -950,9 +961,23 @@ function endTurn() {
     const currentIndex = PLAYER_COLORS.indexOf(currentPlayer);
     const nextIndex = (currentIndex + 1) % playerCount;
     currentPlayer = PLAYER_COLORS[nextIndex];
-    
+
+    // A player with nothing to move is skipped, not stuck. Only when nobody
+    // can move at all is the game actually over.
+    let skipped = 0;
+    while (skipped < playerCount && collectMovesFor(currentPlayer).length === 0) {
+        showMessage(`${capitalize(currentPlayer)} has no legal move and is skipped.`);
+        currentPlayer = PLAYER_COLORS[(PLAYER_COLORS.indexOf(currentPlayer) + 1) % playerCount];
+        skipped++;
+    }
+
     gameState = 'SELECT_STONE';
     updateUI();
+
+    if (skipped >= playerCount && gameState !== 'GAME_OVER') {
+        gameState = 'GAME_OVER';
+        showGameOver('Draw!', 'No player has a legal move left.');
+    }
 
     if (view3D) {
         view3D.updateStones();
@@ -966,7 +991,7 @@ function endTurn() {
     const isAITurn = (playerCount > 2 && isVsComputer && currentPlayer !== 'white') || 
                      (playerCount === 2 && isVsComputer && currentPlayer === 'black');
     
-    if (isAITurn) {
+    if (isAITurn && gameState !== 'GAME_OVER') {
         setTimeout(() => {
             makeAIMove();
         }, 500);
@@ -983,31 +1008,11 @@ function makeAIMove() {
     if (gameState === 'GAME_OVER') return;
     if (currentPlayer === 'white') return;
     
-    let allPossibleMoves = [];
-
-    pyramid.forEach((grid, level) => {
-        grid.forEach((row, r) => {
-            row.forEach((cell, c) => {
-                if (cell.piece === currentPlayer) {
-                    const runMoves = calculateRunMoves(level, r, c);
-                    const jumpMoves = calculateJumpMoves(level, r, c);
-                    const pushMoves = calculatePushMoves(level, r, c);
-                    const moves = [...runMoves, ...jumpMoves, ...pushMoves];
-
-                    moves.forEach(move => {
-                        allPossibleMoves.push({
-                            stone: { level, row: r, col: c },
-                            move: move
-                        });
-                    });
-                }
-            });
-        });
-    });
+    const allPossibleMoves = collectMovesFor(currentPlayer);
 
     if (allPossibleMoves.length === 0) {
-        gameState = 'GAME_OVER';
-        showGameOver('White Wins!', currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1) + ' has no legal moves.');
+        // Boxed in - pass the turn along instead of ending the game.
+        endTurn();
         return;
     }
 
@@ -1350,6 +1355,11 @@ class PyramidView3D {
     }
 
     updateStones() {
+        // A tinted mesh may be about to be removed or recoloured, and its
+        // saved original would then be restored onto the wrong stone - or
+        // never at all. Drop the highlight before the board changes under it.
+        this.clearHover();
+
         const pyramid = this.game.getPyramid();
         
         this.stoneMeshes.forEach((mesh, key) => {
@@ -1366,16 +1376,27 @@ class PyramidView3D {
                 row.forEach((cell, c) => {
                     if (cell.piece) {
                         const key = `${level},${r},${c}`;
+                        const existing = this.stoneMeshes.get(key);
+
+                        // A mesh is keyed by its field, so a field that changed
+                        // owner has to be rebuilt - otherwise the old colour
+                        // keeps standing there as a ghost.
+                        if (existing && existing.userData.color !== cell.piece) {
+                            this.scene.remove(existing);
+                            this.stoneMeshes.delete(key);
+                        }
+
                         if (!this.stoneMeshes.has(key)) {
                             const stoneMesh = this.createStoneMesh(cell.piece);
                             const pos = this.getWorldPosition(level, r, c);
                             stoneMesh.position.copy(pos);
-                            stoneMesh.userData = { level, row: r, col: c };
+                            stoneMesh.userData = { level, row: r, col: c, color: cell.piece };
                             this.scene.add(stoneMesh);
                             this.stoneMeshes.set(key, stoneMesh);
                         } else {
                             const mesh = this.stoneMeshes.get(key);
                             const pos = this.getWorldPosition(level, r, c);
+                            mesh.userData = { level, row: r, col: c, color: cell.piece };
                             if (!animatedStones.has(key)) {
                                 mesh.position.copy(pos);
                             }
@@ -1439,24 +1460,23 @@ class PyramidView3D {
         });
         this.indicatorMeshes = [];
 
+        if (!showHints) return;
+
         const validMoves = this.game.getValidMoves();
         const selectedStone = this.game.getSelectedStone();
         
         if (!selectedStone || validMoves.length === 0) return;
 
         validMoves.forEach(move => {
-            const isDeadly = move.type === 'smash' || move.type === 'push-fall' || 
-                            (move.type === 'push' && move.pushTo === null);
-            
+            // A drop to a lower level kills whatever stands there, so it
+            // reads as deadly too.
+            const isDeadly = move.type === 'smash' || move.type === 'push-fall' ||
+                            (move.type === 'push' && move.pushTo && move.pushTo.level < move.level);
+
             const currentPlayer = this.game.getCurrentPlayer();
-            let ringColor;
-            if (isDeadly) {
-                ringColor = 0xff3333; // Red for deadly
-            } else if (currentPlayer === 'white') {
-                ringColor = 0xffdd44; // Yellow/gold for white player (more visible)
-            } else {
-                ringColor = 0x222222; // Dark gray for black player (more visible)
-            }
+            // Red is reserved for deadly moves, so the red player gets gold.
+            const ringByPlayer = { white: 0xffdd44, black: 0x222222, red: 0xffdd44, blue: 0x66aaff };
+            const ringColor = isDeadly ? 0xff3333 : (ringByPlayer[currentPlayer] || 0xffdd44);
             
             const indicatorGeo = new THREE.RingGeometry(0.2, 0.35, 24);
             const indicatorMat = new THREE.MeshBasicMaterial({
@@ -1481,75 +1501,152 @@ class PyramidView3D {
     setupRaycaster() {
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
-        
+
         let isDragging = false;
         let startX = 0;
         let startY = 0;
-        
-        const getTarget = (clientX, clientY) => {
-            const rect = this.container.getBoundingClientRect();
-            this.mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-            this.mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-            this.raycaster.setFromCamera(this.mouse, this.camera);
-            
-            // Get all intersections sorted by distance (closest first)
-            const intersects = this.raycaster.intersectObjects(this.scene.children, true);
-            
-            // First, check if we hit any stones (they should take priority)
-            for (const intersect of intersects) {
-                let obj = intersect.object;
-                while (obj) {
-                    // Check if it's a stone (has level but is part of stoneMeshes)
-                    if (obj.userData && obj.userData.level !== undefined) {
-                        const key = `${obj.userData.level},${obj.userData.row},${obj.userData.col}`;
-                        if (this.stoneMeshes.has(key)) {
-                            return obj.userData;
-                        }
-                    }
-                    obj = obj.parent;
-                }
-            }
-            
-            // If no stone hit, check cells
-            for (const intersect of intersects) {
-                let obj = intersect.object;
-                while (obj) {
-                    if (obj.userData && obj.userData.level !== undefined) {
-                        const key = `${obj.userData.level},${obj.userData.row},${obj.userData.col}`;
-                        // Only return if it's a cell, not a stone
-                        if (this.cellMeshes.has(key)) {
-                            return obj.userData;
-                        }
-                    }
-                    obj = obj.parent;
-                }
-            }
-            return null;
-        };
 
         this.container.addEventListener('pointerdown', (e) => {
             isDragging = false;
             startX = e.clientX;
             startY = e.clientY;
         });
-        
+
         this.container.addEventListener('pointermove', (e) => {
             const dx = Math.abs(e.clientX - startX);
             const dy = Math.abs(e.clientY - startY);
             if (dx > 10 || dy > 10) {
                 isDragging = true;
             }
+            this.updateHover(e.clientX, e.clientY);
         });
+
+        this.container.addEventListener('pointerleave', () => this.clearHover());
 
         this.container.addEventListener('pointerup', (e) => {
             if (!isDragging) {
-                const data = getTarget(e.clientX, e.clientY);
+                const data = this.pickTarget(e.clientX, e.clientY);
                 if (data) {
                     this.game.onCellClick(data.level, data.row, data.col);
                 }
             }
             isDragging = false;
         });
+    }
+
+    // Each tier overhangs the ring below it, so from most angles only the
+    // outer sliver of a destination field is exposed to the camera, and a
+    // click aimed at its middle lands on the tier in front instead. A field
+    // the player has been offered therefore wins the ray whatever stands in
+    // front of it; everything else resolves to the nearest hit.
+    pickTarget(clientX, clientY) {
+        const rect = this.container.getBoundingClientRect();
+        this.mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+
+        const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+        const validMoves = this.game.getValidMoves();
+
+        const dataOf = (intersect) => {
+            let obj = intersect.object;
+            while (obj) {
+                if (obj.userData && obj.userData.level !== undefined) return obj.userData;
+                obj = obj.parent;
+            }
+            return null;
+        };
+
+        for (const intersect of intersects) {
+            const data = dataOf(intersect);
+            if (data && validMoves.some(m => m.level === data.level && m.row === data.row && m.col === data.col)) {
+                return data;
+            }
+        }
+
+        for (const intersect of intersects) {
+            const data = dataOf(intersect);
+            if (data) {
+                const key = `${data.level},${data.row},${data.col}`;
+                if (this.stoneMeshes.has(key) || this.cellMeshes.has(key)) return data;
+            }
+        }
+
+        return null;
+    }
+
+    isDeadlyMove(move) {
+        return move.type === 'smash' || move.type === 'push-fall' ||
+               (move.type === 'push' && move.pushTo && move.pushTo.level < move.level);
+    }
+
+    // The sand tiles already render close to white in sunlight, so an added
+    // glow barely shows on them; the highlight has to move the material
+    // colour itself. Stones are dark, so those take the glow instead.
+    tintObject(object, color, emissive) {
+        if (!this.hoverRestore) this.hoverRestore = [];
+        object.traverse((child) => {
+            if (!child.material || !child.material.color) return;
+            this.hoverRestore.push({
+                material: child.material,
+                color: child.material.color.getHex(),
+                emissive: child.material.emissive ? child.material.emissive.getHex() : null
+            });
+            if (color !== null) child.material.color.setHex(color);
+            if (emissive !== null && child.material.emissive) child.material.emissive.setHex(emissive);
+        });
+    }
+
+    clearHover() {
+        if (this.hoverRestore) {
+            this.hoverRestore.forEach(({ material, color, emissive }) => {
+                material.color.setHex(color);
+                if (emissive !== null && material.emissive) material.emissive.setHex(emissive);
+            });
+        }
+        this.hoverRestore = null;
+        this.hoverKey = null;
+    }
+
+    // Hover feedback: a field you may move to lights up, and one where the
+    // move would destroy a stone lights up red, so the kill is visible before
+    // the click rather than after it.
+    updateHover(clientX, clientY) {
+        if (!showHints) {
+            this.clearHover();
+            return;
+        }
+
+        const data = this.pickTarget(clientX, clientY);
+        const key = data ? `${data.level},${data.row},${data.col}` : null;
+        if (key === this.hoverKey) return;
+
+        this.clearHover();
+        if (!data) return;
+
+        const move = this.game.getValidMoves().find(m =>
+            m.level === data.level && m.row === data.row && m.col === data.col);
+
+        if (move) {
+            const deadly = this.isDeadlyMove(move);
+            const cellMesh = this.cellMeshes.get(key);
+            if (cellMesh) this.tintObject(cellMesh, deadly ? 0xb03a3a : 0xffffff,
+                                          deadly ? 0x200808 : 0x242424);
+            const stoneMesh = this.stoneMeshes.get(key);
+            if (stoneMesh && deadly) this.tintObject(stoneMesh, 0x8f2020, 0x300a0a);
+            this.hoverKey = key;
+            return;
+        }
+
+        // Before a stone is picked up, show which of your own stones can move.
+        if (this.game.getSelectedStone()) return;
+        const cell = pyramid[data.level] && pyramid[data.level][data.row] &&
+                     pyramid[data.level][data.row][data.col];
+        if (cell && cell.piece === this.game.getCurrentPlayer()) {
+            const stoneMesh = this.stoneMeshes.get(key);
+            if (stoneMesh) this.tintObject(stoneMesh, null, 0x3a3a3a);
+            this.hoverKey = key;
+        }
     }
 
     setupKeyboard() {
@@ -1562,23 +1659,23 @@ class PyramidView3D {
         });
     }
 
-    animateStone(fromKey, toKey, move, callback) {
+    animateStone(fromKey, toKey, opts, callback) {
         const mesh = this.stoneMeshes.get(fromKey);
         if (!mesh) {
             if (callback) callback();
             return;
         }
 
-        animatedStones.set(fromKey, { mesh, toKey, move, callback });
+        const style = opts.style || 'move';
+        const to = opts.to;
+
+        animatedStones.set(fromKey, { mesh, toKey });
 
         const startPos = mesh.position.clone();
-        const endPos = this.getWorldPosition(move.level, move.row, move.col);
-        
-        // Different durations for different move types
-        let duration = 350;
-        if (move.type === 'push') duration = 500; // Slower for push to see it clearly
-        if (move.type === 'smash' || move.type === 'push-fall') duration = 400;
-        
+        const endPos = this.getWorldPosition(to.level, to.row, to.col);
+
+        const duration = style === 'push' ? 500 : 350;
+        const lift = style === 'push' ? 0.3 : 0.15;
         const startTime = Date.now();
 
         const animateStep = () => {
@@ -1587,31 +1684,20 @@ class PyramidView3D {
             const eased = 1 - Math.pow(1 - progress, 3);
 
             mesh.position.lerpVectors(startPos, endPos, eased);
-
-            if (move.type === 'smash' || move.type === 'push-fall') {
-                // Smash: arc up and spin
-                mesh.position.y = startPos.y + (endPos.y - startPos.y) * eased - Math.sin(progress * Math.PI) * 1.5;
-                mesh.rotation.y = progress * Math.PI * 2;
-            } else if (move.type === 'push') {
-                // Push: lift up slightly to show it's being pushed
-                const liftHeight = 0.3;
-                mesh.position.y = startPos.y + (endPos.y - startPos.y) * eased + Math.sin(progress * Math.PI) * liftHeight;
-            } else {
-                // Normal move: slight hop
-                mesh.position.y = startPos.y + (endPos.y - startPos.y) * eased + Math.sin(progress * Math.PI) * 0.15;
-            }
+            mesh.position.y = startPos.y + (endPos.y - startPos.y) * eased
+                + Math.sin(progress * Math.PI) * lift;
 
             if (progress < 1) {
                 requestAnimationFrame(animateStep);
             } else {
                 animatedStones.delete(fromKey);
-                if (move.type === 'smash' || move.type === 'push-fall') {
-                    this.scene.remove(mesh);
-                    this.stoneMeshes.delete(fromKey);
-                } else {
-                    this.stoneMeshes.delete(fromKey);
-                    this.stoneMeshes.set(toKey, mesh);
-                }
+                this.stoneMeshes.delete(fromKey);
+                // Never overwrite a key that still holds another mesh - that
+                // would strand the old one in the scene as a ghost stone.
+                const occupant = this.stoneMeshes.get(toKey);
+                if (occupant && occupant !== mesh) this.scene.remove(occupant);
+                this.stoneMeshes.set(toKey, mesh);
+                mesh.position.copy(endPos);
                 if (callback) callback();
             }
         };
@@ -1619,164 +1705,145 @@ class PyramidView3D {
         animateStep();
     }
 
-    playOsirisAnimation(stonesToRemove, callback) {
-        if (stonesToRemove.length === 0) {
-            if (callback) callback();
-            return;
-        }
+    // A stone that leaves the board (smashed, or pushed off the edge).
+    // It is detached from the board map first so nothing can re-key it
+    // while its exit animation is still running.
+    destroyStone(key, style, dir) {
+        const mesh = this.stoneMeshes.get(key);
+        if (!mesh) return;
+        this.stoneMeshes.delete(key);
+        mesh.userData = {}; // a corpse must not answer clicks any more
+        this.animateRemoval(mesh, style, dir);
+    }
 
-        const lasers = [];
-        
-        // Get positions of all stones
-        const positions = stonesToRemove.map(s => this.getWorldPosition(s.level, s.row, s.col));
-        
-        // Calculate center
-        const center = new THREE.Vector3();
-        positions.forEach(p => center.add(p));
-        center.divideScalar(positions.length);
-        
-        // PHASE 1: Draw blue line connecting the attacking stones (the ones on the ends)
-        // In an Osiris pattern, it's: attacker - captured - attacker
-        // The stonesToRemove are the captured ones in the middle
-        
-        // Find the outer stones (attackers) - they're not in stonesToRemove but adjacent
-        const attackers = [];
-        stonesToRemove.forEach(captured => {
-            const capPos = this.getWorldPosition(captured.level, captured.row, captured.col);
-            // Look for adjacent stones of the current player color
-            const captures = pyramid[captured.level][captured.row][captured.col].piece;
-            const attackerColor = captures === 'white' ? 'black' : 'white';
-            
-            // Check all adjacent positions for attacker stones
-            const directions = [[-1,0], [1,0], [0,-1], [0,1]];
-            directions.forEach(([dr, dc]) => {
-                const nr = captured.row + dr;
-                const nc = captured.col + dc;
-                if (nr >= 0 && nr < LEVELS[captured.level].size && 
-                    nc >= 0 && nc < LEVELS[captured.level].size) {
-                    const adjPiece = pyramid[captured.level][nr][nc]?.piece;
-                    if (adjPiece === attackerColor) {
-                        const adjPos = this.getWorldPosition(captured.level, nr, nc);
-                        attackers.push({ pos: adjPos, level: captured.level, row: nr, col: nc });
-                    }
-                }
-            });
-        });
-
-        // Create blue laser lines between attackers through the captured stones
-        // Connect each pair of attackers
-        const uniqueAttackers = [];
-        const seen = new Set();
-        attackers.forEach(a => {
-            const key = `${a.level},${a.row},${a.col}`;
-            if (!seen.has(key)) {
-                seen.add(key);
-                uniqueAttackers.push(a);
+    // Take the meshes of already-captured stones out of the board map so the
+    // board state can be applied immediately while they animate out.
+    detachStones(stones) {
+        const meshes = [];
+        stones.forEach(({ level, row, col }) => {
+            const key = `${level},${row},${col}`;
+            const mesh = this.stoneMeshes.get(key);
+            if (mesh) {
+                this.stoneMeshes.delete(key);
+                mesh.userData = {}; // a corpse must not answer clicks any more
+                meshes.push(mesh);
             }
         });
+        return meshes;
+    }
 
-        // Create laser from each attacker to center
-        uniqueAttackers.forEach(attacker => {
-            const points = [attacker.pos, center];
+    animateRemoval(mesh, style, dir) {
+        const startPos = mesh.position.clone();
+        const duration = 450;
+        const startTime = Date.now();
+
+        const step = () => {
+            const t = Math.min((Date.now() - startTime) / duration, 1);
+
+            if (style === 'fall') {
+                if (dir) {
+                    mesh.position.x = startPos.x + dir.dc * t * 1.6;
+                    mesh.position.z = startPos.z + dir.dr * t * 1.6;
+                }
+                mesh.position.y = startPos.y + Math.sin(t * Math.PI) * 0.4 - t * t * 6;
+                mesh.rotation.z = t * Math.PI * 1.5;
+            } else {
+                mesh.position.y = startPos.y - t * 0.45;
+                mesh.scale.set(1 + t * 0.35, Math.max(0.001, 1 - t), 1 + t * 0.35);
+            }
+
+            if (t < 1) {
+                requestAnimationFrame(step);
+            } else {
+                this.scene.remove(mesh);
+            }
+        };
+
+        step();
+    }
+
+    // Purely visual: the capture has already been applied to the board and
+    // these meshes are detached, so nothing here touches game state.
+    playOsirisAnimation(stones, attackers, meshes) {
+        if (!meshes || meshes.length === 0) return;
+
+        const positions = stones.map(s => this.getWorldPosition(s.level, s.row, s.col));
+        const center = new THREE.Vector3();
+        positions.forEach(pos => center.add(pos));
+        center.divideScalar(positions.length);
+
+        // One laser from each flanking stone into the middle of the line.
+        const lasers = attackers.map(a => {
+            const points = [this.getWorldPosition(a.level, a.row, a.col), center];
             const geometry = new THREE.BufferGeometry().setFromPoints(points);
-            const material = new THREE.LineBasicMaterial({ 
-                color: 0x00aaff, 
-                transparent: true, 
+            const material = new THREE.LineBasicMaterial({
+                color: 0x00aaff,
+                transparent: true,
                 opacity: 0,
                 linewidth: 2
             });
             const laser = new THREE.Line(geometry, material);
             this.scene.add(laser);
-            lasers.push(laser);
+            return laser;
         });
 
-        // PHASE 2: After laser, electrify the captured stones
         const electricLight = new THREE.PointLight(0x00ffff, 0, 5);
         electricLight.position.copy(center);
         this.scene.add(electricLight);
 
-        // Add glow to captured stones
-        stonesToRemove.forEach(({ level, row, col }) => {
-            const key = `${level},${row},${col}`;
-            const mesh = this.stoneMeshes.get(key);
-            if (mesh) {
-                mesh.traverse((child) => {
-                    if (child.isMesh && child.material) {
-                        child.material.emissive = new THREE.Color(0x00ffff);
-                        child.material.emissiveIntensity = 0;
-                    }
-                });
-            }
+        const emissives = [];
+        meshes.forEach(mesh => {
+            mesh.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    child.material.emissive = new THREE.Color(0x00ffff);
+                    child.material.emissiveIntensity = 0;
+                    emissives.push(child.material);
+                }
+            });
         });
 
-        // Two-phase animation
-        const phase1Duration = 500; // Blue line phase
-        const phase2Duration = 600;  // Electric phase
+        const phase1Duration = 500; // blue line
+        const phase2Duration = 600; // electrify
         const startTime = Date.now();
-        
+
         const animate = () => {
             const elapsed = Date.now() - startTime;
-            
+
             if (elapsed < phase1Duration) {
-                // Phase 1: Blue laser lines
                 const progress = elapsed / phase1Duration;
                 lasers.forEach(laser => {
                     laser.material.opacity = Math.sin(progress * Math.PI) * 0.9;
                 });
                 requestAnimationFrame(animate);
             } else if (elapsed < phase1Duration + phase2Duration) {
-                // Phase 2: Electrify captured stones
                 const progress = (elapsed - phase1Duration) / phase2Duration;
-                
-                // Fade out lasers
+
                 lasers.forEach(laser => {
                     laser.material.opacity = 0.9 * (1 - progress);
                 });
-                
-                // Pulse electric light
+
                 electricLight.intensity = Math.sin(progress * Math.PI * 8) * 2 + 2;
-                
-                // Pulse stone emissive
-                stonesToRemove.forEach(({ level, row, col }) => {
-                    const key = `${level},${row},${col}`;
-                    const mesh = this.stoneMeshes.get(key);
-                    if (mesh) {
-                        mesh.traverse((child) => {
-                            if (child.isMesh && child.material) {
-                                child.material.emissiveIntensity = Math.sin(progress * Math.PI * 6) * 0.6 + 0.6;
-                            }
-                        });
-                    }
+
+                emissives.forEach(material => {
+                    material.emissiveIntensity = Math.sin(progress * Math.PI * 6) * 0.6 + 0.6;
                 });
-                
+
+                meshes.forEach(mesh => {
+                    mesh.scale.setScalar(Math.max(0.001, 1 - progress));
+                });
+
                 requestAnimationFrame(animate);
             } else {
-                // Cleanup
                 lasers.forEach(laser => {
                     this.scene.remove(laser);
                     laser.geometry.dispose();
                     laser.material.dispose();
                 });
                 this.scene.remove(electricLight);
-                
-                // Reset emissive
-                stonesToRemove.forEach(({ level, row, col }) => {
-                    const key = `${level},${row},${col}`;
-                    const mesh = this.stoneMeshes.get(key);
-                    if (mesh) {
-                        mesh.traverse((child) => {
-                            if (child.isMesh && child.material) {
-                                child.material.emissive = new THREE.Color(0x000000);
-                                child.material.emissiveIntensity = 0;
-                            }
-                        });
-                    }
-                });
-                
-                if (callback) callback();
+                meshes.forEach(mesh => this.scene.remove(mesh));
             }
         };
-        
+
         animate();
     }
 

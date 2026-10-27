@@ -397,7 +397,11 @@ function createStoneMesh(color) {
 }
 
 function sync3D() {
-    if (typeof board === 'undefined') return;
+    // The board may not exist yet: init3D can win the race against
+    // initializeBoard's DOMContentLoaded handler. Returning early keeps
+    // the rest of init3D running; a later rebuild3DBoard or drawBoard
+    // call syncs the pieces once the board is built.
+    if (typeof board === 'undefined' || board.length < BOARD_SIZE) return;
 
     const currentKeys = new Set();
     for (let r = 0; r < BOARD_SIZE; r++) {
