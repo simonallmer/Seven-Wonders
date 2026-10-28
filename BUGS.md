@@ -44,26 +44,57 @@ wait for `DOMContentLoaded` rather than a zero timeout, so the first
 
 ## Pyramid
 
-### Y-1 — valid destinations only 36–48% clickable — **fixed**
+### Y-1 — valid destinations resolve to the wrong field — **open**
 
-Each tier of the pyramid overhangs the ring below it. From the default camera
-the middle of a level-0 field is hidden behind the level-1 tier, so a click
-aimed at a destination's centre hit the tier in front and the move was
-silently dropped — the player saw the marker, clicked it, and nothing
-happened. This is almost certainly the "it didn't register movements that
-should be possible" report.
+Each tier overhangs the ring below it, so from the default camera the middle
+of a destination field is hidden behind the tier in front of it and a click
+aimed at its centre lands on the wrong square. This is almost certainly the
+"it didn't register movements that should be possible" report, and also the
+"pushed a stone from the top and it weirdly went all the way down" one — see
+the second measurement below.
 
 - Repro: start a game, select a front-row white stone, click the middle of
-  any marked destination on the left rim. Before the fix most clicks
-  deselected instead of moving.
-- Measured: sampling a 5x5 grid over each destination's footprint, 36–48% of
-  points resolved to the intended field. After the fix, 100% on all five.
-- Fix: `pickTarget()` resolves a field the player has already been offered
-  ahead of whatever occludes it, and falls back to the nearest hit otherwise.
-  This also removed a blanket "stones beat cells" rule that could let a stone
-  behind an empty field steal a click.
-- Note: the fix is independent of the Hints setting — turning hints off
-  changes what is drawn, never where a click lands.
+  any marked destination on the left rim. Most clicks deselect instead of
+  moving.
+- Measured (footprint): sampling a 5x5 grid over each destination, 36–48% of
+  points resolve to the intended field.
+- Measured (centres): with a single white stone on level 2, the eight run
+  destinations plus the jump were each aimed at dead centre. 5 of 9 resolved
+  to a different square, and the error is systematic — one tier off, onto
+  whatever occludes the target. Aiming at the near `2,0,0` resolved to the
+  apex `3,0,0`; aiming at `0,3,0` resolved to `1,2,0`; aiming at `1,2,0`
+  resolved to the stone's own square, i.e. a deselect.
+- Why that reads as "it went all the way down": RUN is a straight line down
+  the slope, so one stone on level 2 offers three destinations in the same
+  direction — `2,0,0`, `1,0,1`, `0,0,2`. Those are stacked in screen space,
+  the lower ones in front. A click meant for the near one lands on a far one,
+  and the stone runs to the bottom. The move logic is correct here: a push
+  over the edge was verified to drop exactly one level (`2,1,0` pushing
+  `2,2,0` lands it on `1,4,1`), and the cascade is the documented rule.
+- A fix was written and then reverted on request, together with the hover
+  highlighting it shipped alongside — see Y-5. If it is reinstated it should
+  go in on its own: `pickTarget()` resolving an already-offered field ahead
+  of whatever occludes it took all sampled destinations to 100%, changes
+  nothing visually, and adds no UI.
+
+### Y-5 — hover highlight turned stones permanently red — **reverted**
+
+A hover highlight tinted the destination field white, or the field and its
+victim red for a killing move. In play, stones stayed red permanently, which
+is worse than cosmetic: red is a real player colour in 4-player mode.
+
+Cause: stone materials are shared — 14 stones carry 28 material instances
+across 42 material-bearing children, so the gold rim and body materials are
+reused between stones. The tint saved "the original colour" per call and
+pushed onto a restore list, so a second tint of an already-tinted shared
+material recorded red as the original, and restoring put red back. Tinting
+one stone also reached every stone sharing that material.
+
+It was also simply too much: the board already marks destinations with rings,
+so lighting them up as well was redundant. Reverted whole, along with the
+Hints toggle that switched it. Any future version should settle what marks a
+move — rings or lighting, not both — and must clone a material before
+touching it.
 
 ### Y-2 — ghost and corpse stones — **watch**
 
@@ -104,18 +135,17 @@ does clicking outside it. The toggle was dead, not the menu unclosable.)
 
 ### Y-4 — the side menu is taller than the viewport — **open** (low)
 
-At 1024x768 the 2-player menu's content is 958px against a 768px panel, so it
-overflows by 190px and the Reset and Close buttons sit below the fold. The
-panel scrolls (`overflow-y: auto` when open) and both buttons are reachable
-after scrolling, but there is no visual scroll affordance.
+At 1024x768 the 2-player menu's content is 882px against a 768px panel, so it
+overflows by 114px and the Close button's bottom sits at 842px, below the
+fold; Reset only just fits, at 766px. The panel scrolls (`overflow-y: auto`
+when open) and both are reachable after scrolling, but there is no visual
+scroll affordance.
 
-The Hints button added ~76px of this; before it the menu already overflowed by
-~114px and Close was already below the fold. Fixing it properly means a
-compaction pass on `.menu-content` (padding `80px 24px 40px`, `gap: 24px`),
-in the spirit of the existing `.side-menu.four-players` rules, rather than a
-one-value tweak. Y-3 takes most of the sting out of it: the toggle at the top
-is now always reachable, so nobody has to scroll to a Close button to shut the
-menu.
+Fixing it properly means a compaction pass on `.menu-content` (padding
+`80px 24px 40px`, `gap: 24px`), in the spirit of the existing
+`.side-menu.four-players` rules, rather than a one-value tweak. Y-3 takes most
+of the sting out of it: the toggle at the top is now always reachable, so
+nobody has to scroll to a Close button to shut the menu.
 
 ---
 

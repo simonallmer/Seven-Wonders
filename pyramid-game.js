@@ -49,7 +49,6 @@ let isVsComputer = localStorage.getItem('pyramidVsComputer') === null ? true : l
 // Conquest mode: only the victory fields win. Attrition never decides the game —
 // once nobody holds 4 stones any more it is a draw.
 let isConquestMode = localStorage.getItem('pyramidConquestMode') === 'true';
-let showHints = localStorage.getItem('pyramidShowHints') === null ? true : localStorage.getItem('pyramidShowHints') === 'true';
 let isMoveInProgress = false; // Block input during move
 let turnInProgress = false;
 
@@ -145,25 +144,6 @@ function initializeUI() {
             ? 'Conquest: only the victory fields win.'
             : 'Standard: last player with 4+ stones wins.');
         updateUI();
-    });
-
-    const hintsBtn = document.getElementById('hints-btn');
-    const updateHintsBtn = () => {
-        if (hintsBtn) hintsBtn.textContent = showHints ? 'Hints: On' : 'Hints: Off';
-    };
-    updateHintsBtn();
-
-    if (hintsBtn) hintsBtn.addEventListener('click', () => {
-        showHints = !showHints;
-        localStorage.setItem('pyramidShowHints', showHints);
-        updateHintsBtn();
-        if (view3D) {
-            view3D.clearHover();
-            view3D.updateIndicators();
-        }
-        showMessage(showHints
-            ? 'Hints on: possible moves are marked, and lit up on hover.'
-            : 'Hints off: no move markers.');
     });
 
     opponentBtn.addEventListener('click', () => {
@@ -1355,11 +1335,6 @@ class PyramidView3D {
     }
 
     updateStones() {
-        // A tinted mesh may be about to be removed or recoloured, and its
-        // saved original would then be restored onto the wrong stone - or
-        // never at all. Drop the highlight before the board changes under it.
-        this.clearHover();
-
         const pyramid = this.game.getPyramid();
         
         this.stoneMeshes.forEach((mesh, key) => {
@@ -1460,8 +1435,6 @@ class PyramidView3D {
         });
         this.indicatorMeshes = [];
 
-        if (!showHints) return;
-
         const validMoves = this.game.getValidMoves();
         const selectedStone = this.game.getSelectedStone();
         
@@ -1501,152 +1474,75 @@ class PyramidView3D {
     setupRaycaster() {
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
-
+        
         let isDragging = false;
         let startX = 0;
         let startY = 0;
+        
+        const getTarget = (clientX, clientY) => {
+            const rect = this.container.getBoundingClientRect();
+            this.mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            this.mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            this.raycaster.setFromCamera(this.mouse, this.camera);
+            
+            // Get all intersections sorted by distance (closest first)
+            const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+            
+            // First, check if we hit any stones (they should take priority)
+            for (const intersect of intersects) {
+                let obj = intersect.object;
+                while (obj) {
+                    // Check if it's a stone (has level but is part of stoneMeshes)
+                    if (obj.userData && obj.userData.level !== undefined) {
+                        const key = `${obj.userData.level},${obj.userData.row},${obj.userData.col}`;
+                        if (this.stoneMeshes.has(key)) {
+                            return obj.userData;
+                        }
+                    }
+                    obj = obj.parent;
+                }
+            }
+            
+            // If no stone hit, check cells
+            for (const intersect of intersects) {
+                let obj = intersect.object;
+                while (obj) {
+                    if (obj.userData && obj.userData.level !== undefined) {
+                        const key = `${obj.userData.level},${obj.userData.row},${obj.userData.col}`;
+                        // Only return if it's a cell, not a stone
+                        if (this.cellMeshes.has(key)) {
+                            return obj.userData;
+                        }
+                    }
+                    obj = obj.parent;
+                }
+            }
+            return null;
+        };
 
         this.container.addEventListener('pointerdown', (e) => {
             isDragging = false;
             startX = e.clientX;
             startY = e.clientY;
         });
-
+        
         this.container.addEventListener('pointermove', (e) => {
             const dx = Math.abs(e.clientX - startX);
             const dy = Math.abs(e.clientY - startY);
             if (dx > 10 || dy > 10) {
                 isDragging = true;
             }
-            this.updateHover(e.clientX, e.clientY);
         });
-
-        this.container.addEventListener('pointerleave', () => this.clearHover());
 
         this.container.addEventListener('pointerup', (e) => {
             if (!isDragging) {
-                const data = this.pickTarget(e.clientX, e.clientY);
+                const data = getTarget(e.clientX, e.clientY);
                 if (data) {
                     this.game.onCellClick(data.level, data.row, data.col);
                 }
             }
             isDragging = false;
         });
-    }
-
-    // Each tier overhangs the ring below it, so from most angles only the
-    // outer sliver of a destination field is exposed to the camera, and a
-    // click aimed at its middle lands on the tier in front instead. A field
-    // the player has been offered therefore wins the ray whatever stands in
-    // front of it; everything else resolves to the nearest hit.
-    pickTarget(clientX, clientY) {
-        const rect = this.container.getBoundingClientRect();
-        this.mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-        this.mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-        this.raycaster.setFromCamera(this.mouse, this.camera);
-
-        const intersects = this.raycaster.intersectObjects(this.scene.children, true);
-        const validMoves = this.game.getValidMoves();
-
-        const dataOf = (intersect) => {
-            let obj = intersect.object;
-            while (obj) {
-                if (obj.userData && obj.userData.level !== undefined) return obj.userData;
-                obj = obj.parent;
-            }
-            return null;
-        };
-
-        for (const intersect of intersects) {
-            const data = dataOf(intersect);
-            if (data && validMoves.some(m => m.level === data.level && m.row === data.row && m.col === data.col)) {
-                return data;
-            }
-        }
-
-        for (const intersect of intersects) {
-            const data = dataOf(intersect);
-            if (data) {
-                const key = `${data.level},${data.row},${data.col}`;
-                if (this.stoneMeshes.has(key) || this.cellMeshes.has(key)) return data;
-            }
-        }
-
-        return null;
-    }
-
-    isDeadlyMove(move) {
-        return move.type === 'smash' || move.type === 'push-fall' ||
-               (move.type === 'push' && move.pushTo && move.pushTo.level < move.level);
-    }
-
-    // The sand tiles already render close to white in sunlight, so an added
-    // glow barely shows on them; the highlight has to move the material
-    // colour itself. Stones are dark, so those take the glow instead.
-    tintObject(object, color, emissive) {
-        if (!this.hoverRestore) this.hoverRestore = [];
-        object.traverse((child) => {
-            if (!child.material || !child.material.color) return;
-            this.hoverRestore.push({
-                material: child.material,
-                color: child.material.color.getHex(),
-                emissive: child.material.emissive ? child.material.emissive.getHex() : null
-            });
-            if (color !== null) child.material.color.setHex(color);
-            if (emissive !== null && child.material.emissive) child.material.emissive.setHex(emissive);
-        });
-    }
-
-    clearHover() {
-        if (this.hoverRestore) {
-            this.hoverRestore.forEach(({ material, color, emissive }) => {
-                material.color.setHex(color);
-                if (emissive !== null && material.emissive) material.emissive.setHex(emissive);
-            });
-        }
-        this.hoverRestore = null;
-        this.hoverKey = null;
-    }
-
-    // Hover feedback: a field you may move to lights up, and one where the
-    // move would destroy a stone lights up red, so the kill is visible before
-    // the click rather than after it.
-    updateHover(clientX, clientY) {
-        if (!showHints) {
-            this.clearHover();
-            return;
-        }
-
-        const data = this.pickTarget(clientX, clientY);
-        const key = data ? `${data.level},${data.row},${data.col}` : null;
-        if (key === this.hoverKey) return;
-
-        this.clearHover();
-        if (!data) return;
-
-        const move = this.game.getValidMoves().find(m =>
-            m.level === data.level && m.row === data.row && m.col === data.col);
-
-        if (move) {
-            const deadly = this.isDeadlyMove(move);
-            const cellMesh = this.cellMeshes.get(key);
-            if (cellMesh) this.tintObject(cellMesh, deadly ? 0xb03a3a : 0xffffff,
-                                          deadly ? 0x200808 : 0x242424);
-            const stoneMesh = this.stoneMeshes.get(key);
-            if (stoneMesh && deadly) this.tintObject(stoneMesh, 0x8f2020, 0x300a0a);
-            this.hoverKey = key;
-            return;
-        }
-
-        // Before a stone is picked up, show which of your own stones can move.
-        if (this.game.getSelectedStone()) return;
-        const cell = pyramid[data.level] && pyramid[data.level][data.row] &&
-                     pyramid[data.level][data.row][data.col];
-        if (cell && cell.piece === this.game.getCurrentPlayer()) {
-            const stoneMesh = this.stoneMeshes.get(key);
-            if (stoneMesh) this.tintObject(stoneMesh, null, 0x3a3a3a);
-            this.hoverKey = key;
-        }
     }
 
     setupKeyboard() {
