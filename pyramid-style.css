@@ -76,7 +76,8 @@ html, body {
     justify-content: space-between;
     align-items: center;
     padding: 0 20px;
-    z-index: 100;
+    /* Above the side menu, so its toggle stays visible and clickable while open. */
+    z-index: 600;
 }
 
 .top-bar-link {
@@ -199,7 +200,7 @@ html, body {
     height: 100%;
     background: linear-gradient(180deg, rgba(26, 21, 16, 0.97) 0%, rgba(20, 16, 12, 0.98) 100%);
     border-left: 2px solid var(--gold);
-    z-index: 999;
+    z-index: 500;
     transform: translateX(100%);
     transition: transform var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
     backdrop-filter: blur(20px);

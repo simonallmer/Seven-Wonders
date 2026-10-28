@@ -74,13 +74,48 @@ stone so a corpse cannot answer clicks. No ghost reproduced in this pass, but
 the pass was scripted rather than played, so this needs real play before it is
 called fixed.
 
-### Y-3 — the side menu covers its own toggle — **open**
+### Y-3 — the side menu covered its own toggle — **fixed**
 
-With `#side-menu` open, the menu panel (`z-index: 999`) sits over
-`#menu-toggle`, so clicking the toggle again hits `menu-content` instead of
-closing the menu. Found while driving the UI in tests. Pyramid has no
-`#close-menu-btn` (other games do), so the menu is closed by clicking outside
-it.
+With `#side-menu` open, the menu panel (`z-index: 999`) sat over the top bar
+(`z-index: 100`) and with it `#menu-toggle`, so a second click on the toggle
+landed on `menu-content` and the menu stayed open. The toggle already animates
+into an X when the menu opens, so it looked like a close button and did
+nothing. (An earlier note here said Pyramid has no in-menu close button; that
+was wrong — `#close-from-menu-btn`, labelled "Close", does close the menu, as
+does clicking outside it. The toggle was dead, not the menu unclosable.)
+
+- Repro: open the menu, then click the toggle again. Before the fix the hit
+  test at the toggle's own centre returned `menu-content`; clicks 2 and 3 of a
+  three-click sequence missed the toggle entirely and the menu stayed open.
+- Fix: `.top-bar` 100 → 600 and `.side-menu` 999 → 500, so the bar sits above
+  the panel. All other layers keep their relative order: game container 1,
+  game message 100, menu 500, top bar 600, game-over 2000, rules 3000, and in
+  the demo build the paywall overlay 1000 and timer badge 9999.
+- Verified: toggle alternates open/closed over four real pointer clicks at
+  375x812 and 1024x768, in both the full game and the demo; every menu button,
+  the title, the counts and the back link remain hit-testable with the menu
+  open; the rules modal, the game-over overlay, the demo paywall and the demo
+  timer badge all still cover the raised bar.
+- Note: every other game with a side menu ships the same stacking (top bar
+  100/1500/5000 under side menu 999/2000/10000), so the toggle is dead while
+  the menu is open in cathedral, colosseum, colossus, gardens, great_wall,
+  library, mausoleum, palace, pharos, statue, temple and tower too. Only
+  Pyramid was asked for and only Pyramid was changed.
+
+### Y-4 — the side menu is taller than the viewport — **open** (low)
+
+At 1024x768 the 2-player menu's content is 958px against a 768px panel, so it
+overflows by 190px and the Reset and Close buttons sit below the fold. The
+panel scrolls (`overflow-y: auto` when open) and both buttons are reachable
+after scrolling, but there is no visual scroll affordance.
+
+The Hints button added ~76px of this; before it the menu already overflowed by
+~114px and Close was already below the fold. Fixing it properly means a
+compaction pass on `.menu-content` (padding `80px 24px 40px`, `gap: 24px`),
+in the spirit of the existing `.side-menu.four-players` rules, rather than a
+one-value tweak. Y-3 takes most of the sting out of it: the toggle at the top
+is now always reachable, so nobody has to scroll to a Close button to shut the
+menu.
 
 ---
 
@@ -131,3 +166,17 @@ it before driving a move in a test:
 ```js
 window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
 ```
+
+CSS transitions are throttled the same way, which is a separate trap: the side
+menu's `.open` class applies but `transform` stays at `translateX(100%)`, so
+hit tests against the "open" menu silently probe an off-screen panel. Disable
+the transition before measuring geometry:
+
+```js
+sideMenu.style.transition = 'none';
+sideMenu.classList.add('open');
+sideMenu.getBoundingClientRect();   // force the reflow before hit-testing
+```
+
+Both traps make a working UI look broken. Confirm which you are looking at by
+reading the computed `transform` or counting rAF callbacks before filing.
