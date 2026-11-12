@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Pharos symbol: the three-stage lighthouse and the rays of its fire. -->
+  <g fill="#f2deae">
+    <path d="M56 168L64 96H116L124 168Z"/>
+    <path d="M58 86H122V94H58Z"/>
+    <path d="M72 84L76 54H104L108 84Z"/>
+    <path d="M78 44H102V52H78Z"/>
+    <circle cx="90" cy="32" r="8"/>
+    <path d="M90 6L93 20H87Z M62 14L78 26L74 30Z M118 14L106 30L102 26Z M48 34L70 34V38Z M132 34L110 38V34Z"/>
+  </g>
+</svg>

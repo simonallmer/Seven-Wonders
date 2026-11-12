@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Statue symbol: the floor seen from above, the four feet of the throne, a die at the centre. -->
+  <g fill="#f2deae" fill-rule="evenodd">
+    <path d="M14 14H166V166H14Z M26 26V154H154V26Z"/>
+    <path d="M50 50H78V78H50Z M102 50H130V78H102Z M50 102H78V130H50Z M102 102H130V130H102Z"/>
+    <circle cx="90" cy="90" r="9"/>
+  </g>
+</svg>

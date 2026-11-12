@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Colossus symbol: the cross-shaped board with its four direction fields and the rayed sun of Helios. -->
+  <g fill="#f2deae" fill-rule="evenodd">
+    <path d="M36 36H144V144H36Z M48 48V132H132V48Z"/>
+    <path d="M72 14H108V30H72Z M72 150H108V166H72Z M14 72H30V108H14Z M150 72H166V108H150Z"/>
+    <circle cx="90" cy="90" r="13"/>
+    <path d="M90 58L94 72H86Z M90 122L86 108H94Z M58 90L72 86V94Z M122 90L108 94V86Z M67 67L79 74L74 79Z M113 113L101 106L106 101Z M113 67L106 79L101 74Z M67 113L74 101L79 106Z"/>
+  </g>
+</svg>

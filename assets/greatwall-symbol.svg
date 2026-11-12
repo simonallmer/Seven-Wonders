@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Great Wall symbol: a watchtower and the crenellated wall running off to both sides. -->
+  <g fill="#f2deae">
+    <path d="M62 44H74V34H84V44H96V34H106V44H118V60H62Z"/>
+    <path d="M66 64H114L120 150H60Z"/>
+    <path d="M6 96H18V88H28V96H40V88H50V96H58L54 150H6Z"/>
+    <path d="M122 96H130V88H140V96H152V88H162V96H174V150H126Z"/>
+    <path d="M4 156H176V166H4Z"/>
+  </g>
+</svg>

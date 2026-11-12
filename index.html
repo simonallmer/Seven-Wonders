@@ -1,80 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seven Wonders - Ancient Strategy Games</title>
-    <meta name="description"
-        content="Play all seven titles from the legendary Seven Wonders abstract strategy game series">
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Seven Wonders</title>
+    <meta name="description" content="Seven Wonders — the abstract strategy games by Simon Allmer. Walk the table in the Crystal Palace and step into a wonder.">
+    <meta name="theme-color" content="#0d0b09">
+    <link rel="icon" href="assets/SevenWondersSymbol.svg">
+    <link rel="preload" href="assets/Ancient-Tulip.ttf" as="font" type="font/ttf" crossorigin>
+    <link rel="stylesheet" href="css/style.css">
+    <script type="importmap">
+        { "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }
+    </script>
 </head>
+<body class="state-intro">
+    <canvas id="view"></canvas>
 
-<body>
-    <a href="https://simonallmer.com/arcade" class="back-link">← Back to Arcade</a>
+    <div id="ui">
+        <a id="sa" href="https://simonallmer.com" title="simonallmer.com"><img src="assets/SALogo.png" alt="Simon Allmer"></a>
+        <div id="brand">Seven Wonders</div>
 
-    <div class="container menu-page">
-        <header class="main-header">
-            <h1 class="title">SEVEN WONDERS</h1>
-        </header>
-
-        <div class="menu-columns">
-            <div class="menu-column">
-                <h2 class="column-title">Old</h2>
-                <nav class="game-menu">
-                    <ul class="game-list">
-                        <li><a href="#pyramid" class="game-link" data-id="pyramid">Pyramid</a></li>
-                        <li><a href="#gardens" class="game-link" data-id="gardens">Gardens</a></li>
-                        <li><a href="#temple" class="game-link" data-id="temple">Temple</a></li>
-                        <li><a href="#statue" class="game-link" data-id="statue">Statue</a></li>
-                        <li><a href="#mausoleum" class="game-link" data-id="mausoleum">Mausoleum</a></li>
-                        <li><a href="#colossus" class="game-link" data-id="colossus">Colossus</a></li>
-                        <li><a href="pharos.html" class="game-link" data-id="pharos">Pharos</a></li>
-                    </ul>
-                </nav>
+        <!-- top right: who is playing -->
+        <aside id="panel">
+            <div class="seg" id="players-seg" role="group" aria-label="Number of players">
+                <button data-players="2">2 Players</button>
+                <button data-players="4">4 Players</button>
             </div>
-            <div class="menu-column">
-                <h2 class="column-title">New</h2>
-                <nav class="game-menu">
-                    <ul class="game-list">
-                        <li><a href="colosseum.html" class="game-link" data-id="colosseum">Colosseum<span class="proto-tag">Prototype</span></a></li>
-                        <li><a href="great_wall.html" class="game-link" data-id="great_wall">Great Wall</a></li>
-                        <li><a href="library.html" class="game-link" data-id="library">Library</a></li>
-                        <li><a href="tower.html" class="game-link" data-id="tower">Tower<span class="proto-tag">Prototype</span></a></li>
-                        <li><a href="cathedral.html" class="game-link" data-id="cathedral">Cathedral<span class="proto-tag">Prototype</span></a></li>
-                        <li><a href="palace.html" class="game-link" data-id="palace">Palace<span class="proto-tag">Prototype</span></a></li>
-                        <li><a href="skyscraper.html" class="game-link" data-id="skyscraper">Skyscraper</a></li>
-                    </ul>
-                </nav>
+            <ul id="seats"></ul>
+            <div class="seg small" id="mode-seg" role="group" aria-label="Victory">
+                <button data-mode="standard" title="Win on the summit, or once every rival has fewer than four stones">Standard</button>
+                <button data-mode="conquest" title="Only the four victory fields win">Conquest</button>
+            </div>
+            <div class="tools">
+                <button id="btn-sound" title="Sound (M)">Sound</button>
+                <button id="btn-light" title="Daylight follows your clock (L)">Live</button>
+                <button id="btn-rules" class="game-only" title="Rules (R)">Rules</button>
+                <button id="btn-restart" class="game-only" title="Start again">Restart</button>
+                <button id="btn-leave" class="game-only" title="Back to the exhibition (Esc)">Exhibition</button>
+            </div>
+        </aside>
+
+        <!-- bottom: the wonder in front of you -->
+        <section id="card">
+            <button class="nav" id="nav-prev" aria-label="Previous wonder">‹</button>
+            <div class="card-body">
+                <div id="card-side"></div>
+                <h1 id="card-name"></h1>
+                <div id="card-place"></div>
+                <p id="card-line"></p>
+                <button id="card-play"></button>
+            </div>
+            <button class="nav" id="nav-next" aria-label="Next wonder">›</button>
+        </section>
+        <div id="hint">← → walk the table &nbsp;·&nbsp; Enter to step inside</div>
+
+        <div id="status"></div>
+        <div id="actions" hidden></div>
+        <div id="toast"></div>
+
+        <div id="rules" class="overlay" hidden>
+            <article class="papyrus">
+                <button class="close" id="rules-close" aria-label="Close">×</button>
+                <img src="assets/pyramid-symbol.svg" alt="" class="sigil" id="rules-sigil">
+                <h2 id="rules-title">Pyramid</h2>
+                <div id="rules-text"></div>
+            </article>
+        </div>
+
+        <div id="gameover" class="overlay" hidden>
+            <div class="banner">
+                <h2 id="over-title"></h2>
+                <p id="over-text"></p>
+                <div class="row">
+                    <button id="over-again">Play again</button>
+                    <button id="over-leave">Back to the Exhibition</button>
+                </div>
             </div>
         </div>
 
-        <div class="extra-buttons">
-            <a href="keywords.html" class="action-btn back-btn">Keywords</a>
-            <a href="events.html" class="action-btn back-btn">Events</a>
-            <a href="store.html" class="action-btn back-btn">Store</a>
+        <div id="intro">
+            <h1>Seven Wonders</h1>
+            <button id="intro-enter" disabled>Preparing the hall…</button>
+            <small>© 2020–2026 Simon Allmer Entertainment</small>
         </div>
-
-        <footer class="copyright">
-            <p style="margin-bottom:6px"><a href="version.html" style="color: inherit; text-decoration: none;">Version 0.0.1</a></p>
-            <p><a href="https://sevenwondersgames.com"
-                    style="color: inherit; text-decoration: none;">SevenWondersGames.com</a></p>
-            <p><a href="https://instagram.com/sevenwondersgames"
-                    style="color: inherit; text-decoration: none;">@SevenWondersGames</a></p>
-            <p>&copy; 2020-2026 Simon Allmer Entertainment</p>
-        </footer>
     </div>
 
-    <script src="script.js"></script>
     <script>
-        // Press D on the main menu to open the Developer Log (password-gated).
-        document.addEventListener('keydown', function (e) {
-            var tag = (e.target && e.target.tagName) || '';
-            if (/^(INPUT|TEXTAREA)$/.test(tag)) return;
-            if (e.key === 'd' || e.key === 'D') { window.location.href = 'devlog.html'; }
-        });
+        // opened by double-click: browsers will not load modules from file://, so say what to do instead
+        if (location.protocol === 'file:') document.getElementById('intro-enter').textContent = 'Double-click “Play Seven Wonders.command” in this folder to play';
     </script>
-
+    <script type="module" src="src/main.js"></script>
 </body>
-
 </html>

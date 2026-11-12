@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Gardens symbol: three terraces under a palm, water falling down the middle. -->
+  <g fill="#f2deae">
+    <path d="M10 150H170V170H10Z"/>
+    <path d="M32 118H148V140H32Z M83 118V140H97V118Z" fill-rule="evenodd"/>
+    <path d="M56 86H124V108H56Z M83 86V108H97V86Z" fill-rule="evenodd"/>
+    <path d="M86 76V44h8V76Z"/>
+    <path d="M90 46C70 22 46 28 36 40C54 34 72 38 90 46Z M90 46C110 22 134 28 144 40C126 34 108 38 90 46Z M90 44C82 22 62 10 50 12C66 18 80 30 90 44Z M90 44C98 22 118 10 130 12C114 18 100 30 90 44Z"/>
+  </g>
+</svg>

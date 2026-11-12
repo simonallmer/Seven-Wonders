@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Skyscraper symbol: the shaft with its windows, the tiered crown of arches, the needle. -->
+  <g fill="#f2deae" fill-rule="evenodd">
+    <path d="M88 4h4v30h-4z"/>
+    <path d="M90 30a14 14 0 0 1 14 14H76a14 14 0 0 1 14-14z"/>
+    <path d="M90 42a22 22 0 0 1 22 22H68a22 22 0 0 1 22-22z M90 50a14 14 0 0 0-14 14h28a14 14 0 0 0-14-14z"/>
+    <path d="M90 60a30 30 0 0 1 30 30H60a30 30 0 0 1 30-30z M90 68a22 22 0 0 0-22 22h44a22 22 0 0 0-22-22z"/>
+    <path d="M58 94H122V176H58Z M68 104V118H78V104Z M85 104V118H95V104Z M102 104V118H112V104Z M68 126V140H78V126Z M85 126V140H95V126Z M102 126V140H112V126Z M68 148V162H78V148Z M85 148V162H95V148Z M102 148V162H112V148Z"/>
+  </g>
+</svg>

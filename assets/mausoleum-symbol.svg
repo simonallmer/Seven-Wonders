@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Mausoleum symbol: podium, colonnade, stepped pyramid. -->
+  <g fill="#f2deae">
+    <path d="M90 14L104 40H76Z"/>
+    <path d="M68 46H112V56H68Z M56 60H124V70H56Z M44 74H136V84H44Z"/>
+    <path d="M50 90h10v34H50Z M68 90h10v34H68Z M85 90h10v34H85Z M102 90h10v34H102Z M120 90h10v34H120Z"/>
+    <path d="M38 128H142V166H38Z"/>
+  </g>
+</svg>

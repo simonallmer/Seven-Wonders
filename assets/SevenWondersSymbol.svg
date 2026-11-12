@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    Seven Wonders column/pillar symbol
+    Faithful SVG vector trace from SevenWondersLogo.jpg
+    Black fill on transparent background, centered
+  -->
+  <g fill="#000000">
+
+    <!-- Top bar (abacus) with scroll-curling ends -->
+    <!-- The bar is a wide rounded shape. Each end curls downward in a small scroll. -->
+    <path d="
+      M 130,148
+      C 130,125  148,118  165,118
+      L 347,118
+      C 364,118  382,125  382,148
+      C 382,158  378,165  370,170
+      C 363,174  359,178  355,184
+      L 157,184
+      C 153,178  149,174  142,170
+      C 134,165  130,158  130,148
+      Z
+    "/>
+
+    <!-- Capital - trapezoid -->
+    <path d="
+      M 155,188
+      L 357,188
+      L 327,228
+      L 185,228
+      Z
+    "/>
+
+    <!-- Left pillar - angled bottom-left corner forming a downward point -->
+    <path d="
+      M 185,234
+      L 222,234
+      L 222,376
+      L 200,376
+      L 185,400
+      Z
+    "/>
+
+    <!-- Center pillar - simple rectangle, extends below the outer pillars -->
+    <path d="
+      M 238,234
+      L 274,234
+      L 274,393
+      L 238,393
+      Z
+    "/>
+
+    <!-- Right pillar - angled bottom-right corner (mirror of left) -->
+    <path d="
+      M 290,234
+      L 327,234
+      L 327,400
+      L 312,376
+      L 290,376
+      Z
+    "/>
+  </g>
+</svg>

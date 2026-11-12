@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Temple symbol: pediment, six columns, three steps. -->
+  <g fill="#f2deae">
+    <path d="M90 18L168 58H12Z"/>
+    <path d="M18 64H162V76H18Z"/>
+    <path d="M26 82h14v54H26Z M48 82h14v54H48Z M70 82h14v54H70Z M96 82h14v54H96Z M118 82h14v54H118Z M140 82h14v54H140Z"/>
+    <path d="M18 142H162V152H18Z M8 158H172V168H8Z"/>
+  </g>
+</svg>

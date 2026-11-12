@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-90.51 -90.51 181.02 181.02">
+  <!-- Pyramid app symbol, redrawn: nested squares from the apex, rotated 45° into a diamond.
+       Square-space side 128: apex block 0–26, then bands 33–60, 67–94, 101–128; the dot is cut from the first band. -->
+  <g transform="translate(0 -90.51) rotate(45)" fill="#f2deae" fill-rule="evenodd">
+    <path d="M0 0H26V26H0Z"/>
+    <path d="M33 0H60V60H0V33H33Z M52.8 43.2a9.6 9.6 0 1 0 -19.2 0a9.6 9.6 0 1 0 19.2 0Z"/>
+    <path d="M67 0H94V94H0V67H67Z"/>
+    <path d="M101 0H128V128H0V101H101Z"/>
+  </g>
+</svg>
