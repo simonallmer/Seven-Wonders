@@ -23,6 +23,8 @@ import { GreatWallWorld } from './greatwall/scene.js';
 import { GreatWallGame } from './greatwall/game.js';
 import { SkyscraperWorld } from './skyscraper/scene.js';
 import { SkyscraperGame } from './skyscraper/game.js';
+import { CathedralWorld } from './cathedral/scene.js';
+import { CathedralGame } from './cathedral/game.js';
 import { WONDERS, ROMAN } from './wonders.js';
 import { initAudio, sfx, setAmbience, setMuted, isMuted } from './audio.js';
 import { Tweens, ease } from './fx.js';
@@ -53,6 +55,7 @@ const GAMES = {
     colossus: { World: ColossusWorld, Game: ColossusGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/colossus-symbol.svg' },
     pharos: { World: PharosWorld, Game: PharosGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/pharos-symbol.svg' },
     greatWall: { World: GreatWallWorld, Game: GreatWallGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/greatwall-symbol.svg' },
+    cathedral: { World: CathedralWorld, Game: CathedralGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/cathedral-symbol.svg' },
     skyscraper: { World: SkyscraperWorld, Game: SkyscraperGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/skyscraper-symbol.svg' },
 };
 const live = {};   // id -> { id, def, world, game, controls }, built the first time a wonder is needed
@@ -204,6 +207,22 @@ const RULES = { pyramid: [
     ['VICTORY', 'The first player with stones on all four victory fields wins. A player with fewer than four stones can no longer win, but can still play for a draw.'],
     ['DRAW', 'The game is drawn when no player has four stones left.'],
     ['STANDARD', 'In Standard play you also win as soon as every rival is down to fewer than four stones. Conquest counts the summit alone.'],
+], cathedral: [
+    ['h', 'General'],
+    ['GOAL', 'Bring every other congregation below four stones. A congregation of fewer than four falls silent: its stones stay where they are, but it has lost.'],
+    ['THE FLOOR', 'A cross of five fields. Stones stand on the crossings and travel along the engraved lines: straight lines everywhere, diagonals only through the strong crossings marked with a rosette.'],
+    ['SETUP', 'Each player’s fifteen stones fill the three outer rows of their arm. White begins.'],
+    ['h', 'Movement'],
+    ['PROCESSION', 'Move one stone along a line over empty fields. It may go as many fields as the longest unbroken line of your own stones standing directly beside it is long. A lone stone always moves one field.'],
+    ['PASSAGE', 'A walkway outside each corner of the crossing joins the flanks of two neighbouring arms. Crossing it is a single step, and nothing is converted through it.'],
+    ['h', 'Conversion'],
+    ['APPROACH', 'End your move directly in front of a rival’s unbroken line that runs on in your direction of travel, and the whole line takes your colour. The line ends where its colour changes or at an empty field. You are never forced to convert.'],
+    ['CHAIN', 'After a conversion the same stone may move again, but only to convert again, and never onto a field it has touched this turn. Click your stone to rest.'],
+    ['h', 'The End'],
+    ['VICTORY', 'The last congregation with four stones or more claims the cathedral.'],
+    ['PASS', 'A player who cannot move is passed over. If nobody can move, the largest congregation wins.'],
+    ['DRAW', 'The game is drawn when the same position comes a third time.'],
+    ['FOUR PLAYERS', 'Red fills the west arm and Blue the east. Play runs White, Red, Black, Blue. Converted stones fight on under their new colour.'],
 ], skyscraper: [
     ['h', 'General'],
     ['GOAL', 'Light more than your share of the windows: more than half with two players, more than a quarter with four.'],

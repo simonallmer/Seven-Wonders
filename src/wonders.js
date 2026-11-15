@@ -11,7 +11,7 @@ export const WONDERS = [
     { id: 'greatWall', name: 'Great Wall', place: 'China · from the 7th century BC', line: 'Hold the supply chain. Break the enemy line.', playable: true },
     { id: 'library', name: 'Library', place: 'House of Wisdom, Baghdad · c. 830', line: 'Build the way from the fountain to your study.' },
     { id: 'tower', name: 'Tower', place: 'Porcelain Tower, Nanjing · 1431', line: 'Own a ring, or two columns from top to bottom.' },
-    { id: 'cathedral', name: 'Cathedral', place: 'A cross of five fields', line: 'Silence every other congregation.' },
+    { id: 'cathedral', name: 'Cathedral', place: 'A cross of five fields', line: 'Silence every other congregation.', playable: true },
     { id: 'palace', name: 'Palace', place: 'Hyde Park, London · 1851', line: 'Glass bands that rise and fall beneath you.' },
     { id: 'skyscraper', name: 'Skyscraper', place: 'Manhattan · 1930', line: 'Light the windows. Take the skyline.', playable: true },
 ];

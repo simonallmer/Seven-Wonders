@@ -12,6 +12,7 @@ import { buildBoard as buildColossus, GROUND as COLOSSUS_GROUND } from './coloss
 import { buildBoard as buildPharos, GROUND as PHAROS_GROUND } from './pharos/scene.js';
 import { buildBoard as buildGreatWall, GROUND as GREATWALL_GROUND } from './greatwall/scene.js';
 import { buildBoard as buildSkyscraper, GROUND as SKYSCRAPER_GROUND } from './skyscraper/scene.js';
+import { buildBoard as buildCathedral, GROUND as CATHEDRAL_GROUND } from './cathedral/scene.js';
 import { makeSkyDome } from './daylight.js';
 import { WONDERS } from './wonders.js';
 
@@ -207,7 +208,7 @@ export class PalaceWorld {
             g.add(cyl(0.64, 0.66, 0.05, plinthMat, 0, 0, 0, 40));
             const ring = new THREE.Mesh(new THREE.TorusGeometry(0.65, 0.012, 6, 48), m.brass); ring.rotation.x = Math.PI / 2; ring.position.y = 0.05; g.add(ring);
             const holder = new THREE.Group(); holder.position.y = 0.05; holder.rotation.y = out > 0 ? 0 : Math.PI; g.add(holder);
-            if (!['pyramid', 'gardens', 'temple', 'statue', 'mausoleum', 'colossus', 'pharos', 'greatWall', 'skyscraper'].includes(w.id)) holder.add(MINIATURES[w.id]());
+            if (!['pyramid', 'gardens', 'temple', 'statue', 'mausoleum', 'colossus', 'pharos', 'greatWall', 'skyscraper', 'cathedral'].includes(w.id)) holder.add(MINIATURES[w.id]());
             // engraved brass nameplate, tilted toward the visitor
             const tex = canvasTexture(512, 128, (x, W, H) => {
                 const gr = x.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#e2c377'); gr.addColorStop(0.5, '#b8934a'); gr.addColorStop(1, '#d8b869');
@@ -235,6 +236,7 @@ export class PalaceWorld {
         this.setPharosBoard(2);
         this.setGreatWallBoard(2);
         this.setSkyscraperBoard(2);
+        this.setCathedralBoard(2);
         // nameplates were drawn before the display font finished loading: redraw once it has
         document.fonts && document.fonts.ready.then(() => this.wonders.forEach((w) => { w.plateTex.image && this.redrawPlate(w); }));
     }
@@ -275,6 +277,7 @@ export class PalaceWorld {
         this.setPharosBoard(n === 2 ? 2 : 4);
         this.setGreatWallBoard(n === 2 ? 2 : 4);
         this.setSkyscraperBoard(n === 2 ? 2 : 4);
+        this.setCathedralBoard(n === 2 ? 2 : 4);
     }
 
     // The Skyscraper miniature is the real tower in steel, crown and needle on top.
@@ -292,6 +295,20 @@ export class PalaceWorld {
     }
 
     // The Great Wall miniature is the real stretch of wall between its watchtowers (two walls crossing for four players).
+    // The Cathedral miniature is the real cathedral over its floor, with the stones of two or four congregations.
+    setCathedralBoard(n) {
+        const w = this.wonders[WONDERS.findIndex((x) => x.id === 'cathedral')];
+        if (this.miniCathedral === n) return;
+        this.miniCathedral = n;
+        w.holder.clear();
+        const { group } = buildCathedral(n, { mini: true });
+        const k = 0.052;
+        group.scale.setScalar(k);
+        group.position.set(0, -CATHEDRAL_GROUND * k, -0.05);
+        w.holder.add(group);
+        w.mini = { scale: k, origin: w.pos.clone().add(group.position) };
+    }
+
     setGreatWallBoard(n) {
         const w = this.wonders[WONDERS.findIndex((x) => x.id === 'greatWall')];
         if (this.miniWall === n) return;
@@ -448,6 +465,7 @@ export class PalaceWorld {
         this.buildPharosMemorabilia(add);
         this.buildGreatWallMemorabilia(add);
         this.buildSkyscraperMemorabilia(add);
+        this.buildCathedralMemorabilia(add);
 
         // the two ends of the table: a globe, books and a spyglass; a map and a compass
         const globe = new THREE.Group();
@@ -493,6 +511,46 @@ export class PalaceWorld {
     }
 
     // Skyscraper: the rules on a blueprint, a length of riveted steel, a yellow cab
+    // Cathedral: the rules on a leaf of an illuminated book on its lectern, a hand bell, a pane of stained glass
+    buildCathedralMemorabilia(add) {
+        const m = materials(), index = WONDERS.findIndex((x) => x.id === 'cathedral'), P = this.wonders[index].pos, out = this.wonders[index].out;
+        const side = (dx, dz, ry, s = 1) => [P.x - out * dx, P.z + out * dz, (out > 0 ? 0 : Math.PI) + ry, s];
+        const draw = (x, W, H) => {
+            x.fillStyle = '#efe4c8'; x.fillRect(0, 0, W, H);
+            for (let i = 0; i < 40; i++) { x.fillStyle = `rgba(150,120,70,${0.03 + (i % 5) / 100})`; x.beginPath(); x.ellipse((i * 7919) % W, (i * 104729) % H, 30 + (i * 13) % 60, 14 + (i * 7) % 30, i, 0, 7); x.fill(); }
+            x.strokeStyle = '#7a1f2a'; x.lineWidth = 5; x.strokeRect(22, 22, W - 44, H - 44); x.strokeStyle = '#b8902e'; x.lineWidth = 2; x.strokeRect(32, 32, W - 64, H - 64);
+            x.fillStyle = '#7a1f2a'; x.textAlign = 'center'; x.font = '64px "Ancient Tulip", Georgia, serif'; x.fillText('CATHEDRAL', W / 2, 120);
+            x.fillStyle = '#3a2a1a'; x.font = 'italic 26px Georgia, serif'; x.fillText('the rules of the game', W / 2, 160);
+            // a great initial, then lines of script
+            x.fillStyle = '#243f9c'; x.fillRect(64, 200, 86, 86); x.fillStyle = '#e8c860'; x.font = '74px Georgia, serif'; x.fillText('C', 107, 268);
+            x.strokeStyle = '#3a2a1a'; x.lineWidth = 3;
+            for (let r = 0; r < 10; r++) { let px = r < 3 ? 170 : 64; const py = 216 + r * 34; x.beginPath(); x.moveTo(px, py); while (px < W - 70 - (r === 9 ? 150 : 0)) { const wl = 14 + ((px * 3 + r * 23) % 44); x.lineTo(px + wl, py); px += wl + 10; x.moveTo(px, py); } x.stroke(); }
+        };
+        const tex = canvasTexture(512, 640, draw);
+        const leaf = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.425), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, emissive: 0xfff0d0, emissiveMap: tex, emissiveIntensity: 0 }));
+        leaf.position.set(0, 0.27, 0.012); leaf.rotation.x = -0.5;
+        const lectern = new THREE.Group();
+        const board = box(0.4, 0.02, 0.47, m.wood, 0, 0, 0); board.rotation.x = Math.PI / 2 - 0.5; board.position.set(0, 0.27, 0); lectern.add(board, leaf);
+        lectern.add(cyl(0.02, 0.03, 0.2, m.wood, 0, 0, -0.06, 8), box(0.24, 0.02, 0.2, m.wood, 0, 0, -0.04));
+        add(lectern, ...side(-1.0, 0.5, -0.3, 0.9));
+        leaf.userData.pick = { type: 'rules', index }; this.pickables.push(leaf);
+        this.rulesSheets.push(leaf);
+        document.fonts && document.fonts.ready.then(() => { const c = tex.image; draw(c.getContext('2d'), c.width, c.height); tex.needsUpdate = true; });
+
+        // a hand bell
+        const bell = new THREE.Group();
+        bell.add(new THREE.Mesh(new THREE.LatheGeometry([[0.07, 0], [0.066, 0.01], [0.05, 0.04], [0.04, 0.08], [0.032, 0.11], [0.012, 0.125]].map(([r, y]) => new THREE.Vector2(r, y)), 18), m.brass));
+        bell.add(cyl(0.012, 0.014, 0.09, m.wood, 0, 0.12, 0, 8));
+        add(bell, ...side(-0.96, -0.44, 0.4));
+
+        // a pane of stained glass leaning on its frame
+        const pane = new THREE.Group(), cols = [0x2f55c8, 0xb8252c, 0xd9a521, 0x2c8a4a];
+        for (let r = 0; r < 3; r++) for (let c = 0; c < 2; c++) pane.add(box(0.07, 0.07, 0.006, new THREE.MeshPhysicalMaterial({ color: cols[(r + c * 2) % 4], roughness: 0.15, transmission: 0, clearcoat: 1, emissive: cols[(r + c * 2) % 4], emissiveIntensity: 0.25 }), -0.037 + c * 0.074, 0.01 + r * 0.074, 0));
+        pane.add(box(0.16, 0.24, 0.004, m.iron, 0, 0, -0.005));
+        pane.rotation.x = -0.3;
+        add(pane, ...side(-0.72, 0.9, 0.6));
+    }
+
     buildSkyscraperMemorabilia(add) {
         const m = materials(), index = WONDERS.findIndex((x) => x.id === 'skyscraper'), P = this.wonders[index].pos, out = this.wonders[index].out;
         const side = (dx, dz, ry, s = 1) => [P.x - out * dx, P.z + out * dz, (out > 0 ? 0 : Math.PI) + ry, s];

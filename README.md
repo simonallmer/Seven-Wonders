@@ -47,7 +47,7 @@ Opening `index.html` directly (`file://`) cannot work — browsers block modules
 
 ## Handy
 
-- `?skip` skips the title, `?skip&play` goes straight into Pyramid, `?skip&play=gardens`, `=temple`, `=statue`, `=mausoleum`, `=colossus`, `=pharos`, `=greatWall` or `=skyscraper` into another wonder, `?hour=18.5` pins the clock.
+- `?skip` skips the title, `?skip&play` goes straight into Pyramid, `?skip&play=gardens`, `=temple`, `=statue`, `=mausoleum`, `=colossus`, `=pharos`, `=greatWall`, `=cathedral` or `=skyscraper` into another wonder, `?hour=18.5` pins the clock.
 - Keys: ← → walk the table · Enter play · R rules · L light (Live/Dawn/Noon/Dusk/Night) · M mute · Esc back · Tab fold the game menu away.
 - In a game the panel hangs under two small signs at the top right: back to the Exhibition, and three lines that fold the panel away.
 - `rules/` holds one internal rules reference per playable wonder, all with the same sections; keep it in step with `RULES` in `src/main.js` and `src/<id>/rules.js`.

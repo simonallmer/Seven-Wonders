@@ -450,3 +450,49 @@ import { chooseMove as skyMove } from './src/skyscraper/ai.js';
     console.log('skyscraper', n, 'p', a, 'vs', b, '->', JSON.stringify(o), 'plies', g.ply, 'windows', K.scores(g).slice(1).join(','), ((Date.now() - t0) / g.ply | 0) + 'ms/move, slowest', max + 'ms');
   }
 }
+
+// ---------------------------------------------------------------- CATHEDRAL
+import * as C from './src/cathedral/rules.js';
+import { chooseMove as cathMove } from './src/cathedral/ai.js';
+{
+  const s = C.createState(2), n4 = C.createState(4);
+  console.assert(C.L.N === 125, 'a cross of five fields of 5 x 5');
+  console.assert(C.countStones(s)[1] === 15 && C.countStones(s)[2] === 15 && C.countStones(n4)[3] === 15 && C.countStones(n4)[4] === 15, 'fifteen stones each');
+  console.assert(!C.L.cells[C.L.find(7, 7)].strong && C.L.cells[C.L.find(7, 6)].strong, 'the middle is weak, its neighbours strong');
+  console.assert(C.L.passage[C.L.find(5, 2)] === C.L.find(2, 5) && C.L.passage[C.L.find(9, 12)] === C.L.find(12, 9), 'passages join the flanks');
+  console.log('cathedral: opening moves', C.allMoves(s).length, 'with four players', C.allMoves(n4).length);
+  // procession: a stone with two friends in line behind it walks two fields, a lone one walks one
+  const e = C.createState(2); e.grid.fill(0);
+  const put = (x, y, c) => { e.grid[C.L.find(x, y)] = c; };
+  put(7, 12, 1); put(7, 13, 1); put(7, 14, 1); put(5, 7, 1);
+  const tos = (x, y) => C.stepsFrom(e, C.L.find(x, y)).map((st) => C.L.cells[st.to]).filter((c) => c.x === 7 && c.y < 12).map((c) => c.y).sort().join(',');
+  console.assert(tos(7, 12) === '10,11', 'procession of two: ' + tos(7, 12));
+  console.assert(Math.max(...C.stepsFrom(e, C.L.find(5, 7)).map((st) => Math.abs(C.L.cells[st.to].x - 5) + Math.abs(C.L.cells[st.to].y - 7))) <= 2, 'a lone stone walks one field');
+  // conversion: stopping in front of a line turns the whole line, and stops where the colour changes
+  put(7, 9, 2); put(7, 8, 2); put(7, 7, 2); put(7, 6, 1); put(9, 3, 2); put(8, 3, 2); put(6, 3, 2);
+  const conv = C.stepsFrom(e, C.L.find(7, 12)).find((st) => st.type === 'convert');
+  console.assert(conv && C.L.cells[conv.to].y === 10 && conv.run.length === 3, 'approach converts the line of three');
+  console.assert(!C.stepsFrom(e, C.L.find(7, 12)).some((st) => st.type === 'walk' && st.to === conv.to), 'no plain walk onto a converting field');
+  const t = C.cloneState(e); t.turn = 0;
+  C.applyMove(t, { from: conv.from, steps: [conv] });
+  console.assert(C.countStones(t)[1] === 8 && C.countStones(t)[2] === 3, 'three stones changed colour');
+  console.assert(!C.outcome(e) && C.outcome(t) && C.outcome(t).winner === 1 && C.outcome(t).reason === 'silence', 'below four stones the congregation falls silent');
+  // a passage is one plain step and converts nothing
+  const p = C.createState(2); p.grid.fill(0); p.grid[C.L.find(5, 2)] = 1; p.grid[C.L.find(1, 5)] = 2; p.grid[C.L.find(0, 5)] = 2; p.grid[C.L.find(3, 3 + 2)] = 0;
+  const pas = C.stepsFrom(p, C.L.find(5, 2)).find((st) => st.type === 'passage');
+  console.assert(pas && pas.to === C.L.find(2, 5) && !pas.run, 'the passage converts nothing');
+  console.assert(!C.stepsFrom(p, C.L.find(5, 2), new Set()).some((st) => st.type === 'passage'), 'no passage inside a chain');
+  // chains never re-enter a field
+  for (const m of C.allMoves(e)) { const seen = new Set([m.from]); for (const st of m.steps) { console.assert(!seen.has(st.to), 'chain re-enters a field'); seen.add(st.to); } console.assert(m.steps.slice(1).every((st) => st.type === 'convert'), 'only conversions continue a chain'); }
+  console.log('cathedral: rule checks done');
+  for (const [n, a, b] of [[2, 'medium', 'easy'], [2, 'easy', 'hard'], [4, 'medium', 'easy']]) {
+    let g = C.createState(n), t0 = Date.now(), o = null, max = 0; const hist = [];
+    while (!(o = C.outcome(g)) && g.ply < 220) {
+      const lv = g.turn % 2 === 0 ? a : b, t1 = Date.now();
+      const m = cathMove(g, lv, 'standard', hist.slice(-40)); max = Math.max(max, Date.now() - t1);
+      console.assert(m && C.allMoves(g).some((x) => x.from === m.from && x.steps.length === m.steps.length && x.steps.every((st, i) => st.to === m.steps[i].to && st.type === m.steps[i].type)), 'AI move is legal');
+      C.applyMove(g, m, false); hist.push(C.positionKey(g));
+    }
+    console.log('cathedral', n, 'p', a, 'vs', b, '->', JSON.stringify(o), 'plies', g.ply, 'stones', C.countStones(g).slice(1).join(','), ((Date.now() - t0) / g.ply | 0) + 'ms/move, slowest', max + 'ms');
+  }
+}

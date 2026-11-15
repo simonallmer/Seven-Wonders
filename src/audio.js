@@ -115,6 +115,10 @@ function clack(t = 0, vol = 1) {
 const SFX = {
     tick() { tone(1500, { d: 0.03, vol: 0.05, type: 'triangle' }); noise({ d: 0.02, vol: 0.04, freq: 4000 }); },
     browse() { noise({ a: 0.05, d: 0.28, vol: 0.07, freq: 500, sweep: 2.4, q: 0.8 }); tone(392, { t: 0.12, d: 0.5, vol: 0.035 }); },
+    bell() { // a conversion: a small bell, struck once
+        [[784, 0.09], [1568, 0.045], [2090, 0.03], [3136, 0.015]].forEach(([f, v], i) => tone(f, { d: 1.1 - i * 0.2, vol: v }));
+        noise({ d: 0.03, vol: 0.05, freq: 3000 });
+    },
     select() { tone(330, { d: 0.12, vol: 0.09, type: 'triangle' }); tone(495, { t: 0.03, d: 0.18, vol: 0.06 }); },
     deny() { tone(150, { d: 0.14, vol: 0.12, type: 'triangle', slide: 0.8 }); },
     paper() { noise({ a: 0.02, d: 0.22, vol: 0.12, type: 'highpass', freq: 2200, sweep: 1.8 }); noise({ t: 0.14, a: 0.02, d: 0.16, vol: 0.08, type: 'highpass', freq: 3000 }); },

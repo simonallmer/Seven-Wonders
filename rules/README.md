@@ -12,6 +12,7 @@ The wording players see in the game is the `RULES` table in `src/main.js`; the l
 - [Colossus](colossus.md)
 - [Pharos](pharos.md)
 - [Great Wall](greatwall.md)
+- [Cathedral](cathedral.md)
 - [Skyscraper](skyscraper.md)
 
-Still to come: Colosseum, Library, Tower, Cathedral, Palace.
+Still to come: Colosseum, Library, Tower, Palace.
