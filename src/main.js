@@ -26,6 +26,7 @@ import { SkyscraperGame } from './skyscraper/game.js';
 import { CathedralWorld } from './cathedral/scene.js';
 import { CathedralGame } from './cathedral/game.js';
 import { WONDERS, ROMAN } from './wonders.js';
+import { DEMO } from './edition.js';
 import { initAudio, sfx, setAmbience, setMuted, isMuted } from './audio.js';
 import { Tweens, ease } from './fx.js';
 
@@ -34,12 +35,16 @@ const params = new URLSearchParams(location.search);
 const smooth = (k, a, b) => THREE.MathUtils.smoothstep(k, a, b);
 
 // ------------------------------------------------------------------ settings
-const SEAT_TYPES = ['human', 'easy', 'medium', 'hard'];
+const SEAT_TYPES = DEMO ? ['human', 'easy'] : ['human', 'easy', 'medium', 'hard'];
 const SEAT_LABEL = { human: 'Human', easy: 'CPU · Easy', medium: 'CPU · Medium', hard: 'CPU · Hard' };
 const settings = Object.assign(
     { players: 2, seats: [{ type: 'human' }, { type: 'medium' }, { type: 'medium' }, { type: 'medium' }], mode: 'standard', light: 'live', focus: 0 },
     JSON.parse(localStorage.getItem('sw.v2') || '{}'));
 const save = () => localStorage.setItem('sw.v2', JSON.stringify(settings));
+if (DEMO) { // the demo: two players, and the computer plays at its easy level
+    settings.players = 2;
+    settings.seats.forEach((seat, i) => { if (seat.type !== 'easy' && !(i === 0 && seat.type === 'human')) seat.type = i ? 'easy' : 'human'; });
+}
 
 // ------------------------------------------------------------------ worlds
 const R = createRenderer($('#view'));
@@ -58,6 +63,7 @@ const GAMES = {
     cathedral: { World: CathedralWorld, Game: CathedralGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/cathedral-symbol.svg' },
     skyscraper: { World: SkyscraperWorld, Game: SkyscraperGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/skyscraper-symbol.svg' },
 };
+if (DEMO) WONDERS.forEach((w, i) => { if (i >= 7) { w.locked = true; w.playable = false; delete GAMES[w.id]; } }); // the New Wonders belong to Arcade
 const live = {};   // id -> { id, def, world, game, controls }, built the first time a wonder is needed
 let cur = null;    // the wonder whose world is behind the cross-fade
 const playersFor = (def) => (def.players.includes(settings.players) ? settings.players : def.players[0]);
@@ -165,6 +171,7 @@ function renderPanel() {
         b.classList.toggle('on', +b.dataset.players === n);
         b.disabled = !def.players.includes(+b.dataset.players);
         b.title = b.disabled ? 'This wonder is a game for two' : '';
+        if (DEMO && +b.dataset.players === 4) { b.disabled = false; b.classList.add('arcade'); b.title = 'Four players: unlocked with Arcade'; }
     });
     document.querySelectorAll('#mode-seg button').forEach((b) => b.classList.toggle('on', b.dataset.mode === settings.mode));
     $('#mode-seg').hidden = !def.modes;
@@ -185,8 +192,9 @@ function renderCard() {
     const btn = $('#card-play');
     const g = live[w.id] && live[w.id].game;
     const resume = w.playable && g && g.state && !g.over && g.state.ply > 0 && g.state.nPlayers === playersFor(GAMES[w.id]);
-    btn.textContent = w.playable ? (resume ? 'Resume' : 'Play') : 'Still in its crate';
-    btn.classList.toggle('locked', !w.playable);
+    if (w.locked) $('#card-line').textContent = 'One of the New Seven Wonders. Unlocked with Arcade.';
+    btn.textContent = w.locked ? 'Unlock with Arcade' : w.playable ? (resume ? 'Resume' : 'Play') : 'Still in its crate';
+    btn.classList.toggle('locked', !w.playable && !w.locked);
 }
 
 // ------------------------------------------------------------------ rules papyrus
@@ -418,6 +426,7 @@ let warm = 0;
 function activate() {
     const w = WONDERS[settings.focus];
     if (state !== 'menu') return;
+    if (w.locked) { openArcade(); return; }
     if (!w.playable) { sfx('deny'); return; }
     enterGame();
 }
@@ -489,6 +498,7 @@ async function leaveGame() {
 // ------------------------------------------------------------------ input
 function bindUI() {
     $('#players-seg').onclick = (e) => {
+        if (DEMO && +e.target.dataset.players === 4) { openArcade(); return; }
         const n = +e.target.dataset.players; if (!n || n === settings.players || e.target.disabled) return;
         settings.players = n; save(); sfx('select');
         palace.setPlayers(n);
@@ -522,11 +532,14 @@ function bindUI() {
     $('#nav-next').onclick = () => setFocus(settings.focus + 1);
     $('#card-play').onclick = activate;
     $('#intro-enter').onclick = begin;
+    if ($('#arcade')) { $('#arcade-close').onclick = closeArcade; $('#arcade').onclick = (e) => { if (e.target.id === 'arcade') closeArcade(); }; }
+    if (DEMO) { document.body.classList.add('demo'); document.title = 'Seven Wonders · Demo'; }
 
     addEventListener('keydown', (e) => {
         if (e.metaKey || e.ctrlKey || e.altKey) return;
         const k = e.key;
         if (state === 'intro') { if ((k === 'Enter' || k === ' ') && !$('#intro-enter').disabled) begin(); return; }
+        if (k === 'Escape' && $('#arcade') && !$('#arcade').hidden) { closeArcade(); return; }
         if (k === 'Escape') { if (!$('#rules').hidden) closeRules(); else if (state === 'game') leaveGame(); return; }
         if (k === 'Tab' && state === 'game') { e.preventDefault(); return toggleMenu(); }
         if (k === 'm' || k === 'M') return toggleSound();
@@ -571,6 +584,9 @@ function bindUI() {
 }
 let hoverRules = -1;
 
+// the demo's one sign: what Arcade unlocks, and where to find it
+function openArcade() { if (!$('#arcade')) return; $('#arcade').hidden = false; sfx('paper'); }
+function closeArcade() { $('#arcade').hidden = true; sfx('tick'); }
 // in a game the panel can be folded away behind the three lines
 function toggleMenu(open = document.body.classList.contains('menu-closed'), remember = true) {
     if (!$('#btn-menu')) return;

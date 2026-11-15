@@ -175,6 +175,13 @@ body.state-travel #panel { transform: translateY(-8px); }
     transition: background 0.2s;
 }
 .banner button:hover, #intro button:not(:disabled):hover { background: rgba(220, 183, 102, 0.35); }
+.banner a { display: inline-block; text-decoration: none; padding: 11px 22px; border: 1px solid var(--gold); border-radius: 999px; background: rgba(220, 183, 102, 0.2); color: #fff0cc; font-size: 16px; letter-spacing: 0.06em; }
+.banner a:hover { background: rgba(220, 183, 102, 0.4); }
+#arcade .banner p { max-width: 30em; margin-left: auto; margin-right: auto; }
+#brand small { display: none; margin-left: 0.7em; font-family: Georgia, serif; font-size: 0.42em; letter-spacing: 0.22em; text-transform: uppercase; vertical-align: middle; padding: 2px 8px; border: 1px solid var(--gold); border-radius: 999px; color: var(--gold); }
+body.demo #brand small { display: inline-block; }
+.seg button.arcade { opacity: 0.55; }
+.seg button.arcade::after { content: ' ·  Arcade'; font-size: 0.78em; letter-spacing: 0.08em; }
 #gameover { background: radial-gradient(ellipse at center, rgba(8, 6, 4, 0.2), rgba(8, 6, 4, 0.7)); }
 
 /* ---------- intro ---------- */

@@ -15,6 +15,7 @@ import { buildBoard as buildSkyscraper, GROUND as SKYSCRAPER_GROUND } from './sk
 import { buildBoard as buildCathedral, GROUND as CATHEDRAL_GROUND } from './cathedral/scene.js';
 import { makeSkyDome } from './daylight.js';
 import { WONDERS } from './wonders.js';
+import { DEMO } from './edition.js';
 
 const HALL = { len: 76, half: 11, wall: 10, bay: 4.75 };
 const TABLE = { y: 1.0, straight: 6, r: 2.35 };
@@ -237,6 +238,7 @@ export class PalaceWorld {
         this.setGreatWallBoard(2);
         this.setSkyscraperBoard(2);
         this.setCathedralBoard(2);
+        if (DEMO) this.lockNewWonders();
         // nameplates were drawn before the display font finished loading: redraw once it has
         document.fonts && document.fonts.ready.then(() => this.wonders.forEach((w) => { w.plateTex.image && this.redrawPlate(w); }));
     }
@@ -278,6 +280,7 @@ export class PalaceWorld {
         this.setGreatWallBoard(n === 2 ? 2 : 4);
         this.setSkyscraperBoard(n === 2 ? 2 : 4);
         this.setCathedralBoard(n === 2 ? 2 : 4);
+        if (DEMO) this.lockNewWonders();
     }
 
     // The Skyscraper miniature is the real tower in steel, crown and needle on top.
@@ -295,6 +298,22 @@ export class PalaceWorld {
     }
 
     // The Great Wall miniature is the real stretch of wall between its watchtowers (two walls crossing for four players).
+    // The demo shows the New Wonders as shapes only: everything on their plinths in one colourless grey.
+    lockNewWonders() {
+        const grey = this.lockGrey || (this.lockGrey = new THREE.MeshStandardMaterial({ color: 0x707074, roughness: 0.85 }));
+        this.wonders.forEach((w, i) => {
+            if (i < 7) return;
+            w.holder.traverse((o) => {
+                if (!o.isMesh) return;
+                const mats = Array.isArray(o.material) ? o.material : [o.material];
+                if (mats.every((mm) => mm.visible === false)) return; // unseen things for the pointer stay unseen
+                o.material = grey;
+                if (o.isInstancedMesh && o.instanceColor) { o.instanceColor = null; }
+                if (o.geometry.attributes.color) o.geometry.deleteAttribute('color');
+            });
+        });
+    }
+
     // The Cathedral miniature is the real cathedral over its floor, with the stones of two or four congregations.
     setCathedralBoard(n) {
         const w = this.wonders[WONDERS.findIndex((x) => x.id === 'cathedral')];
@@ -463,9 +482,9 @@ export class PalaceWorld {
         this.buildMausoleumMemorabilia(add);
         this.buildColossusMemorabilia(add);
         this.buildPharosMemorabilia(add);
-        this.buildGreatWallMemorabilia(add);
-        this.buildSkyscraperMemorabilia(add);
-        this.buildCathedralMemorabilia(add);
+        if (!DEMO) this.buildGreatWallMemorabilia(add);
+        if (!DEMO) this.buildSkyscraperMemorabilia(add);
+        if (!DEMO) this.buildCathedralMemorabilia(add);
 
         // the two ends of the table: a globe, books and a spyglass; a map and a compass
         const globe = new THREE.Group();

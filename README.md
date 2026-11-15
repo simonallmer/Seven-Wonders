@@ -52,3 +52,9 @@ Opening `index.html` directly (`file://`) cannot work — browsers block modules
 - In a game the panel hangs under two small signs at the top right: back to the Exhibition, and three lines that fold the panel away.
 - `rules/` holds one internal rules reference per playable wonder, all with the same sections; keep it in step with `RULES` in `src/main.js` and `src/<id>/rules.js`.
 - Console: `sevenWonders.advance(seconds)` steps the simulation (useful when the tab is throttled).
+
+## The demo edition
+
+`./make-demo.sh` builds the demo into `Seven Wonders Demo/`, which is its own git checkout of `simonallmer/Seven-Wonders-Demo` and is ignored by this repository. Never edit that folder by hand: change the game here, run the script, then commit and push both folders.
+
+The demo is this game with `DEMO = true` in `src/edition.js`: the seven Old Wonders, two players, human or the easy computer, no time limit. The New Wonders stand on the table as grey shapes; clicking one, or "4 Players", opens the Arcade box (About Arcade, Subscribe). The script also takes the matches and computer players of the New Wonders out of the demo's files, leaving only what their miniatures need.
