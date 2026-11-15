@@ -27,35 +27,23 @@ const thrones = (L) => (L.nPlayers === 2 ? [0] : [-5, 5]); // z of every throne
 
 const FACE = ['', '#f1e7d0', '#1b1714', '#a3261a', '#1f3f9a'], PIP = ['', '#2a1c10', '#f4f0e6', '#f6ecd8', '#f6ecd8'];
 const SPOTS = [[], [[0, 0]], [[-1, -1], [1, 1]], [[-1, -1], [0, 0], [1, 1]], [[-1, -1], [1, -1], [-1, 1], [1, 1]], [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]], [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]]];
-// Real dice: every face carries its own number, opposite faces add up to seven.
-// Box faces come in the order +x, -x, +y, -y, +z, -z.
-const ON_FACE = [2, 5, 1, 6, 3, 4];
+// Zeus' dice: every face shows the number the die holds, so it reads from any side and changes in a blink.
 const dieMats = {};
-function dieMaterials(color) {
-    if (dieMats[color]) return dieMats[color];
-    return (dieMats[color] = ON_FACE.map((n) => {
-        const tex = canvasTexture(128, 128, (x) => {
-            x.fillStyle = FACE[color]; x.fillRect(0, 0, 128, 128);
-            x.strokeStyle = 'rgba(0,0,0,0.22)'; x.lineWidth = 5; x.strokeRect(2, 2, 124, 124);
-            x.fillStyle = PIP[color];
-            for (const [px, py] of SPOTS[n]) { x.beginPath(); x.arc(64 + px * 31, 64 + py * 31, n === 1 ? 17 : 12.5, 0, 7); x.fill(); }
-        });
-        return new THREE.MeshPhysicalMaterial({ map: tex, roughness: color === BLACK ? 0.2 : 0.35, clearcoat: 0.7, clearcoatRoughness: 0.2, });
-    }));
-}
-// how a die must be turned for the number n to lie on top
-const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
-const TURN = [null, [X, 0], [Z, Math.PI / 2], [X, -Math.PI / 2], [X, Math.PI / 2], [Z, -Math.PI / 2], [X, Math.PI]];
-function topUp(n, yaw, out = new THREE.Quaternion()) {
-    out.setFromAxisAngle(Y, yaw * Math.PI / 2);
-    return out.multiply(new THREE.Quaternion().setFromAxisAngle(TURN[n][0], TURN[n][1]));
+function dieMaterial(color, n) {
+    const key = color * 8 + n;
+    if (dieMats[key]) return dieMats[key];
+    const tex = canvasTexture(128, 128, (x) => {
+        x.fillStyle = FACE[color]; x.fillRect(0, 0, 128, 128);
+        x.strokeStyle = 'rgba(0,0,0,0.22)'; x.lineWidth = 5; x.strokeRect(2, 2, 124, 124);
+        x.fillStyle = PIP[color];
+        for (const [px, py] of SPOTS[n]) { x.beginPath(); x.arc(64 + px * 31, 64 + py * 31, n === 1 ? 17 : 12.5, 0, 7); x.fill(); }
+    });
+    return (dieMats[key] = new THREE.MeshPhysicalMaterial({ map: tex, roughness: color === BLACK ? 0.2 : 0.35, clearcoat: 0.7, clearcoatRoughness: 0.2 }));
 }
 let dieGeo = null;
 function makeDie(color, n) {
-    const m = new THREE.Mesh(dieGeo || (dieGeo = new THREE.BoxGeometry(HALF * 2, HALF * 2, HALF * 2)), dieMaterials(color));
+    const m = new THREE.Mesh(dieGeo || (dieGeo = new THREE.BoxGeometry(HALF * 2, HALF * 2, HALF * 2)), dieMaterial(color, n));
     m.castShadow = m.receiveShadow = true; m.userData.color = color;
-    m.userData.yaw = Math.floor(Math.random() * 4);
-    topUp(n, m.userData.yaw, m.quaternion);
     return m;
 }
 // where the defeated dice of a colour lie: in two of the 2 x 2 hollows the plinth of the statue covers
@@ -350,7 +338,7 @@ export class StatueWorld {
             this.statue.traverse((o) => { if (o.isMesh) o.castShadow = k > 0.5; });
         };
         if (!animated) { set(on ? 1 : 0); return; }
-        this.tweens.run(1.5, (k) => { if (this.shown === on) set(on ? ease.inOut(k) : 1 - ease.inOut(k)); }, on ? 0 : 0.5);
+        this.tweens.run(on ? 1.2 : 0.7, (k) => { if (this.shown === on) set(on ? ease.inOut(k) : 1 - ease.inOut(k)); }); // away at once: the game is waiting
     }
 
     homeView(n = this.nPlayers) {
@@ -497,26 +485,22 @@ export class StatueWorld {
         });
     }
 
-    // Zeus changes the die: it rises in a crackle of pale light, spins too fast to follow, and comes down
-    // showing its new number. Diminished, it dips instead and the light is dimmer.
+    // Zeus changes the die: a blink of pale light, and every face shows the new number. No rolling, no waiting.
     playValue(ev) {
         const die = this.dice.get(ev.at);
         if (!die) return Promise.resolve();
         sfx(ev.diminish ? 'diminish' : 'charge');
-        const yaw = die.userData.yaw = (die.userData.yaw + 1) % 4, goal = topUp(ev.pips, yaw), spin = new THREE.Quaternion();
-        const axis = new THREE.Vector3(0.5 + Math.random() * 0.5, 1, 0.4 + Math.random() * 0.5).normalize(), p = new THREE.Vector3();
         const halo = this.halo || (this.halo = new THREE.Mesh(new THREE.SphereGeometry(0.62, 14, 10),
             new THREE.MeshBasicMaterial({ color: 0xbfd8ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })));
-        this.scene.add(halo);
-        if (!ev.diminish) this.flash = Math.max(this.flash, 0.35);
-        return this.tweens.run(ev.diminish ? 0.55 : 0.6, (k) => {
-            const w = Math.sin(Math.PI * k), left = 1 - ease.out(k);
-            die.position.y = DIE_Y + w * (ev.diminish ? -0.0 : 0.42) + (ev.diminish ? 0 : 0);
-            die.scale.setScalar(ev.diminish ? 1 - w * 0.2 : 1);
-            die.quaternion.copy(goal).multiply(spin.setFromAxisAngle(axis, left * Math.PI * (ev.diminish ? 4 : 8)));
-            halo.position.copy(die.position); halo.material.opacity = w * (ev.diminish ? 0.18 : 0.42); halo.scale.setScalar(0.8 + w * 0.35);
-            if (!ev.diminish && k < 0.75 && Math.random() < 0.6) { p.copy(die.position); this.sparks.emit(p.x + (Math.random() - 0.5) * 0.5, p.y + (Math.random() - 0.5) * 0.4, p.z + (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 1.2, Math.random() * 1.2, (Math.random() - 0.5) * 1.2, 0.35, 0.16, 0.9); }
-            if (k === 1) { die.quaternion.copy(goal); die.position.y = DIE_Y; die.scale.setScalar(1); this.scene.remove(halo); }
+        this.scene.add(halo); halo.position.copy(die.position);
+        if (!ev.diminish) { this.flash = Math.max(this.flash, 0.3); this.sparks.burst(die.position, 5, { speed: 0.6, up: 0.8, size: 0.16, alpha: 0.9, life: 0.4, spread: 0.3 }); }
+        let swapped = false;
+        return this.tweens.run(0.22, (k) => {
+            const w = Math.sin(Math.PI * k);
+            if (!swapped && k >= 0.4) { swapped = true; die.material = dieMaterial(ev.color, ev.pips); }
+            die.scale.setScalar(1 + w * (ev.diminish ? -0.12 : 0.1));
+            halo.material.opacity = w * (ev.diminish ? 0.2 : 0.5); halo.scale.setScalar(0.85 + w * 0.3);
+            if (k === 1) { die.material = dieMaterial(ev.color, ev.pips); die.scale.setScalar(1); this.scene.remove(halo); }
         });
     }
 

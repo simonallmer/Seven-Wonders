@@ -8,6 +8,9 @@ import { sfx } from '../audio.js';
 
 export const GROUND = -32;    // the foot of the tower as it stands on the table; the roof of the board is y = 0
 const STREET = -84;
+// the grid of the island: avenues run north–south (along z, north is -z), streets across; the park lies to the north-west
+const AVE = 24, ST = 26, GX = 7, GZ = 16;
+const PARK = { gx0: -4, gx1: -2, gz0: -15, gz1: -5 };
 // the light of each colour: White burns warm, Black violet, Red and Blue in their own colours
 export const LIGHT = [0, 0xffe9b0, 0x9d6bff, 0xff5236, 0x49a6ff];
 const DARK = new THREE.Color(0x0d1319), SHUT = new THREE.Color(0x05070a);
@@ -143,16 +146,55 @@ export class SkyscraperWorld {
         let hs = 29;
         const hr = () => { hs = (hs * 16807) % 2147483647; return hs / 2147483647; };
         const sRGB = THREE.SRGBColorSpace, list = [];
-        for (let gx = -9; gx <= 9; gx++) for (let gz = -16; gz <= 16; gz++) {
-            if (Math.abs(gx) <= 0 && Math.abs(gz) <= 0) continue;
+        // blocks of AVE x ST with an avenue and a cross street left free between them; north is -z
+        const inPark = (gx, gz) => gx >= PARK.gx0 && gx <= PARK.gx1 && gz >= PARK.gz0 && gz <= PARK.gz1;
+        for (let gx = -GX; gx <= GX; gx++) for (let gz = -GZ; gz <= GZ; gz++) {
+            if ((gx === 0 && gz === 0) || inPark(gx, gz)) continue;
             for (let k = 0; k < 2; k++) {
-                const w = 7 + hr() * 7, d = 7 + hr() * 7, near = Math.hypot(gx, gz * 0.6), h = 8 + hr() * hr() * (near < 5 ? 62 : 34);
-                list.push({ x: gx * 22 + (k ? 5.5 : -5.5) + hr() * 2, y: STREET + h / 2, z: gz * 26 + (hr() - 0.5) * 8, sx: w, sy: h, sz: d, color: new THREE.Color().setHSL(0.06 + hr() * 0.06, 0.12 + hr() * 0.12, 0.4 + hr() * 0.25, sRGB) });
+                const w = 6 + hr() * 3.5, d = 7 + hr() * 6, near = Math.hypot(gx, gz * 0.6), h = 8 + hr() * hr() * (near < 5 ? 62 : 34);
+                list.push({ x: gx * AVE + (k ? 5 : -5) + (hr() - 0.5), y: STREET + h / 2, z: gz * ST + (hr() - 0.5) * 5, sx: w, sy: h, sz: d, color: new THREE.Color().setHSL(0.06 + hr() * 0.06, 0.12 + hr() * 0.12, 0.4 + hr() * 0.25, sRGB) });
             }
         }
         const city = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), this.cityMat, list.length), o = new THREE.Object3D();
         list.forEach((t, i) => { o.position.set(t.x, t.y, t.z); o.scale.set(t.sx, t.sy, t.sz); o.updateMatrix(); city.setMatrixAt(i, o.matrix); city.setColorAt(i, t.color); });
         scene.add(city);
+        // Central Park: a long green rectangle among the blocks, with its reservoir and its trees
+        const px0 = (PARK.gx0 - 0.5) * AVE + 1.5, px1 = (PARK.gx1 + 0.5) * AVE - 1.5, pz0 = (PARK.gz0 - 0.5) * ST + 2, pz1 = (PARK.gz1 + 0.5) * ST - 2;
+        const lawn = new THREE.Mesh(new THREE.PlaneGeometry(px1 - px0, pz1 - pz0), std({ color: 0x3f6b35, roughness: 1 }));
+        lawn.rotation.x = -Math.PI / 2; lawn.position.set((px0 + px1) / 2, STREET + 0.25, (pz0 + pz1) / 2); scene.add(lawn);
+        const lake = new THREE.Mesh(new THREE.CircleGeometry(1, 24), this.riverMat);
+        lake.rotation.x = -Math.PI / 2; lake.scale.set((px1 - px0) * 0.36, (pz1 - pz0) * 0.14, 1); lake.position.set((px0 + px1) / 2, STREET + 0.4, pz0 + (pz1 - pz0) * 0.62); scene.add(lake);
+        const trees = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), std({ color: 0xffffff, roughness: 1, flatShading: true }), 260);
+        for (let i = 0; i < trees.count; i++) {
+            let x, z;
+            do { x = px0 + 2 + hr() * (px1 - px0 - 4); z = pz0 + 2 + hr() * (pz1 - pz0 - 4); }
+            while (((x - lake.position.x) / lake.scale.x) ** 2 + ((z - lake.position.z) / lake.scale.y) ** 2 < 1.2);
+            const r = 1.6 + hr() * 1.8;
+            o.position.set(x, STREET + r * 0.8, z); o.scale.set(r, r * (0.9 + hr() * 0.5), r); o.rotation.set(0, hr() * 6, 0); o.updateMatrix();
+            trees.setMatrixAt(i, o.matrix); trees.setColorAt(i, new THREE.Color().setHSL(0.26 + hr() * 0.08, 0.4 + hr() * 0.2, 0.2 + hr() * 0.14, sRGB));
+        }
+        o.rotation.set(0, 0, 0); scene.add(trees);
+
+        // the streets are lived in: cars keep to the right along avenues and streets, people walk the pavements
+        const lanes = [];
+        for (let gx = -GX; gx < GX; gx++) lanes.push({ along: 'z', at: gx * AVE + AVE / 2, len: (GZ + 0.5) * ST });
+        for (let gz = -GZ; gz < GZ; gz++) lanes.push({ along: 'x', at: gz * ST + ST / 2, len: (GX + 0.5) * AVE });
+        const blocked = (l, p) => l.along === 'z' ? (l.at > px0 && l.at < px1 && p > pz0 && p < pz1) : (l.at > pz0 && l.at < pz1 && p > px0 && p < px1); // no road through the park
+        const mk = (n, geo, mat) => { const m = new THREE.InstancedMesh(geo, mat, n); m.frustumCulled = false; scene.add(m); return m; };
+        this.carMat = std({ color: 0xffffff, roughness: 0.4, metalness: 0.3, emissive: 0xffe2a0, emissiveIntensity: 0 });
+        this.cars = mk(150, new THREE.BoxGeometry(0.9, 0.7, 2), this.carMat);
+        this.walkers = mk(180, new THREE.BoxGeometry(0.32, 0.8, 0.32), std({ color: 0xffffff, roughness: 1 }));
+        const paint = ['#16181c', '#16181c', '#2a2d33', '#6d1f1c', '#e2b23a', '#e2b23a', '#3f5a4a', '#c9c5ba', '#23324a'];
+        const movers = (mesh, n, speed, side, colors) => {
+            const out = [];
+            for (let i = 0; i < n; i++) {
+                const lane = lanes[Math.floor(hr() * lanes.length)], dir = hr() < 0.5 ? 1 : -1;
+                out.push({ lane, dir, p: (hr() * 2 - 1) * lane.len, v: speed * (0.7 + hr() * 0.6), off: side * (0.75 + hr() * 0.5) });
+                mesh.setColorAt(i, new THREE.Color(colors[Math.floor(hr() * colors.length)]));
+            }
+            return { mesh, list: out, blocked };
+        };
+        this.traffic = [movers(this.cars, this.cars.count, 5, 0.75, paint), movers(this.walkers, this.walkers.count, 0.7, 1.5, ['#2b2622', '#3d3a36', '#5b4a3a', '#77705f', '#8a2f2a', '#2f3f5c'])];
         // the building the tower stands on, down to the street
         const pod = std({ map: face.clone(), roughness: 0.7, color: 0xb4b9c0 }); pod.map.wrapS = pod.map.wrapT = THREE.RepeatWrapping; pod.map.repeat.set(3, 3); pod.map.needsUpdate = true;
         const podium = new THREE.Group();
@@ -168,7 +210,7 @@ export class SkyscraperWorld {
 
         this.boardGroup = new THREE.Group(); scene.add(this.boardGroup);
         // the elevator: a gilt band round the tower at the highest floor that can be lit
-        const gilt = new THREE.MeshStandardMaterial({ color: 0xe8b64c, roughness: 0.25, metalness: 1, emissive: 0x6a4a10, emissiveIntensity: 0.5 });
+        const gilt = this.gilt = new THREE.MeshStandardMaterial({ color: 0xe8b64c, roughness: 0.25, metalness: 1, emissive: 0x6a4a10, emissiveIntensity: 0.5, transparent: true });
         this.band = new THREE.Group();
         for (const [w, d, x, z] of [[5.36, 0.1, 0, 2.63], [5.36, 0.1, 0, -2.63], [0.1, 5.36, 2.63, 0], [0.1, 5.36, -2.63, 0]]) this.band.add(box(w, 0.1, d, gilt, x, -0.05, z));
         scene.add(this.band);
@@ -190,6 +232,7 @@ export class SkyscraperWorld {
             this.boardGroup.clear();
             const { group, windows, owner, L, lift, core } = buildBoard(state.nPlayers);
             this.L = L; this.windows = windows; this.owner = owner; this.lift = lift; this.core = core; this.boardGroup.add(group);
+            this.crownOn = true; this.bandOn = undefined;
             this.ofBlock = L.blocks.map(() => []);
             owner.forEach(({ block }, k) => this.ofBlock[block].push(k));
         }
@@ -199,8 +242,21 @@ export class SkyscraperWorld {
         this.sync(state);
     }
 
-    // The crown sits on the tower while the visitor arrives, and is lifted away for the game.
-    reveal(on, animated = true) { if (this.lift) this.lift.reveal(this.tweens, on, animated); }
+    // The crown sits on the tower while the visitor arrives and for as long as the roof is closed. When the elevator
+    // reaches the roof the crown is lifted away, and the gilt band of the elevator goes with it.
+    reveal(on, animated = true, state = this.state) {
+        const open = !!state && elevator(state) >= ROOF, crown = on || !open;
+        if (this.lift && (crown !== this.crownOn || !animated)) {
+            this.crownOn = crown;
+            if (animated) this.lift.reveal(this.tweens, crown, true); else { this.lift.shown = crown; this.lift.set(crown ? 1 : 0); }
+        }
+        const band = open ? 0 : 1;
+        if (band !== this.bandOn) {
+            this.bandOn = band; this.band.visible = true;
+            if (animated) this.tweens.run(0.8, (k) => { this.gilt.opacity = band ? k : 1 - k; if (k === 1) this.band.visible = !!band; });
+            else { this.gilt.opacity = band; this.band.visible = !!band; }
+        }
+    }
 
     homeView(n = this.nPlayers) {
         return n === 2 ? { pos: new THREE.Vector3(-7.5, 5.2, 12.5), target: new THREE.Vector3(0, -2.6, 0) }
@@ -218,6 +274,7 @@ export class SkyscraperWorld {
         const haze = new THREE.Color(0xc6cfdb).multiplyScalar(d.night ? 0.1 : Math.min(1, 0.35 + d.keyPower * 0.2));
         this.scene.fog.color.copy(d.skyHorizon).lerp(d.skyTop, d.low * 0.6).lerp(haze, 0.4 * (1 - d.low * 0.6));
         this.cityMat.emissiveIntensity = d.lamps * 1.6;
+        this.carMat.emissiveIntensity = d.lamps * 0.9; // headlamps after dark
         this.riverMat.color.copy(d.skyTop).lerp(new THREE.Color(0x3b5f78), 0.5).multiplyScalar(d.night ? 0.5 : 1);
         this.cloud.material.uniforms.uColor.value.copy(this.scene.fog.color).multiplyScalar(1.15);
         this.beacon.intensity = d.lamps * 30;
@@ -269,6 +326,7 @@ export class SkyscraperWorld {
         this.sync(state);
         const y0 = this.band.position.y, y1 = elevator(state) - ROOF;
         if (Math.abs(y1 - y0) > 0.01) { sfx('lift'); await this.tweens.run(0.6, (k) => { this.band.position.y = y0 + (y1 - y0) * ease.inOut(k); }); }
+        if (y1 >= 0 && this.crownOn) { sfx('lift'); this.reveal(false, true, state); }
     }
 
     celebrate(color) {
@@ -288,6 +346,17 @@ export class SkyscraperWorld {
             const col = new THREE.Color(), base = new THREE.Color(LIGHT[this.validColor] || 0xffffff), w = 0.16 + (Math.sin(t * 3.4) * 0.5 + 0.5) * 0.3;
             for (const b of this.valid) for (const k of this.ofBlock[b]) this.windows.setColorAt(k, col.copy(DARK).lerp(base, w));
             this.windows.instanceColor.needsUpdate = true;
+        }
+        const m = this.mover || (this.mover = new THREE.Object3D());
+        for (const { mesh, list, blocked } of this.traffic) {
+            list.forEach((c, i) => {
+                c.p += c.dir * c.v * dt;
+                if (c.p > c.lane.len) c.p -= 2 * c.lane.len; else if (c.p < -c.lane.len) c.p += 2 * c.lane.len;
+                const side = c.lane.at - c.dir * c.off * (c.lane.along === 'z' ? 1 : -1), hide = blocked(c.lane, c.p);
+                if (c.lane.along === 'z') { m.position.set(side, STREET + 0.4, c.p); m.rotation.y = 0; } else { m.position.set(c.p, STREET + 0.4, side); m.rotation.y = Math.PI / 2; }
+                m.scale.setScalar(hide ? 0.0001 : 1); m.updateMatrix(); mesh.setMatrixAt(i, m.matrix);
+            });
+            mesh.instanceMatrix.needsUpdate = true;
         }
         const a = t * 0.05;
         this.airship.position.set(Math.cos(a) * 46, 3 + Math.sin(t * 0.2) * 1.5, Math.sin(a) * 46); this.airship.rotation.y = -a;

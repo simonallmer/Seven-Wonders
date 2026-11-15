@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Tower symbol: the Porcelain Tower, five tiers with upturned eaves under the spire. -->
+  <g fill="#f2deae" fill-rule="evenodd">
+    <path d="M88 4h4v22h-4z"/>
+    <path d="M90 16a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"/>
+    <path d="M67.0 40Q75.0 36 82.5 28H97.5Q105.0 36 113.0 40V44H67.0Z"/>
+    <path d="M75.0 47H105.0V57H75.0Z M86 49V57H94V49Z"/>
+    <path d="M60.5 70Q68.5 66 79.25 58H100.75Q111.5 66 119.5 70V74H60.5Z"/>
+    <path d="M68.5 77H111.5V87H68.5Z M86 79V87H94V79Z"/>
+    <path d="M54.0 100Q62.0 96 76.0 88H104.0Q118.0 96 126.0 100V104H54.0Z"/>
+    <path d="M62.0 107H118.0V117H62.0Z M86 109V117H94V109Z"/>
+    <path d="M47.5 130Q55.5 126 72.75 118H107.25Q124.5 126 132.5 130V134H47.5Z"/>
+    <path d="M55.5 137H124.5V147H55.5Z M86 139V147H94V139Z"/>
+    <path d="M41.0 160Q49.0 156 69.5 148H110.5Q131.0 156 139.0 160V164H41.0Z"/>
+    <path d="M49.0 167H131.0V177H49.0Z M86 169V177H94V169Z"/>
+  </g>
+</svg>

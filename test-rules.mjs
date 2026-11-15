@@ -417,7 +417,7 @@ import { chooseMove as skyMove } from './src/skyscraper/ai.js';
 {
   for (const n of [2, 4]) { const L = K.layout(n), s = K.createState(n); console.log('skyscraper', n, 'players:', L.N, 'blocks,', L.windows, 'windows, need', L.need, 'opening moves', K.movesFor(s).length, 'elevator', K.elevator(s)); }
   const L = K.layout(2), f = L.find;
-  console.assert(L.windows === 105 && L.need === 53 && K.layout(4).windows === 205, 'window counts');
+  console.assert(L.windows === 125 && L.need === 63 && K.layout(4).windows === 225, 'window counts');
   // only blocks in line with one of your own, no higher than the elevator
   let s = K.createState(2);
   let ms = K.movesFor(s);

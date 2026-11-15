@@ -16,10 +16,11 @@ Light more than your share of the windows: more than half with two players, more
 
 ## Board and pieces
 
-- The outside of the tower, five windows wide on every side, and its roof. A corner block has a window on two sides and counts twice.
-- 2 players: the five upper floors and the roof (105 windows, 53 needed). 4 players: all ten floors (205 windows, 52 needed).
+- The outside of the tower, five windows wide on every side, and its roof. A block is one piece: a corner block has a window on two sides and counts twice; a block on the edge of the roof shows on the roof and on its side (two windows, three at a roof corner).
+- 2 players: the five upper floors and the roof (125 windows, 63 needed). 4 players: all ten floors (225 windows, 57 needed).
 - Seats are shown as light: warm white, violet (Black), red, blue.
-- The crown of the building is taken off for play.
+- The crown of the building stays on while the roof is closed. When the elevator reaches the roof, the crown is lifted away and the elevator band disappears.
+- The panel shows every player's windows against the number needed, and a bar of the whole tower with the leader first.
 
 ## Setup
 
@@ -39,6 +40,7 @@ Light one dark window.
 
 - **Row:** when a row of five is fully lit (five along one side on one floor, five across the roof, or the five floors of one column), whoever has the most windows in it takes the whole row. A tie leaves it as it is.
 - **Split:** a window may complete several rows at once. Each is judged on its own; the completing window stays yours if you won at least one of them.
+- **Safe in the same turn:** when you take a row, the window you just lit cannot be lost in that turn, even if another row it completes goes to a rival.
 
 ## Special rules
 

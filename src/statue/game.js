@@ -65,7 +65,7 @@ export class StatueGame {
     prompt() {
         const name = COLOR_NAMES[this.color], left = this.state.reserve[this.color];
         if (this.state.forced) return `Diminished — ${name} must move a die showing 1 this turn`;
-        return left ? `${name} to move — click a free field to place a die (${left} left), or a die to move it` : `${name} to move`;
+        return left ? `${name} — place a die (${left} left) or move one` : `${name} to move`;
     }
 
     // the dice a forced player may move

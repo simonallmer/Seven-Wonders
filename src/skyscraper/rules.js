@@ -3,7 +3,7 @@
 //
 // The board is the skin of a tower five fields square and ten floors high: every outer block of
 // floors 0–8 and the whole of floor 9, the roof. A block has one window on each outward face — two at a
-// corner — and a player who lights a block lights all its windows.
+// corner, and on the roof floor one more that looks up — and a player who lights a block lights all its windows.
 // 2 players play on the five upper floors only; 4 players on all ten.
 
 export const WHITE = 1, BLACK = 2, RED = 3, BLUE = 4;
@@ -23,8 +23,9 @@ function makeLayout(nPlayers) {
         if (!edge && w < ROOF) continue;
         // faces: 0 north (v = 0), 1 east (u = 4), 2 south (v = 4), 3 west (u = 0), 4 roof
         const faces = [];
+        // a block on the edge of the roof shows on the roof and on its sides: two windows, three at a corner
+        if (v === 0) faces.push(0); if (u === SIZE - 1) faces.push(1); if (v === SIZE - 1) faces.push(2); if (u === 0) faces.push(3);
         if (w === ROOF) faces.push(4);
-        else { if (v === 0) faces.push(0); if (u === SIZE - 1) faces.push(1); if (v === SIZE - 1) faces.push(2); if (u === 0) faces.push(3); }
         at[id(u, v, w)] = blocks.length;
         blocks.push({ u, v, w, faces });
     }

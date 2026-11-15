@@ -2,6 +2,7 @@
 import { createState, cloneState, movesFor, applyMove, outcome, turnOrder, scores, elevator, layout, COLOR_NAMES, ROOF } from './rules.js';
 import { chooseMove } from './ai.js';
 import { sfx } from '../audio.js';
+import { LIGHT } from './scene.js';
 
 export class SkyscraperGame {
     constructor(world, hud) {
@@ -23,7 +24,7 @@ export class SkyscraperGame {
         this.over = null; this.busy = false; this.thinking = false;
         this.moves = [];
         this.world.setBoard(this.state);
-        this.world.reveal(!this.active, false);
+        this.world.reveal(!this.active, false, this.state);
         this.refresh();
         if (this.active) this.nextTurn();
     }
@@ -35,7 +36,7 @@ export class SkyscraperGame {
 
     setActive(on) {
         this.active = on;
-        this.world.reveal(!on, on); // the crown is lifted away for the game and back in place at once when you leave
+        this.world.reveal(!on, on, this.state); // the crown is back in place at once when you leave
         if (!on) this.world.clearIndicators();
         if (on && !this.over && !this.busy) this.nextTurn();
     }
@@ -47,9 +48,10 @@ export class SkyscraperGame {
     }
 
     refresh() {
-        const sc = scores(this.state), need = layout(this.state.nPlayers).need, score = [], out = [];
+        const sc = scores(this.state), L = layout(this.state.nPlayers), need = L.need, score = [], out = [];
         for (const c of this.order) score[c] = `<b>${sc[c]}</b> / ${need}`;
-        this.hud.update({ order: this.order, turn: this.over ? -1 : this.state.turn, score, out, thinking: this.thinking, over: this.over });
+        const parts = this.order.map((c) => ({ n: sc[c], name: COLOR_NAMES[c], color: '#' + LIGHT[c].toString(16).padStart(6, '0') })).sort((a, b) => b.n - a.n);
+        this.hud.update({ order: this.order, turn: this.over ? -1 : this.state.turn, score, out, thinking: this.thinking, over: this.over, bar: { total: L.windows, need, parts } });
     }
 
     floorText() { const e = elevator(this.state); return e >= ROOF ? 'the roof is open' : `elevator at floor ${e + 1}`; }

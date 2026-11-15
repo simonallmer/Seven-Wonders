@@ -98,6 +98,16 @@ const hud = {
             li.querySelector('.seat-score').innerHTML = info.score[c];
             li.querySelector('.seat-name').classList.toggle('thinking', info.turn === i && info.thinking);
         });
+        // the whole field as one bar: every player's share, the leader first, and the mark that wins
+        const bar = $('#share');
+        if (bar) {
+            bar.hidden = !info.bar;
+            if (info.bar) {
+                const { total, need, parts } = info.bar;
+                bar.innerHTML = parts.map((p) => `<i style="width:${(p.n / total) * 100}%;background:${p.color}"></i>`).join('') + `<s style="left:${(need / total) * 100}%"></s>`;
+                bar.title = parts.map((p) => `${p.name} ${p.n}`).join(' · ') + ` · ${need} of ${total} win`;
+            }
+        }
     },
     status(text) { $('#status').textContent = text; },
     // one extra thing the player may do right now (Statue's Diminish), or null to take the button away
@@ -197,12 +207,12 @@ const RULES = { pyramid: [
 ], skyscraper: [
     ['h', 'General'],
     ['GOAL', 'Light more than your share of the windows: more than half with two players, more than a quarter with four.'],
-    ['THE TOWER', 'The board is the outside of the tower, five windows wide on every side, and its roof. A corner block has a window on two sides and counts twice. With two players only the five upper floors and the roof are in play; with four, all ten.'],
+    ['THE TOWER', 'The board is the outside of the tower, five windows wide on every side, and its roof. Every block is one piece: a corner block has a window on two sides and counts twice, and a block on the edge of the roof shows on the roof and on its side as well. With two players only the five upper floors and the roof are in play; with four, all ten.'],
     ['SETUP', 'Each player starts with one lit window in the middle of their side, on the lowest floor in play. White begins.'],
     ['h', 'Your Turn'],
     ['LIGHT', 'Light one dark window. It must be in line with one of your own lit windows: on the same floor along the same side, straight above or below, or straight through the tower to the opposite side.'],
     ['SHADOW', 'A rival’s window between the two blocks the line. The inside of the tower does not.'],
-    ['ELEVATOR', 'You cannot light higher than the elevator has come. It starts one floor above the lowest and rises a floor every round, until the roof is open. The gilt band shows where it stands.'],
+    ['ELEVATOR', 'You cannot light higher than the elevator has come. It starts one floor above the lowest and rises a floor every round, until the roof is open. The gilt band shows where it stands. When it reaches the roof, the crown of the tower is lifted away.'],
     ['h', 'Captures'],
     ['ROW', 'When a row of five is fully lit — five along one side on one floor, five across the roof, or the five floors of one column — whoever has the most windows in it takes the whole row. A tie leaves it as it is.'],
     ['SPLIT', 'A window may complete several rows at once. Each is judged on its own, and the window that completed them stays yours if you won at least one of them.'],

@@ -43,6 +43,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
     transition: opacity 0.6s, transform 0.6s;
 }
+#share { position: relative; display: flex; height: 8px; margin: 8px 2px 2px; border-radius: 4px; background: rgba(255, 255, 255, 0.09); }
+#share i { display: block; height: 100%; transition: width 0.5s; }
+#share i:first-child { border-radius: 4px 0 0 4px; }
+#share s { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--text); border-radius: 1px; box-shadow: 0 0 4px rgba(0, 0, 0, 0.8); }
+body:not(.state-game) #share { display: none; }
 /* in a game the panel hangs under two small signs, and folds away behind the three lines */
 #gamebar { position: absolute; top: 18px; right: 22px; z-index: 5; display: flex; gap: 14px; }
 body:not(.state-game) #gamebar { display: none; }

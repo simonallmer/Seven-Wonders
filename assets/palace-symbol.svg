@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Palace symbol: the transept of the Crystal Palace, a fan of glass ribs over the gridded front. -->
+  <g fill="#f2deae" fill-rule="evenodd">
+    <path d="M14 96a76 76 0 0 1 152 0h-10a66 66 0 0 0-132 0z"/>
+    <path d="M52 96a38 38 0 0 1 76 0h-8a30 30 0 0 0-60 0z"/>
+    <path d="M122.3 79.8L151.8 67.6L153.8 72.4L124.3 84.6Z"/>
+    <path d="M113.6 68.7L136.2 46.1L139.9 49.8L117.3 72.4Z"/>
+    <path d="M101.4 61.7L113.6 32.2L118.4 34.2L106.2 63.7Z"/>
+    <path d="M87.4 60.0L87.4 28.0L92.6 28.0L92.6 60.0Z"/>
+    <path d="M73.8 63.7L61.6 34.2L66.4 32.2L78.6 61.7Z"/>
+    <path d="M62.7 72.4L40.1 49.8L43.8 46.1L66.4 68.7Z"/>
+    <path d="M55.7 84.6L26.2 72.4L28.2 67.6L57.7 79.8Z"/>
+    <path d="M74 96a16 16 0 0 1 32 0z"/>
+    <path d="M14 102h152v66h-152z M22 112v16h12v-16z M42 112v16h12v-16z M62 112v16h12v-16z M82 112v16h12v-16z M102 112v16h12v-16z M122 112v16h12v-16z M142 112v16h12v-16z M22 138v16h12v-16z M42 138v16h12v-16z M62 138v16h12v-16z M82 138v16h12v-16z M102 138v16h12v-16z M122 138v16h12v-16z M142 138v16h12v-16z"/>
+  </g>
+</svg>

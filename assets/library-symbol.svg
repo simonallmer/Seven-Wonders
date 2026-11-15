@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Library symbol: the House of Wisdom from above, four domed halls round the courtyard and its fountain. -->
+  <g fill="#f2deae" fill-rule="evenodd">
+    <path d="M12 46a34 34 0 1 1 68 0a34 34 0 1 1 -68 0Z M26 46a20 20 0 1 0 40 0a20 20 0 1 0 -40 0Z"/>
+    <path d="M100 46a34 34 0 1 1 68 0a34 34 0 1 1 -68 0Z M114 46a20 20 0 1 0 40 0a20 20 0 1 0 -40 0Z"/>
+    <path d="M12 134a34 34 0 1 1 68 0a34 34 0 1 1 -68 0Z M26 134a20 20 0 1 0 40 0a20 20 0 1 0 -40 0Z"/>
+    <path d="M100 134a34 34 0 1 1 68 0a34 34 0 1 1 -68 0Z M114 134a20 20 0 1 0 40 0a20 20 0 1 0 -40 0Z"/>
+    <path d="M74 90a16 16 0 1 1 32 0a16 16 0 1 1 -32 0Z M83 90a7 7 0 1 0 14 0a7 7 0 1 0 -14 0Z"/>
+    <path d="M84 20h12v44h-12z M84 116h12v44h-12z M20 84h44v12h-44z M116 84h44v12h-44z"/>
+  </g>
+</svg>
