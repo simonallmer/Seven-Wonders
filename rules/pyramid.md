@@ -45,13 +45,12 @@ Move one of your stones: Run, Jump or Push.
 ## Special rules
 
 - The apex field is playable.
-- A player with fewer than four stones can no longer win, but can still play for a draw.
+- A player with fewer than four stones can no longer win. With four players they play on until only one rival still has four.
 
 ## End of the game
 
 - **Victory:** stones on all four victory fields.
-- **Standard mode:** you also win as soon as every rival has fewer than four stones.
-- **Conquest mode:** only the four victory fields win.
+- **Attrition:** you also win as soon as every rival has fewer than four stones.
 - **Draw:** no player has four stones left.
 
 ## Four players
@@ -60,5 +59,5 @@ One player per side of the pyramid; turn order White, Red, Black, Blue. Otherwis
 
 ## Implementation notes
 
-- Authority: the printed accordion rulebook (old folder `Rulebooks/`) and the old Standard/Conquest modes.
+- Authority: the printed accordion rulebook (old folder `Rulebooks/`) plus the attrition win of the old Standard mode. The old Conquest mode (summit only) was cut in November 2026.
 - Code: `src/pyramid/rules.js`.

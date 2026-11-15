@@ -205,10 +205,9 @@ export function countStones(s) {
     return n;
 }
 
-// mode 'standard': also won once every rival is below four stones.
-// mode 'conquest': only the four victory fields win (the printed rulebook).
+// Won on the four victory fields, or once every rival is below four stones.
 // Returns null while the game runs, else { winner: color | 0, reason }.
-export function outcome(s, mode = 'standard') {
+export function outcome(s) {
     const order = turnOrder(s.nPlayers);
     const vc = victoryCells(s.B);
     const first = s.grid[vc[0]];
@@ -216,7 +215,7 @@ export function outcome(s, mode = 'standard') {
     const counts = countStones(s);
     const alive = order.filter((c) => counts[c] >= 4);
     if (alive.length === 0) return { winner: 0, reason: 'attrition' };
-    if (mode === 'standard' && alive.length === 1) return { winner: alive[0], reason: 'attrition' };
+    if (alive.length === 1) return { winner: alive[0], reason: 'attrition' };
     if (s.stuck) return { winner: 0, reason: 'stuck' };
     return null;
 }

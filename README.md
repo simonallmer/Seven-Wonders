@@ -39,7 +39,7 @@ Opening `index.html` directly (`file://`) cannot work — browsers block modules
 1. Write `src/<wonder>/rules.js` (pure, with checks in `test-rules.mjs`), `ai.js` + `ai-worker.js`, `scene.js` and `game.js`.
    The world needs `scene`, `tweens`, `setBoard`, `pick`, `update`, `applyDaylight`, `homeView`, `cameraLimits`, and may set `ambience`, `veil`, `storm`, `shake`.
    The game needs `newGame(settings)`, `setActive`, `seatsChanged`, `refresh`, `click`, `hot`, `state.nPlayers`, `state.ply`, `over`; it reports to the HUD with `update({ order, turn, score, out, thinking })`.
-2. Add it to `GAMES` and `RULES` in `src/main.js` (player counts, Standard/Conquest switch, sigil) and set `playable: true` in `src/wonders.js`. Worlds are built the first time their wonder is focused.
+2. Add it to `GAMES` and `RULES` in `src/main.js` (player counts, sigil) and set `playable: true` in `src/wonders.js`. Worlds are built the first time their wonder is focused.
    A game may call `hud.action(label, fn)` — or `hud.action([{ label, fn }, …])` for several — to show buttons above the status line (Statue's Diminish, Great Wall's Shoot / Spin / Turn), and `hud.action(null)` to take them away.
    Anything tall that would hide the board (Zeus, the lighthouse, the temple roof, the Chrysler crown) is a `Lift` from `src/fx.js`: shown while the visitor arrives, raised by `world.reveal(false)` when the game becomes active.
 3. In `src/palace.js`, build the miniature from the wonder's own `buildBoard({ mini: true })` and store `wonders[i].mini = { scale, origin }`; `diveView(index, home)` then lands the camera exactly on the real board. Add memorabilia and a rules sheet with `userData.pick = { type: 'rules', index }`.

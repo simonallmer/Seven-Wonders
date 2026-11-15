@@ -65,7 +65,7 @@ export class PyramidGame {
         if (this.isHuman()) { this.hud.status(`${name} to move`); return; }
         this.hud.status(`${name} is thinking…`);
         this.thinking = true;
-        const req = { id: ++this.gen, state: cloneState(this.state), level: this.seat().type, mode: this.settings.mode, history: this.history.slice(-40) };
+        const req = { id: ++this.gen, state: cloneState(this.state), level: this.seat().type, mode: 'standard', history: this.history.slice(-40) };
         this.pending = { id: req.id, at: performance.now() };
         if (this.worker) this.worker.postMessage(req);
         else setTimeout(() => this.onAI({ id: req.id, move: chooseMove(req.state, req.level, req.mode, req.history) }), 60);
@@ -121,7 +121,7 @@ export class PyramidGame {
         await this.world.play(events, this.state);
         if (gen !== this.gen) return; // a new game began during the animation
         this.busy = false;
-        this.over = outcome(this.state, this.settings.mode);
+        this.over = outcome(this.state);
         if (this.over) { this.finish(mover); return; }
         const expected = (this.order.indexOf(mover) + 1) % this.state.nPlayers;
         if (this.state.turn !== expected) this.hud.toast(`${COLOR_NAMES[this.order[expected]]} has no move and is passed over`);

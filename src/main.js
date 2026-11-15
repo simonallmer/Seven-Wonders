@@ -38,7 +38,7 @@ const smooth = (k, a, b) => THREE.MathUtils.smoothstep(k, a, b);
 const SEAT_TYPES = DEMO ? ['human', 'easy'] : ['human', 'easy', 'medium', 'hard'];
 const SEAT_LABEL = { human: 'Human', easy: 'CPU · Easy', medium: 'CPU · Medium', hard: 'CPU · Hard' };
 const settings = Object.assign(
-    { players: 2, seats: [{ type: 'human' }, { type: 'medium' }, { type: 'medium' }, { type: 'medium' }], mode: 'standard', light: 'live', focus: 0 },
+    { players: 2, seats: [{ type: 'human' }, { type: 'medium' }, { type: 'medium' }, { type: 'medium' }], light: 'live', focus: 0 },
     JSON.parse(localStorage.getItem('sw.v2') || '{}'));
 const save = () => localStorage.setItem('sw.v2', JSON.stringify(settings));
 if (DEMO) { // the demo: two players, and the computer plays at its easy level
@@ -52,16 +52,16 @@ const { renderer } = R;
 let palace, envRT = null, day = null;
 // Every playable wonder: its world, its match and what the panel offers for it.
 const GAMES = {
-    pyramid: { World: PyramidWorld, Game: PyramidGame, players: [2, 4], modes: true, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/pyramid-symbol.svg' },
-    gardens: { World: GardensWorld, Game: GardensGame, players: [2], modes: false, order: () => [1, 2], sigil: 'assets/gardens-symbol.svg' },
-    temple: { World: TempleWorld, Game: TempleGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/temple-symbol.svg' },
-    statue: { World: StatueWorld, Game: StatueGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/statue-symbol.svg' },
-    mausoleum: { World: MausoleumWorld, Game: MausoleumGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/mausoleum-symbol.svg' },
-    colossus: { World: ColossusWorld, Game: ColossusGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/colossus-symbol.svg' },
-    pharos: { World: PharosWorld, Game: PharosGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/pharos-symbol.svg' },
-    greatWall: { World: GreatWallWorld, Game: GreatWallGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/greatwall-symbol.svg' },
-    cathedral: { World: CathedralWorld, Game: CathedralGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/cathedral-symbol.svg' },
-    skyscraper: { World: SkyscraperWorld, Game: SkyscraperGame, players: [2, 4], modes: false, order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/skyscraper-symbol.svg' },
+    pyramid: { World: PyramidWorld, Game: PyramidGame, players: [2, 4], order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/pyramid-symbol.svg' },
+    gardens: { World: GardensWorld, Game: GardensGame, players: [2], order: () => [1, 2], sigil: 'assets/gardens-symbol.svg' },
+    temple: { World: TempleWorld, Game: TempleGame, players: [2, 4], order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/temple-symbol.svg' },
+    statue: { World: StatueWorld, Game: StatueGame, players: [2, 4], order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/statue-symbol.svg' },
+    mausoleum: { World: MausoleumWorld, Game: MausoleumGame, players: [2, 4], order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/mausoleum-symbol.svg' },
+    colossus: { World: ColossusWorld, Game: ColossusGame, players: [2, 4], order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/colossus-symbol.svg' },
+    pharos: { World: PharosWorld, Game: PharosGame, players: [2, 4], order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/pharos-symbol.svg' },
+    greatWall: { World: GreatWallWorld, Game: GreatWallGame, players: [2, 4], order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/greatwall-symbol.svg' },
+    cathedral: { World: CathedralWorld, Game: CathedralGame, players: [2, 4], order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/cathedral-symbol.svg' },
+    skyscraper: { World: SkyscraperWorld, Game: SkyscraperGame, players: [2, 4], order: (n) => (n === 2 ? [1, 2] : [1, 3, 2, 4]), sigil: 'assets/skyscraper-symbol.svg' },
 };
 if (DEMO) WONDERS.forEach((w, i) => { if (i >= 7) { w.locked = true; w.playable = false; delete GAMES[w.id]; } }); // the New Wonders belong to Arcade
 const live = {};   // id -> { id, def, world, game, controls }, built the first time a wonder is needed
@@ -173,8 +173,6 @@ function renderPanel() {
         b.title = b.disabled ? 'This wonder is a game for two' : '';
         if (DEMO && +b.dataset.players === 4) { b.disabled = false; b.classList.add('arcade'); b.title = 'Four players: unlocked with Arcade'; }
     });
-    document.querySelectorAll('#mode-seg button').forEach((b) => b.classList.toggle('on', b.dataset.mode === settings.mode));
-    $('#mode-seg').hidden = !def.modes;
     const order = def.order(n);
     $('#seats').innerHTML = order.map((c, i) => `
         <li><span class="dot" style="background:${STONE_CSS[c]}"></span><span class="seat-name">${COLOR_NAMES[c]}</span>
@@ -212,9 +210,8 @@ const RULES = { pyramid: [
     ['FALL', 'A stone pushed off the bottom step falls and is removed.'],
     ['OSIRIS', 'Whenever stones are enclosed in a straight line on one step by two opposing stones, with no gap, they are removed.'],
     ['h', 'The End'],
-    ['VICTORY', 'The first player with stones on all four victory fields wins. A player with fewer than four stones can no longer win, but can still play for a draw.'],
+    ['VICTORY', 'The first player with stones on all four victory fields wins. You also win as soon as every rival is down to fewer than four stones.'],
     ['DRAW', 'The game is drawn when no player has four stones left.'],
-    ['STANDARD', 'In Standard play you also win as soon as every rival is down to fewer than four stones. Conquest counts the summit alone.'],
 ], cathedral: [
     ['h', 'General'],
     ['GOAL', 'Bring every other congregation below four stones. A congregation of fewer than four falls silent: its stones stay where they are, but it has lost.'],
@@ -504,10 +501,6 @@ function bindUI() {
         palace.setPlayers(n);
         renderPanel(); renderCard();
         if (state === 'game' && cur.game.state.nPlayers !== playersFor(cur.def)) restart();
-    };
-    $('#mode-seg').onclick = (e) => {
-        const m = e.target.dataset.mode; if (!m) return;
-        settings.mode = m; save(); sfx('tick'); renderPanel();
     };
     $('#seats').onclick = (e) => {
         const i = e.target.dataset.seat; if (i === undefined) return;
