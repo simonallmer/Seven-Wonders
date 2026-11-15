@@ -9,7 +9,7 @@ OUT="Seven Wonders Demo"
 mkdir -p "$OUT"
 rsync -a --delete \
   --exclude '.git' --exclude '.gitignore' --exclude '.DS_Store' --exclude '.claude' --exclude "$OUT" \
-  --exclude 'instagram' --exclude 'rules' --exclude 'titles' --exclude 'test-rules.mjs' --exclude 'make-demo.sh' --exclude 'README.md' \
+  --exclude 'instagram' --exclude 'marketing' --exclude 'rules' --exclude 'titles' --exclude 'test-rules.mjs' --exclude 'make-demo.sh' --exclude 'README.md' \
   ./ "$OUT/"
 
 sed -i '' 's/export const DEMO = false;/export const DEMO = true;/' "$OUT/src/edition.js"
