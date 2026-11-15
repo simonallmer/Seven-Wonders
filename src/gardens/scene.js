@@ -514,7 +514,9 @@ export class GardensWorld {
 
     // One step of a move: the hand travels to `at` and sets down `dropped` (colours, lowest first) there.
     // With dropped = null the hand has just been picked up and rises from its source.
-    stepTo(state, hand, at, dropped = null) {
+    // quick: a player walking a stack by hand is not kept waiting; the computer's moves keep their calm pace
+    stepTo(state, hand, at, dropped = null, quick = false) {
+        const q = quick ? 0.45 : 1;
         const carrying = this.handInner.children.length > 0;
         const from = this.handGroup.position.clone();
         const before = this.state, mover = currentColor(state);
@@ -522,7 +524,7 @@ export class GardensWorld {
         if (!dropped || !carrying) {
             const to = this.handGroup.position.clone(), start = to.clone(); start.y -= isGarden(at) ? 0.6 : 0.36;
             sfx('pickup');
-            return this.tweens.run(0.24, (k) => this.handGroup.position.lerpVectors(start, to, ease.out(k)));
+            return this.tweens.run(0.24 * q, (k) => this.handGroup.position.lerpVectors(start, to, ease.out(k)));
         }
         const to = this.hover(state, at);
         // the stones that were just set down are already in place: fetch them back into the hand for the flight
@@ -539,10 +541,10 @@ export class GardensWorld {
             D.forEach((s, i) => s.position.set(p.x, p.y + i * STONE_H, p.z));
             this.handGroup.position.set(p.x, p.y + n * STONE_H, p.z);
         };
-        return this.tweens.run(dist < 0.05 ? 0.06 : 0.2 + dist * 0.07, (k) => {
+        return this.tweens.run(dist < 0.05 ? 0.06 : (0.2 + dist * 0.07) * q, (k) => {
             p.lerpVectors(from, to, ease.inOut(k)); p.y += Math.sin(Math.PI * k) * Math.min(0.5, dist * 0.22);
             place();
-        }).then(() => this.tweens.run(0.17, (k) => {
+        }).then(() => this.tweens.run(0.17 * q, (k) => {
             const e = ease.in(k);
             D.forEach((s, i) => { p.copy(to).y += i * STONE_H; s.position.lerpVectors(p, finals[i], e); });
             this.handGroup.position.set(to.x, to.y + n * STONE_H * (1 - e), to.z);

@@ -61,6 +61,13 @@ export class StatueGame {
         this.hud.update({ order: this.order, turn: this.over ? -1 : this.state.turn, score, out, thinking: this.thinking, over: this.over });
     }
 
+    // what the player to move is told: a new die may be placed on any turn as long as the reserve lasts
+    prompt() {
+        const name = COLOR_NAMES[this.color], left = this.state.reserve[this.color];
+        if (this.state.forced) return `Diminished — ${name} must move a die showing 1 this turn`;
+        return left ? `${name} to move — click a free field to place a die (${left} left), or a die to move it` : `${name} to move`;
+    }
+
     // the dice a forced player may move
     forcedDice() {
         const g = this.state.grid, one = this.color * 8 + 1, out = [];
@@ -75,7 +82,7 @@ export class StatueGame {
         this.moves = legalMoves(this.state);
         if (this.moves[0].type === 'pass') { this.hud.toast(`${name} cannot move and is passed over`); this.doMove(this.moves[0]); return; }
         if (this.isHuman()) {
-            this.hud.status(forced ? `${name} must move a die showing 1` : `${name} to move`);
+            this.hud.status(this.prompt());
             if (forced) this.world.showChoices(this.forcedDice());
             return;
         }
@@ -122,7 +129,7 @@ export class StatueGame {
         this.world.clearIndicators();
         if (this.state.forced && this.isHuman()) this.world.showChoices(this.forcedDice());
         if (sound) sfx('tick');
-        this.hud.status(this.state.forced ? `${COLOR_NAMES[this.color]} must move a die showing 1` : `${COLOR_NAMES[this.color]} to move`);
+        this.hud.status(this.prompt());
     }
 
     diminish(at, targets) {

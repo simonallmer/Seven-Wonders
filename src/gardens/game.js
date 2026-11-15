@@ -158,7 +158,7 @@ export class GardensGame {
         this.busy = true;
         this.world.clearIndicators();
         const { p, targets } = this.show();
-        await this.world.stepTo(p.state, p.hand, node, dropped);
+        await this.world.stepTo(p.state, p.hand, node, dropped, true);
         if (gen !== this.gen) return;
         this.busy = false;
         if (done) { this.sel = null; this.doMove(done, false); return; }

@@ -36,9 +36,18 @@
                 <button id="btn-light" title="Daylight follows your clock (L)">Live</button>
                 <button id="btn-rules" class="game-only" title="Rules (R)">Rules</button>
                 <button id="btn-restart" class="game-only" title="Start again">Restart</button>
-                <button id="btn-leave" class="game-only" title="Back to the exhibition (Esc)">Exhibition</button>
             </div>
         </aside>
+
+        <!-- in a game: back to the exhibition, and the menu folded away behind three lines -->
+        <div id="gamebar">
+            <button id="btn-leave" title="Back to the Exhibition (Esc)" aria-label="Back to the Exhibition">
+                <svg viewBox="0 0 26 26" aria-hidden="true"><path d="M11 4H5v18h6M10 13h12M17 8l5 5-5 5"/></svg>
+            </button>
+            <button id="btn-menu" title="Menu (Tab)" aria-label="Menu" aria-controls="panel">
+                <svg viewBox="0 0 26 26" aria-hidden="true"><path d="M3 6h20M3 13h20M3 20h20"/></svg>
+            </button>
+        </div>
 
         <!-- bottom: the wonder in front of you -->
         <section id="card">

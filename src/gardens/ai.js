@@ -14,7 +14,7 @@ function side(s, c) {
     const home = white ? G_WHITE_HOME : G_BLACK_HOME, launch = white ? G_BLACK_HOME : G_WHITE_HOME;
     const arrive = white ? G_BLACK_HIGH : G_WHITE_HIGH, goal = white ? G_WHITE_HIGH : G_BLACK_HIGH;
     const inGoal = at(goal, c);
-    let v = inGoal * 1000 + at(arrive, c) * 540 + at(launch, c) * 250 + at(home, c) * 60;
+    let v = inGoal * 1000 + at(arrive, c) * 540 + at(launch, c) * 295 + at(home, c) * 60;
     if (inGoal >= WIN_COUNT - 1) v += 300;
     for (let i = 0; i < FIELDS; i++) {
         const t = s.towers[i];
@@ -24,7 +24,9 @@ function side(s, c) {
         const prog = upper === white ? COLS - 1 - col : col;
         for (let k = 0; k < h; k++) {
             if (((t >> k) & 1) + 1 !== c) continue;
-            v += mine ? (upper ? 600 + prog * 34 : 105 + prog * 26) : (upper ? 150 : 45);
+            // taking stones wins games here, so a buried stone is worth little; but every step on counts, and
+            // stepping into the rival's garden counts clearly more than waiting in front of it for one more capture
+            v += mine ? (upper ? 600 + prog * 34 : 105 + prog * 30) : (upper ? 150 : 45);
         }
         if (mine && h > 1) v += 6 * h; // a tall tower is hard to take and carries far
     }
