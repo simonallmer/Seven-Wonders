@@ -53,7 +53,7 @@ export function buildHallLife(scene, { HALL, iron }) {
     }
 
     // court signs on the gallery fascia, and carpets hung over the balustrade in the other bays
-    const COURTS = ['EGYPT', 'GREECE', 'BABYLON', 'RHODES', 'ALEXANDRIA', 'PERSIA', 'INDIA', 'CHINA', 'SILKS', 'FINE ARTS', 'MACHINERY', 'ROME', 'TURKEY', 'ITALY', 'JEWELLERY', 'GLASS'];
+    const COURTS = ['EGYPT', 'GREECE', 'BABYLON', 'RHODES', 'ALEXANDRIA', 'PERSIA', 'INDIA', 'CHINA', 'SILKS', 'FINE ARTS', 'MACHINERY', 'ROME', 'THE AMERICAS', 'CHILE', 'JEWELLERY', 'GLASS'];
     const signMat = (t) => std({ roughness: 0.6, map: canvasTexture(512, 96, (x, w, h) => {
         x.fillStyle = '#a33a2c'; x.fillRect(0, 0, w, h);
         x.strokeStyle = '#e8c96a'; x.lineWidth = 5; x.strokeRect(9, 9, w - 18, h - 18);
@@ -80,6 +80,8 @@ export function buildHallLife(scene, { HALL, iron }) {
     const plinthRed = std({ color: 0x5e2420, roughness: 0.7 });
     const darkWood = std({ color: 0x3a1f10, roughness: 0.55 });
     const sevres = std({ color: 0x24448e, roughness: 0.25, metalness: 0.1 });
+    // the bays nearest the table hold the famous exhibits, so they show behind the wonders
+    const EXHIBITS = { '-1:6': () => velocipede(m), '-1:7': () => fireEngine(m), '-1:8': () => prognosticator(m), '1:6': () => telegraph(m), '1:7': () => americas(m), '1:8': () => goldLump(m, plinthRed) };
     for (const s of [-1, 1]) for (let i = 0; i < nBays; i++) {
         const x = bayX(i) + bay / 2, kind = (i * 3 + (s > 0 ? 1 : 0)) % 3;
         if ((i + (s > 0 ? 1 : 0)) % 2 === 0) {
@@ -90,8 +92,9 @@ export function buildHallLife(scene, { HALL, iron }) {
                 c.position.set(x + dx, (G1 - 0.1) / 2, s * (half - 0.3)); c.rotation.y = s > 0 ? Math.PI : 0; st.add(c);
             }
         }
-        const z = s * 9.75;
-        if (kind === 0) st.add(statue(m.marble, plinthRed, x, z, i));
+        const z = s * 9.75, special = EXHIBITS[s + ':' + i];
+        if (special) { const e = special(); e.position.set(x, 0, z); e.rotation.y = s > 0 ? Math.PI : 0; st.add(e); }
+        else if (kind === 0) st.add(statue(m.marble, plinthRed, x, z, i));
         else if (kind === 1) { // a glass case on a dark stand, with a gilt cup inside
             st.add(box(1.5, 0.75, 0.75, darkWood, x, 0, z));
             st.add(box(1.4, 0.62, 0.66, m.glass, x, 0.75, z));
@@ -164,7 +167,9 @@ export function buildHallLife(scene, { HALL, iron }) {
     st.add(cyl(1.85, 1.85, 0.3, m.gold, px, 3.35, 0, 8));
     const dome = new THREE.Mesh(new THREE.SphereGeometry(1.75, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), red); dome.position.set(px, 3.65, 0); dome.scale.y = 0.9; st.add(dome);
     st.add(cyl(0.02, 0.12, 0.7, m.gold, px, 5.2, 0, 8));
-    st.add(box(0.8, 1.0, 0.8, plinthRed, px, 0.25, 0), box(0.5, 0.5, 0.5, m.glass, px, 1.25, 0), sphere(0.11, m.glass, px, 1.5, 0));
+    const gem = kohinoor(m, plinthRed); gem.position.x = px; st.add(gem);
+
+    buildPark(scene);
 
     shadowed(st, true, false);
     mergeByMaterial(st);
@@ -214,6 +219,7 @@ export function buildHallLife(scene, { HALL, iron }) {
     crowd.finish();
 
     return {
+        showVisitors(on) { crowd.show(on); },
         update(dt, time) {
             for (let j = 0; j < jets.length; j++) {
                 const [x, y, r, out, up, rate, life] = jets[j];
@@ -247,20 +253,209 @@ function fern(x, y, z) {
     }
     g.position.set(x, y, z); return g;
 }
-// a draped marble figure on its plinth, varied by a seed
+// a draped marble figure on a moulded pedestal, varied by a seed: a modest goddess, an orator, an urn-bearer, a spear-bearer, a figure raising a wreath
+const UP = new THREE.Vector3(0, 1, 0);
+const stdm = (o) => new THREE.MeshStandardMaterial(o);
+function bone(g, a, b, r, mat) {
+    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), d = B.clone().sub(A), L = d.length();
+    const c = new THREE.Mesh(new THREE.CapsuleGeometry(r, Math.max(0.001, L), 3, 8), mat);
+    c.position.copy(A).add(B).multiplyScalar(0.5); c.quaternion.setFromUnitVectors(UP, d.normalize()); g.add(c); return c;
+}
+const ARMS = [
+    [[0.2, 1.4, 0], [0.24, 1.12, 0.04], [0.24, 0.86, 0.08], [-0.2, 1.4, 0], [-0.22, 1.14, 0.1], [0.02, 1.1, 0.17]],
+    [[0.2, 1.4, 0], [0.38, 1.6, 0.12], [0.5, 1.82, 0.22], [-0.2, 1.4, 0], [-0.24, 1.12, 0.02], [-0.22, 0.88, 0.1]],
+    [[0.2, 1.4, 0], [0.32, 1.62, -0.02], [0.2, 1.78, -0.02], [-0.2, 1.4, 0], [-0.24, 1.12, 0.06], [-0.18, 0.9, 0.16]],
+    [[0.2, 1.4, 0], [0.34, 1.52, 0.04], [0.36, 1.78, 0.06], [-0.2, 1.4, 0], [-0.32, 1.16, -0.02], [-0.16, 1.0, 0.02]],
+    [[0.2, 1.4, 0], [0.3, 1.66, 0.04], [0.12, 1.9, 0.06], [-0.2, 1.4, 0], [-0.3, 1.66, 0.04], [-0.12, 1.9, 0.06]],
+];
 function statue(stone, base, x, z, seed) {
-    const g = new THREE.Group(), v = Math.abs(Math.round(seed * 7)) % 4;
-    g.add(box(0.7, 1.0, 0.7, base), box(0.8, 0.08, 0.8, stone, 0, 1.0, 0));
-    g.add(lathe([[0, 0], [0.24, 0], [0.22, 0.2], [0.16, 0.7], [0.18, 1.0], [0.12, 1.15], [0, 1.18]], stone, 0, 1.08, 0));
-    g.add(sphere(0.1, stone, 0, 2.36, 0.01));
-    const arm = cyl(0.04, 0.05, 0.62, stone, 0, 0, 0, 6);
-    arm.geometry.translate(0, -0.31, 0); arm.position.set(0.2, 2.15, 0);
-    arm.rotation.z = [2.6, 0.3, 2.2, 0.5][v]; arm.rotation.x = [0, 0.5, -0.4, 0][v]; g.add(arm);
-    const arm2 = arm.clone(); arm2.position.x = -0.2; arm2.rotation.z = -[0.25, 0.4, 0.3, 2.7][v]; g.add(arm2);
-    if (v === 1) g.add(box(0.5, 0.08, 0.3, stone, 0.25, 1.95, 0.2)); // a tablet, or a fold of drapery
+    const g = new THREE.Group(), v = Math.abs(Math.round(seed * 7)) % 5;
+    g.add(box(0.82, 0.14, 0.82, stone), box(0.72, 0.06, 0.72, stone, 0, 0.14, 0), box(0.6, 0.72, 0.6, base, 0, 0.2, 0), box(0.7, 0.06, 0.7, stone, 0, 0.92, 0), box(0.8, 0.08, 0.8, stone, 0, 0.98, 0));
+    const f = new THREE.Group(); f.position.y = 1.06; g.add(f);
+    const gown = v !== 1 && v !== 3;
+    if (gown) {
+        f.add(lathe([[0, 0], [0.25, 0], [0.26, 0.04], [0.21, 0.3], [0.18, 0.62], [0.16, 0.9], [0.13, 1.0], [0, 1.02]], stone, 0, 0, 0));
+        for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2 + 0.3; bone(f, [Math.cos(a) * 0.235, 0.06, Math.sin(a) * 0.235], [Math.cos(a) * 0.16, 0.72, Math.sin(a) * 0.16], 0.026, stone); }
+        bone(f, [0.05, 0.56, 0.11], [0.07, 0.08, 0.18], 0.06, stone); // a knee bent under the drapery
+    } else {
+        bone(f, [0.09, 0.92, 0], [0.1, 0.5, 0.02], 0.075, stone); bone(f, [0.1, 0.5, 0.02], [0.1, 0.08, 0], 0.058, stone);
+        bone(f, [-0.09, 0.92, 0], [-0.13, 0.5, 0.08], 0.075, stone); bone(f, [-0.13, 0.5, 0.08], [-0.17, 0.08, 0.04], 0.058, stone);
+        f.add(box(0.1, 0.06, 0.22, stone, 0.1, 0, 0.04), box(0.1, 0.06, 0.22, stone, -0.17, 0, 0.08));
+        f.add(lathe([[0, 0.66], [0.21, 0.66], [0.2, 0.8], [0.17, 1.0], [0, 1.02]], stone, 0, 0, 0));
+    }
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.26, 3, 10), stone); torso.position.y = 1.2; torso.scale.set(1.25, 1, 0.78); torso.rotation.z = 0.06; f.add(torso);
+    bone(f, [-0.17, 1.4, 0], [0.17, 1.42, 0], 0.06, stone);
+    bone(f, [0.18, 1.42, 0.06], [-0.14, 0.98, 0.09], 0.05, stone); // the cloak slung across the chest
+    bone(f, [0, 1.44, 0], [0.01, 1.53, 0.01], 0.045, stone);
+    const head = sphere(0.095, stone, 0.01, 1.63, 0.02); head.scale.set(0.9, 1.12, 1); f.add(head);
+    f.add(sphere(0.1, stone, 0.01, 1.665, -0.015));
+    if (gown) f.add(sphere(0.05, stone, 0.01, 1.69, -0.1));
+    const A = ARMS[v];
+    for (const o of [0, 3]) { bone(f, A[o], A[o + 1], 0.045, stone); bone(f, A[o + 1], A[o + 2], 0.038, stone); f.add(sphere(0.042, stone, ...A[o + 2])); }
+    if (v === 2) f.add(lathe([[0, 0], [0.06, 0], [0.1, 0.1], [0.07, 0.2], [0.05, 0.22], [0.08, 0.26], [0, 0.26]], stone, 0.22, 1.64, -0.03));
+    if (v === 3) bone(f, [0.36, 0.0, 0.06], [0.36, 2.3, 0.06], 0.016, stone);
+    if (v === 4) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.025, 6, 16), stone); w.position.set(0, 1.95, 0.06); f.add(w); }
     g.position.set(x, 0, z); g.rotation.y = z > 0 ? Math.PI : 0;
     return g;
 }
+
+// ---------------------------------------------------------------- the inventions and treasures of 1851
+const cylX = (r, l, mat, x, y, z, seg = 16) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, l, seg), mat); c.rotation.z = Math.PI / 2; c.position.set(x, y, z); return c; };
+const cylZ = (r, l, mat, x, y, z, seg = 8) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, l, seg), mat); c.rotation.x = Math.PI / 2; c.position.set(x, y, z); return c; };
+function wheel(r, rim, spokes, n = 12) {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.TorusGeometry(r, 0.022, 6, 28), rim));
+    g.add(cylZ(0.05, 0.1, spokes, 0, 0, 0, 10));
+    for (let k = 0; k < n; k++) { const s = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.013, r, 5), spokes); s.geometry.translate(0, r / 2, 0); s.rotation.z = k / n * Math.PI * 2; g.add(s); }
+    return g;
+}
+const MAHOGANY = stdm({ color: 0x4a2414, roughness: 0.4 }), IRON = stdm({ color: 0x1a1614, roughness: 0.55, metalness: 0.4 });
+const ENGINE_RED = stdm({ color: 0x9a1f18, roughness: 0.4, metalness: 0.1 }), VELVET = stdm({ color: 0x6a1420, roughness: 1 });
+
+// a manual fire engine: the crew pumped the long brakes on either side
+function fireEngine(m, s) {
+    const g = new THREE.Group();
+    g.add(box(1.9, 0.62, 0.78, ENGINE_RED, 0, 0.5, 0), box(1.96, 0.05, 0.84, m.gold, 0, 1.12, 0), box(1.96, 0.05, 0.84, m.gold, 0, 0.47, 0));
+    g.add(cyl(0.13, 0.14, 0.55, m.brass, 0, 1.15, 0, 14), sphere(0.13, m.brass, 0, 1.7, 0), cyl(0.02, 0.03, 0.2, m.brass, 0, 1.8, 0, 6));
+    for (const [wx, r] of [[-0.66, 0.46], [0.68, 0.38]]) for (const wz of [-0.5, 0.5]) { const w = wheel(r, IRON, ENGINE_RED, 12); w.position.set(wx, r, wz); g.add(w); }
+    for (const wz of [-0.64, 0.64]) { g.add(box(3.0, 0.06, 0.06, m.wood, 0, 1.3, wz), box(0.05, 0.22, 0.05, IRON, 0, 1.1, wz)); }
+    for (const wx of [-1.5, 1.5]) g.add(box(0.06, 0.06, 1.34, m.wood, wx, 1.3, 0));
+    const hose = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.045, 6, 18), IRON); hose.rotation.x = Math.PI / 2; hose.position.set(-0.62, 1.2, 0); g.add(hose);
+    g.add(box(0.36, 0.22, 0.62, ENGINE_RED, 0.72, 1.17, 0), box(1.3, 0.05, 0.05, m.wood, 1.55, 0.5, 0));
+    g.add(cylX(0.025, 0.5, m.brass, -1.15, 0.9, 0.3, 8));
+    return g;
+}
+// a treadle carriage on four spoked wheels, after the velocipedes of the 1850s
+function velocipede(m) {
+    const g = new THREE.Group(), green = stdm({ color: 0x2c4a34, roughness: 0.45 }), leather = stdm({ color: 0x3a2216, roughness: 0.7 });
+    g.add(box(1.9, 0.1, 1.2, MAHOGANY, 0, 0, 0));
+    const y = 0.1;
+    for (const [wx, r, wz] of [[-0.45, 0.42, 0.37], [-0.45, 0.42, -0.37], [0.55, 0.28, 0.3], [0.55, 0.28, -0.3]]) { const w = wheel(r, IRON, green, 12); w.position.set(wx, y + r, wz); g.add(w); }
+    g.add(cylZ(0.016, 0.76, IRON, -0.45, y + 0.42, 0), cylZ(0.016, 0.62, IRON, 0.55, y + 0.28, 0));
+    g.add(box(1.05, 0.05, 0.08, green, 0.05, y + 0.4, 0), box(0.05, 0.28, 0.05, green, -0.28, y + 0.45, 0));
+    g.add(box(0.34, 0.06, 0.3, leather, -0.28, y + 0.72, 0), box(0.05, 0.26, 0.3, leather, -0.46, y + 0.76, 0));
+    g.add(box(0.04, 0.5, 0.04, green, 0.5, y + 0.32, 0), box(0.04, 0.04, 0.36, IRON, 0.5, y + 0.82, 0));
+    for (const wz of [-0.13, 0.13]) g.add(box(0.5, 0.03, 0.07, m.wood, 0.12, y + 0.24, wz));
+    return g;
+}
+// Merryweather's Tempest Prognosticator: twelve leeches in twelve bottles, each able to ring the bell when a storm draws near
+function prognosticator(m) {
+    const g = new THREE.Group(), water = stdm({ color: 0x8aa6a0, roughness: 0.2, transparent: true, opacity: 0.7 });
+    g.add(box(0.7, 0.7, 0.7, MAHOGANY), cyl(0.44, 0.46, 0.08, MAHOGANY, 0, 0.7, 0, 24));
+    for (let k = 0; k < 12; k++) {
+        const a = k / 12 * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+        g.add(cyl(0.045, 0.05, 0.24, m.glass, c * 0.32, 0.78, s * 0.32, 10), cyl(0.02, 0.03, 0.06, m.glass, c * 0.32, 1.02, s * 0.32, 8), cyl(0.04, 0.04, 0.12, water, c * 0.32, 0.79, s * 0.32, 8));
+        bone(g, [c * 0.32, 1.08, s * 0.32], [c * 0.07, 1.44, s * 0.07], 0.006, m.brass);
+        const p = (k % 2) ? 0.41 : 0.43;
+        if (k % 2 === 0) g.add(cyl(0.012, 0.012, 0.74, m.gold, Math.cos(a + 0.26) * p, 0.78, Math.sin(a + 0.26) * p, 5));
+    }
+    g.add(lathe([[0, 0], [0.07, 0], [0.05, 0.08], [0.04, 0.3], [0.06, 0.34], [0.03, 0.4], [0.03, 0.62], [0, 0.62]], MAHOGANY, 0, 0.78, 0));
+    g.add(lathe([[0, 0], [0.09, 0], [0.085, 0.02], [0.065, 0.09], [0.045, 0.15], [0, 0.16]], m.gold, 0, 1.4, 0));
+    g.add(lathe([[0, 0], [0.46, 0], [0.4, 0.1], [0.26, 0.24], [0.1, 0.32], [0.03, 0.44], [0, 0.46]], m.gold, 0, 1.52, 0));
+    return g;
+}
+// Bakewell's copying telegraph: a stylus traces a drawing on one turning drum while a twin drum far away writes it again
+function telegraph(m) {
+    const g = new THREE.Group(), paper = stdm({ color: 0xeee4c8, roughness: 0.9 }), copper = stdm({ color: 0xb06a3a, roughness: 0.4, metalness: 0.7 });
+    g.add(box(1.5, 0.05, 0.7, MAHOGANY, 0, 0.78, 0));
+    for (const [lx, lz] of [[-0.68, -0.3], [0.68, -0.3], [-0.68, 0.3], [0.68, 0.3]]) g.add(cyl(0.03, 0.025, 0.78, MAHOGANY, lx, 0, lz, 8));
+    for (const sx of [-0.4, 0.4]) {
+        g.add(box(0.04, 0.26, 0.04, m.brass, sx - 0.2, 0.83, 0.05), box(0.04, 0.26, 0.04, m.brass, sx + 0.2, 0.83, 0.05));
+        g.add(cylX(0.075, 0.42, m.brass, sx, 1.06, 0.05), cylX(0.078, 0.28, paper, sx, 1.06, 0.05));
+        g.add(box(0.2, 0.2, 0.18, MAHOGANY, sx, 0.83, -0.22));
+        bone(g, [sx, 1.0, -0.33], [sx + 0.03, 0.66, -0.33], 0.006, m.brass); g.add(sphere(0.03, m.brass, sx + 0.03, 0.66, -0.33));
+        bone(g, [sx - 0.2, 1.24, 0.16], [sx + 0.12, 1.15, 0.1], 0.008, m.brass);
+    }
+    bone(g, [-0.4, 0.86, -0.32], [0.4, 0.86, -0.32], 0.006, copper);
+    return g;
+}
+// the great lump of Chilean gold, on velvet under a glass bell
+function goldLump(m, base) {
+    const g = new THREE.Group(), geo = new THREE.IcosahedronGeometry(0.085, 2), p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const k = 1 + 0.3 * Math.sin(x * 61 + 1) * Math.sin(y * 53 + 2) * Math.cos(z * 47); p.setXYZ(i, x * k * 1.4, y * k * 0.8, z * k * 1.1); }
+    geo.computeVertexNormals();
+    const nugget = new THREE.Mesh(geo, m.gold); nugget.position.y = 1.07; nugget.rotation.y = 0.6;
+    g.add(box(0.6, 0.92, 0.6, base), box(0.68, 0.04, 0.68, m.gold, 0, 0.92, 0), box(0.34, 0.06, 0.34, VELVET, 0, 0.96, 0), nugget);
+    const bell = new THREE.Mesh(new THREE.SphereGeometry(0.27, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), m.glass); bell.position.y = 0.96; bell.scale.y = 1.2; g.add(bell);
+    return g;
+}
+// featherwork and jewellery from the Americas, in a tall case
+function americas(m) {
+    const g = new THREE.Group(), cloth = stdm({ color: 0x2a2420, roughness: 1 });
+    g.add(box(1.7, 0.8, 0.55, MAHOGANY), box(1.6, 1.3, 0.5, m.glass, 0, 0.8, 0), box(1.72, 0.1, 0.57, MAHOGANY, 0, 2.1, 0), box(1.6, 1.3, 0.02, cloth, 0, 0.8, -0.24));
+    const plumes = [0xc8282a, 0xe8b830, 0x2a5ab0, 0x3a9a4a].map((c) => stdm({ color: c, roughness: 0.8 }));
+    for (const [fx, n, len] of [[-0.5, 9, 0.32], [0, 15, 0.46], [0.5, 9, 0.32]]) for (let k = 0; k < n; k++) {
+        const a = -1.2 + k / (n - 1) * 2.4, f = sphere(0.035, plumes[k % 4], 0, 0, 0);
+        f.scale.set(1, len / 0.07, 0.25); f.position.set(fx + Math.sin(a) * len * 0.55, 1.42 + Math.cos(a) * len * 0.55, -0.2); f.rotation.z = -a; g.add(f);
+    }
+    const beads = [stdm({ color: 0x2fa3a0, roughness: 0.3 }), stdm({ color: 0xc8463a, roughness: 0.3 }), m.steel];
+    for (const [bx, k] of [[-0.5, 0], [0, 1], [0.48, 2]]) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.014, 5, 18), beads[k]); t.rotation.x = Math.PI / 2; t.position.set(bx, 0.83, 0.08); g.add(t); }
+    g.add(cyl(0.1, 0.07, 0.13, stdm({ color: 0xb8904a, roughness: 0.9 }), 0.25, 0.8, -0.05, 12));
+    return g;
+}
+// the Koh-i-Noor, in the gilded cage it was shown in
+function kohinoor(m, base) {
+    const g = new THREE.Group(), stone = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0, metalness: 0, clearcoat: 1, emissive: 0x9fb4d0, emissiveIntensity: 0.7 });
+    g.add(box(0.8, 1.0, 0.8, base, 0, 0.25, 0), box(0.9, 0.06, 0.9, m.gold, 0, 1.25, 0));
+    for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2; g.add(cyl(0.008, 0.008, 0.6, m.gold, Math.cos(a) * 0.3, 1.31, Math.sin(a) * 0.3, 4)); }
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.015, 6, 28), m.gold); ring.rotation.x = Math.PI / 2; ring.position.y = 1.91; g.add(ring);
+    g.add(lathe([[0, 0], [0.3, 0], [0.22, 0.12], [0.06, 0.2], [0.02, 0.32], [0, 0.32]], m.gold, 0, 1.91, 0));
+    g.add(cyl(0.03, 0.06, 0.22, m.gold, 0, 1.31, 0, 10));
+    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.06, 0), stone); gem.position.y = 1.6; gem.scale.y = 0.75; g.add(gem);
+    return g;
+}
+
+// ---------------------------------------------------------------- Hyde Park, 1851, seen through the glass
+// The building stood on the south side of the park between Rotten Row and South Carriage Drive, near the Serpentine,
+// with Knightsbridge beyond the drive. The hall runs east–west along x; north is -z.
+function buildPark(scene) {
+    const g = new THREE.Group();
+    const sand = stdm({ color: 0xbfa77c, roughness: 1 }), gravel = stdm({ color: 0xa89c86, roughness: 1 });
+    const flat = (w, d, mat, x, y, z) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat); p.rotation.x = -Math.PI / 2; p.position.set(x, y, z); g.add(p); };
+    flat(96, 36, gravel, 0, -0.04, 0);       // the gravel apron round the building
+    flat(560, 7, sand, 0, -0.035, -24);      // Rotten Row, the riding track
+    flat(560, 9, gravel, 0, -0.035, 19);     // South Carriage Drive
+    const lake = new THREE.Shape(), cx = 60, cz = -92, ang = -0.28;
+    for (let i = 0; i <= 48; i++) {
+        const t = i / 48 * Math.PI * 2, lx = Math.cos(t) * 120, lz = Math.sin(t) * (20 + 6 * Math.sin(t * 3));
+        const X = cx + lx * Math.cos(ang) - lz * Math.sin(ang), Z = cz + lx * Math.sin(ang) + lz * Math.cos(ang);
+        i ? lake.lineTo(X, -Z) : lake.moveTo(X, -Z);
+    }
+    const water = new THREE.Mesh(new THREE.ShapeGeometry(lake, 1), new THREE.MeshPhysicalMaterial({ color: 0x5a7a90, roughness: 0.08, clearcoat: 1 }));
+    water.rotation.x = -Math.PI / 2; water.position.y = -0.02; g.add(water);
+    const inLake = (x, z) => { const dx = x - cx, dz = z - cz, u = dx * Math.cos(ang) + dz * Math.sin(ang), w = -dx * Math.sin(ang) + dz * Math.cos(ang); return (u / 128) ** 2 + (w / 32) ** 2 < 1; };
+    const bark = stdm({ color: 0x4e3e30, roughness: 1 }), leaves = [0x5a7c44, 0x4a6e3a, 0x3e6034, 0x627f4a].map((c) => stdm({ color: c, roughness: 1 }));
+    let placed = 0;
+    while (placed < 150) {
+        const x = (rand() - 0.5) * 420, z = -130 + rand() * 172;
+        if ((Math.abs(x) < 46 && Math.abs(z) < 16) || Math.abs(z + 24) < 6 || Math.abs(z - 19) < 7 || inLake(x, z)) continue;
+        const h = 9 + rand() * 8;
+        g.add(cyl(0.3, 0.5, h * 0.55, bark, x, 0, z, 6));
+        for (let k = 0; k < 5; k++) {
+            const b = new THREE.Mesh(new THREE.IcosahedronGeometry(h * (0.2 + rand() * 0.1), 1), leaves[(placed + k) % 4]);
+            b.position.set(x + (rand() - 0.5) * h * 0.4, h * (0.62 + rand() * 0.2), z + (rand() - 0.5) * h * 0.4); g.add(b);
+        }
+        placed++;
+    }
+    // Knightsbridge: stuccoed terraces with slate roofs beyond the drive
+    const fronts = canvasTexture(128, 160, (x, w, h) => {
+        x.clearRect(0, 0, w, h);
+        for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) { x.fillStyle = 'rgba(40,44,52,0.85)'; x.fillRect(12 + c * 29, 16 + r * 36, 16, r === 0 ? 20 : 26); }
+        x.fillStyle = 'rgba(60,50,40,0.7)'; x.fillRect(0, h - 10, w, 10);
+    });
+    const glazing = stdm({ map: fronts, transparent: true, alphaTest: 0.3, roughness: 0.6 });
+    const stucco = [0xe6dcc6, 0xd8ccb2, 0xb88c6a].map((c) => stdm({ color: c, roughness: 0.9 })), slate = stdm({ color: 0x4a4e56, roughness: 0.8 });
+    for (let x = -230, k = 0; x < 230; x += 12, k++) {
+        const h = 13 + (k * 7 % 5);
+        g.add(box(11.6, h, 12, stucco[k % 3], x, 0, 66), box(11.6, 1.8, 11, slate, x, h, 66));
+        g.add(box(0.9, 1.8, 0.9, stucco[2], x - 3.5, h + 1.8, 66), box(0.9, 1.8, 0.9, stucco[2], x + 3.5, h + 1.8, 66));
+        const f = new THREE.Mesh(new THREE.PlaneGeometry(11.2, h - 1), glazing); f.position.set(x, (h - 1) / 2 + 0.5, 59.95); f.rotation.y = Math.PI; g.add(f);
+    }
+    shadowed(g, true, false); mergeByMaterial(g);
+    g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+    scene.add(g);
+}
+
 // a bronze rider on a standing horse, facing +x
 function rider(mat, x, y, z) {
     const g = new THREE.Group();
@@ -357,6 +552,7 @@ class Crowd {
         this.pos = new THREE.Vector3(); this.sc = new THREE.Vector3();
         this.update(0, 0);
     }
+    show(on) { for (const g of [this.L, this.M]) for (const k in g) if (g[k].isInstancedMesh) g[k].visible = on; }
     step(p, dt) {
         let dx = 0, dz = 0;
         if (p.kind === 'line') {
