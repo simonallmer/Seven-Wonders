@@ -16,6 +16,7 @@ import { buildBoard as buildCathedral, GROUND as CATHEDRAL_GROUND } from './cath
 import { makeSkyDome } from './daylight.js';
 import { WONDERS } from './wonders.js';
 import { DEMO } from './edition.js';
+import { buildHallLife } from './hall-life.js';
 
 const HALL = { len: 76, half: 11, wall: 10, bay: 4.75 };
 const TABLE = { y: 1.0, straight: 6, r: 2.35 };
@@ -68,6 +69,7 @@ export class PalaceWorld {
         scene.add(this.spot, this.spot.target);
 
         this.buildHall();
+        this.life = buildHallLife(scene, { HALL, iron: this.iron });
         this.buildTable();
         this.buildWonders();
         this.buildMemorabilia();
@@ -144,10 +146,10 @@ export class PalaceWorld {
 
         // potted palms down both sides, as in the old photographs
         const m = materials();
-        for (let i = 1; i < n; i += 2) for (const z of [-half + 2.2, half - 2.2]) {
+        for (let i = 1; i < n; i += 2) for (const z of [-7.6, 7.6]) {
             const g = new THREE.Group();
             g.add(cyl(0.5, 0.36, 0.7, m.terracotta, 0, 0, 0, 12));
-            const p = buildPalm(1, 0.1 + (i % 3) * 0.08); p.scale.setScalar(3.2 + (i % 4) * 0.5); p.position.y = 0.6; p.rotation.y = i; g.add(p);
+            const p = buildPalm(1, 0.1 + (i % 3) * 0.08); p.scale.setScalar(2.6 + (i % 4) * 0.33); p.position.y = 0.6; p.rotation.y = i; g.add(p);
             g.position.set(-len / 2 + i * bay, 0, z); shadowed(g, true, false); scene.add(g);
         }
         // the crystal fountain that stood at the crossing
@@ -1055,6 +1057,7 @@ export class PalaceWorld {
             this.spot.position.set(this.spot.target.position.x, 5.4, this.spot.target.position.z * 1.9);
         }
         this.earth.rotation.y += dt * 0.08;
+        this.life.update(dt, this.time);
         for (const sheet of this.rulesSheets) { // the rules glow faintly, and brighter under the pointer
             const mat = sheet.userData.glow ? sheet.material[sheet.userData.glow] : sheet.material;
             const goal = hoverRules === sheet.userData.pick.index ? 0.5 : 0.08 + Math.sin(this.time * 2.2) * 0.06;
