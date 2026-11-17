@@ -291,7 +291,9 @@ export class PalaceWorld {
         if (this.miniSky === n) return;
         this.miniSky = n;
         w.holder.clear();
-        const { group } = buildSkyscraper(n, { mini: true });
+        const { group, night } = buildSkyscraper(n, { mini: true });
+        this.nightMats = night;
+        this.lightNight();
         const k = 0.024;
         group.scale.setScalar(k);
         group.position.set(0, -SKYSCRAPER_GROUND * k, 0);
@@ -1033,9 +1035,16 @@ export class PalaceWorld {
         this.hemi.intensity = d.ambient * 1.9;
         this.scene.fog.color.copy(d.skyHorizon).multiplyScalar(d.night ? 0.5 : 0.85);
         for (const l of this.lamps) { l.light.intensity = d.lamps * 26; l.globeMat.emissiveIntensity = d.lamps * 3; }
+        this.lightNight();
         this.spot.intensity = 5 + d.lamps * 12;
         this.motes.material.uniforms.uColor.value.copy(d.keyColor);
         this.motes.material.uniforms.uOpacity.value = d.night ? 0.25 : 0.7;
+    }
+
+    // the Skyscraper miniature's windows and crown light up as the hall grows dark
+    lightNight() {
+        const k = this.day ? this.day.lamps : 0;
+        for (const mat of this.nightMats || []) mat.emissiveIntensity = k * 1.5;
     }
 
     setFocus(i) {

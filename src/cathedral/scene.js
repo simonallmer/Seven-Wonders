@@ -144,7 +144,7 @@ export function buildBoard(nPlayers, { mini = false } = {}) {
     // arrives, and all of this is lifted away for the game. Its materials are its own, so that it can fade.
     const rm = { stone: stone.clone(), slate: m.slate.clone(), dark: new THREE.MeshStandardMaterial({ color: 0x2a221c, roughness: 0.8 }),
         glass: new THREE.MeshBasicMaterial({ color: 0xffffff }), gold: m.gold.clone() };
-    const up = new THREE.Group(), panes = [], butt = [];
+    const up = new THREE.Group(), panes = [], butt = [], pins = [], bars = [], crenels = [], roses = [];
     let gi = 0;
     for (const [x0, z0, x1, z1, door] of runs) {
         const len = Math.hypot(x1 - x0, z1 - z0), ux = (x1 - x0) / len, uz = (z1 - z0) / len, alongX = Math.abs(ux) > 0.5;
@@ -155,15 +155,52 @@ export function buildBoard(nPlayers, { mini = false } = {}) {
         for (let k = 0; k < n; k++) {
             const t = (k + 0.5) / n * len, wx = x0 + ux * t, wz = z0 + uz * t;
             const color = new THREE.Color(GLASS[gi++ % GLASS.length]);
-            for (const side of [1, -1]) panes.push({ x: wx + nx * 0.21 * side, y: 3.7, z: wz + nz * 0.21 * side, ry: Math.atan2(nx * side, nz * side), sx: door ? 0.62 : 0.8, sy: 3.6, color });
-            if (k) butt.push({ x: x0 + ux * (k / n) * len + nx * 0.55, y: 3.1, z: z0 + uz * (k / n) * len + nz * 0.55, sx: alongX ? 0.3 : 0.9, sy: 6.2, sz: alongX ? 0.9 : 0.3 });
+            for (const side of [1, -1]) {
+                const ry = Math.atan2(nx * side, nz * side), px = wx + nx * 0.215 * side, pz = wz + nz * 0.215 * side, w = door ? 0.62 : 0.8;
+                panes.push({ x: wx + nx * 0.21 * side, y: 3.7, z: wz + nz * 0.21 * side, ry, sx: w, sy: 3.6, color });
+                // tracery: a mullion down the middle and a transom near the head
+                bars.push({ x: px, y: 3.6, z: pz, ry, sx: 0.05, sy: 3.4, sz: 0.03 }, { x: px, y: 4.4, z: pz, ry, sx: w, sy: 0.05, sz: 0.03 });
+            }
+            if (k) {
+                const bx = x0 + ux * (k / n) * len + nx * 0.55, bz = z0 + uz * (k / n) * len + nz * 0.55;
+                butt.push({ x: bx, y: 3.1, z: bz, sx: alongX ? 0.3 : 0.9, sy: 6.2, sz: alongX ? 0.9 : 0.3 });
+                pins.push({ x: bx + nx * 0.15, y: 6.85, z: bz + nz * 0.15, sx: 0.2, sy: 1.3, sz: 0.2 }); // a pinnacle on every buttress
+            }
         }
         if (door) up.add(box(alongX ? 1.0 : 0.44, 2.0, alongX ? 0.44 : 1.0, rm.dark, x0 + ux * (DOOR - WALL), 0.3, z0 + uz * (DOOR - WALL)));
+        // a cornice, and a pierced parapet along the eaves
+        up.add(box(alongX ? len + 0.6 : 0.62, 0.16, alongX ? 0.62 : len + 0.6, rm.stone, cx, WALL_H - 0.16, cz));
+        for (let t = 0.25; t < len + 0.2; t += 0.5) crenels.push({ x: x0 + ux * t + nx * 0.26, y: WALL_H + 0.12, z: z0 + uz * t + nz * 0.26, sx: alongX ? 0.24 : 0.1, sy: 0.24, sz: alongX ? 0.1 : 0.24 });
+        // a rose window high in each gable end but the west, which the towers hide
+        if (!door && !(alongX && cz > 0)) roses.push({ x: cx + nx * 0.22, y: 5.3, z: cz + nz * 0.22, ry: Math.atan2(nx, nz) });
     }
     const lancet = new THREE.Shape(); lancet.moveTo(-0.5, 0); lancet.lineTo(0.5, 0); lancet.lineTo(0.5, 0.72); lancet.quadraticCurveTo(0.42, 0.93, 0, 1); lancet.quadraticCurveTo(-0.42, 0.93, -0.5, 0.72); lancet.closePath();
     const lg = new THREE.ShapeGeometry(lancet, 6); lg.translate(0, -0.5, 0);
     const glass = instanced(lg, rm.glass, panes); glass.castShadow = glass.receiveShadow = false; up.add(glass);
     up.add(instanced(new THREE.BoxGeometry(1, 1, 1), rm.stone, butt));
+    up.add(instanced(new THREE.ConeGeometry(1, 1, 6), rm.stone, pins), instanced(new THREE.BoxGeometry(1, 1, 1), rm.stone, crenels), instanced(new THREE.BoxGeometry(1, 1, 1), rm.dark, bars));
+    for (const ro of roses) { // glass, a stone ring and eight spokes
+        const g = new THREE.Group(); g.position.set(ro.x, ro.y, ro.z); g.rotation.y = ro.ry;
+        const gl = new THREE.Mesh(new THREE.CircleGeometry(0.8, 20), rm.rose || (rm.rose = new THREE.MeshBasicMaterial({ color: 0x5a78c8 }))); gl.position.z = 0.01; g.add(gl);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.82, 0.07, 6, 24), rm.stone); g.add(ring);
+        for (let k = 0; k < 4; k++) { const sp = box(1.6, 0.05, 0.05, rm.stone, 0, -0.025, 0.03); sp.rotation.z = k * Math.PI / 4; g.add(sp); }
+        g.add(new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.04, 6, 16), rm.stone));
+        up.add(g);
+    }
+    // the apse: a rounded east end beyond the choir, with tall windows of its own
+    const apseH = WALL_H - GROUND;
+    const apse = new THREE.Mesh(new THREE.CylinderGeometry(2.95, 2.95, apseH, 18, 1, false, Math.PI / 2, Math.PI), rm.stone);
+    apse.position.set(0, GROUND + apseH / 2, -END); up.add(apse);
+    const apseRoof = new THREE.Mesh(new THREE.ConeGeometry(3.15, 3.3, 18, 1, false, Math.PI / 2, Math.PI), rm.slate);
+    apseRoof.position.set(0, WALL_H + 1.65, -END); up.add(apseRoof);
+    for (let k = 0; k < 5; k++) {
+        const a = Math.PI / 2 + (k + 0.5) / 5 * Math.PI, wx = Math.sin(a) * 2.97, wz = -END + Math.cos(a) * 2.97;
+        const win = new THREE.Mesh(lg, new THREE.MeshBasicMaterial({ color: GLASS[k % GLASS.length] })); win.scale.set(0.6, 3.4, 1); win.position.set(wx, 3.7, wz); win.rotation.y = a; up.add(win);
+        rm['apse' + k] = win.material;
+        const bA = a + Math.PI / 5 / 2; if (k < 4) { const b = box(0.3, 6.2, 0.8, rm.stone, Math.sin(bA) * 3.25, 0, -END + Math.cos(bA) * 3.25); b.rotation.y = bA; up.add(b); const pn = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.3, 6), rm.stone); pn.position.set(Math.sin(bA) * 3.4, 6.85, -END + Math.cos(bA) * 3.4); up.add(pn); }
+    }
+    // gilt crestings along the ridges
+    up.add(box(15.9, 0.08, 0.08, rm.gold, 0, WALL_H + 3.28, 0), box(0.08, 0.08, 15.9, rm.gold, 0, WALL_H + 3.28, 0));
     // roofs: two steep gables that cross, the flèche over the crossing
     const tri = new THREE.Shape(); tri.moveTo(-3.15, 0); tri.lineTo(3.15, 0); tri.lineTo(0, 3.3); tri.closePath();
     const gable = (rot) => { const r = new THREE.Mesh(new THREE.ExtrudeGeometry(tri, { depth: 15.9, bevelEnabled: false }), rm.slate); r.position.set(rot ? -7.95 : 0, WALL_H, rot ? 0 : -7.95); r.rotation.y = rot ? Math.PI / 2 : 0; return r; };
@@ -171,12 +208,28 @@ export function buildBoard(nPlayers, { mini = false } = {}) {
     up.add(cyl(0.02, 0.5, 5.2, rm.slate, 0, WALL_H + 3.1, 0, 8), cyl(0.06, 0.06, 0.5, rm.gold, 0, WALL_H + 8.3, 0, 6));
     // the west front, here at the near end: two towers with their spires, the rose between them, the portal
     for (const sx of [-1, 1]) {
-        up.add(box(2.5, 11.5, 2.5, rm.stone, sx * 1.9, GROUND, 9.2));
-        const sp = new THREE.Mesh(new THREE.ConeGeometry(1.7, 5.6, 4), rm.slate); sp.position.set(sx * 1.9, GROUND + 11.5 + 2.8, 9.2); sp.rotation.y = Math.PI / 4; up.add(sp);
-        for (const y of [5.2, 8.4]) up.add(box(0.5, 1.7, 0.06, rm.dark, sx * 1.9, y, 10.46));
+        const tx = sx * 1.9, top = GROUND + 11.5;
+        up.add(box(2.5, 11.5, 2.5, rm.stone, tx, GROUND, 9.2));
+        for (const y of [3.2, 6.6, 9.9]) up.add(box(2.7, 0.16, 2.7, rm.stone, tx, GROUND + y, 9.2)); // string courses
+        for (const [cx, cz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) up.add(box(0.4, 11.5, 0.4, rm.stone, tx + cx * 1.2, GROUND, 9.2 + cz * 1.2)); // corner buttresses
+        // belfry and lower windows on the front and the outer side
+        for (const y of [5.2, 8.4]) {
+            up.add(box(0.5, 1.7, 0.06, rm.dark, tx - 0.32, y, 10.46), box(0.5, 1.7, 0.06, rm.dark, tx + 0.32, y, 10.46));
+            up.add(box(0.06, 1.7, 0.5, rm.dark, tx + sx * 1.26, y, 9.2 - 0.32), box(0.06, 1.7, 0.5, rm.dark, tx + sx * 1.26, y, 9.2 + 0.32));
+        }
+        up.add(box(2.7, 0.3, 2.7, rm.stone, tx, top, 9.2));
+        for (const [cx, cz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const pn = new THREE.Mesh(new THREE.ConeGeometry(0.24, 1.6, 6), rm.stone); pn.position.set(tx + cx * 1.15, top + 1.1, 9.2 + cz * 1.15); up.add(pn); }
+        const sp = new THREE.Mesh(new THREE.ConeGeometry(1.25, 6.4, 8), rm.slate); sp.position.set(tx, top + 0.3 + 3.2, 9.2); sp.rotation.y = Math.PI / 8; up.add(sp);
+        up.add(cyl(0.03, 0.03, 0.7, rm.gold, tx, top + 6.6, 9.2, 6), box(0.36, 0.05, 0.05, rm.gold, tx, top + 7.0, 9.2));
     }
-    up.add(box(1.3, 6.4, 0.5, rm.stone, 0, GROUND, 10.1), box(1.1, 2.4, 0.08, rm.dark, 0, GROUND, 10.4));
-    const rose = new THREE.Mesh(new THREE.CircleGeometry(0.52, 20), new THREE.MeshBasicMaterial({ color: 0x6f86c8 })); rose.position.set(0, 4.6, 10.36); up.add(rose);
+    // the portal: a deep doorway under a steep gable, the rose above it framed in stone
+    up.add(box(1.5, 6.4, 0.6, rm.stone, 0, GROUND, 10.1), box(1.1, 2.4, 0.08, rm.dark, 0, GROUND, 10.42));
+    const gab = new THREE.Shape(); gab.moveTo(-0.8, 0); gab.lineTo(0.8, 0); gab.lineTo(0, 1.2); gab.closePath();
+    const pg = new THREE.Mesh(new THREE.ExtrudeGeometry(gab, { depth: 0.3, bevelEnabled: false }), rm.stone); pg.position.set(0, GROUND + 2.6, 10.25); up.add(pg);
+    const rose = new THREE.Mesh(new THREE.CircleGeometry(0.52, 20), new THREE.MeshBasicMaterial({ color: 0x6f86c8 })); rose.position.set(0, 4.6, 10.42); up.add(rose);
+    const rr = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.06, 6, 24), rm.stone); rr.position.set(0, 4.6, 10.44); up.add(rr);
+    for (let k = 0; k < 4; k++) { const spk = box(1.04, 0.04, 0.04, rm.stone, 0, 4.58, 10.45); spk.rotation.z = k * Math.PI / 4; up.add(spk); }
+    up.add(box(1.7, 0.4, 0.7, rm.stone, 0, GROUND + 6.4, 10.1)); // a gallery of kings above the rose, as a band
     shadowed(up); rose.castShadow = false;
     mergeByMaterial(up, (o) => o.isInstancedMesh);
     group.add(up);

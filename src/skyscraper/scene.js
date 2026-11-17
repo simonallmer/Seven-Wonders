@@ -73,11 +73,25 @@ export function buildBoard(nPlayers, { mini = false } = {}) {
     const steel = std({ color: 0xc4ccd4, roughness: 0.3, metalness: 0.85 });
     const skin = (rx, ry) => { const m = std({ map: grid.clone(), color: 0xb9c2cb, roughness: 0.35, metalness: 0.8 }); m.map.repeat.set(rx, ry); m.map.needsUpdate = true; return m; };
     const glass = std({ color: 0x141a22, roughness: 0.2, metalness: 0.6 });
-    const core = new THREE.Mesh(new THREE.BoxGeometry(5, 10, 5), skin(5, 10)); core.position.y = -5; core.userData.body = true; group.add(core);
+    // On the table the whole tower wears one facade, window for window, and its windows light up after dark:
+    // the board block and the shaft below read as one building. (In the game the block keeps its own grid.)
+    const night = [];
+    const facadeTex = mini && canvasTexture(64, 64, (x) => { x.fillStyle = '#9aa4ae'; x.fillRect(0, 0, 64, 64); x.fillStyle = '#59626c'; x.fillRect(0, 0, 64, 3); x.fillRect(0, 0, 3, 64); x.fillStyle = '#141a22'; x.fillRect(10, 10, 44, 44); });
+    const litTex = mini && canvasTexture(256, 256, (x) => {
+        x.fillStyle = '#000'; x.fillRect(0, 0, 256, 256);
+        for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if ((r * 5 + c * 3 + r * c * 7) % 9 < 5) { x.fillStyle = ['#ffd890', '#ffe6b8', '#fff3dc'][(r + c) % 3]; x.fillRect(c * 32 + 5, r * 32 + 5, 22, 22); }
+    });
+    const facade = (rx, ry) => {
+        const mat = std({ map: facadeTex.clone(), emissiveMap: litTex.clone(), emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.35, metalness: 0.7 });
+        mat.map.wrapS = mat.map.wrapT = mat.emissiveMap.wrapS = mat.emissiveMap.wrapT = THREE.RepeatWrapping;
+        mat.map.repeat.set(rx, ry); mat.emissiveMap.repeat.set(rx / 8, ry / 8); mat.map.needsUpdate = mat.emissiveMap.needsUpdate = true;
+        night.push(mat); return mat;
+    };
+    const core = new THREE.Mesh(new THREE.BoxGeometry(5, 10, 5), mini ? facade(5, 10) : skin(5, 10)); core.position.y = -5; core.userData.body = true; group.add(core);
     // below the board: a shaft with dark window bands, two setbacks, the base
     const tall = canvasTexture(64, 128, (x) => { x.fillStyle = '#8f99a3'; x.fillRect(0, 0, 64, 128); x.fillStyle = '#1a2028'; for (let i = 0; i < 3; i++) x.fillRect(8 + i * 18, 6, 10, 116); });
     tall.wrapS = tall.wrapT = THREE.RepeatWrapping;
-    const band = (rx, ry) => { const m = std({ map: tall.clone(), roughness: 0.4, metalness: 0.7 }); m.map.repeat.set(rx, ry); m.map.needsUpdate = true; return m; };
+    const band = (rx, ry) => { if (mini) return facade(rx * 1.6, ry * 3.4); const m = std({ map: tall.clone(), roughness: 0.4, metalness: 0.7 }); m.map.repeat.set(rx, ry); m.map.needsUpdate = true; return m; };
     group.add(box(5.5, 12, 5.5, band(3, 3), 0, -22, 0), box(5.9, 0.3, 5.9, steel, 0, -10.3, 0));
     group.add(box(7.2, 6, 7.2, band(4, 2), 0, -28, 0), box(7.6, 0.3, 7.6, steel, 0, -22.3, 0));
     group.add(box(9.6, 4, 9.6, band(5, 1), 0, GROUND, 0), box(10, 0.3, 10, steel, 0, -28.3, 0));
@@ -89,6 +103,7 @@ export function buildBoard(nPlayers, { mini = false } = {}) {
     const windows = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.76, 0.76), new THREE.MeshBasicMaterial({ color: 0xffffff }), owner.length);
     owner.forEach(({ block, face }, k) => { windowPose(L.blocks[block], face, o); o.updateMatrix(); windows.setMatrixAt(k, o.matrix); windows.setColorAt(k, DARK); });
     group.add(windows);
+    if (mini) windows.visible = false; // the facade carries them
     if (L.low > 0) { // the floors below the game: shuttered windows, so the tower reads as one
         const list = [];
         for (let w = 0; w < L.low; w++) for (let v = 0; v < 5; v++) for (let u = 0; u < 5; u++) {
@@ -97,14 +112,15 @@ export function buildBoard(nPlayers, { mini = false } = {}) {
         }
         const shut = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.76, 0.76), new THREE.MeshBasicMaterial({ color: SHUT }), list.length);
         list.forEach(([b, f], k) => { windowPose(b, f, o); o.updateMatrix(); shut.setMatrixAt(k, o.matrix); });
-        group.add(shut);
+        if (!mini) group.add(shut);
     }
     // the crown, with materials of its own so that it can be faded and lifted away
     const cs = steel.clone(), cg = glass.clone();
+    if (mini) { cg.emissive.set(0xfff0d0); cg.emissiveIntensity = 0; night.push(cg); } // the crown is floodlit at night
     const crown = buildCrown(cs, cg);
     shadowed(crown); mergeByMaterial(crown);
     group.add(crown);
-    return { group, windows, owner, L, lift: new Lift(crown, [cs, cg], 4), core };
+    return { group, windows, owner, L, lift: new Lift(crown, [cs, cg], 4), core, night };
 }
 
 // ---------------------------------------------------------------- the world
