@@ -52,6 +52,14 @@ export function buildHallLife(scene, { HALL, iron }) {
         }
     }
 
+    for (const s of [-1, 1]) for (let i = 0; i < nBays; i++) {
+        const x = bayX(i) + bay / 2;
+        for (const [y, z, n] of [[G1 + 0.2, half - 0.45, 2], [G2 + 0.18, half - 0.4, 1]]) for (let j = 0; j < n; j++) {
+            const t = galleryTable(m, i * 5 + j * 3 + (s > 0 ? 2 : 0) + (y > 7 ? 1 : 0), i + j);
+            t.position.set(x + (n === 2 ? (j ? 1.1 : -1.1) : 0), y, s * z); t.rotation.y = s > 0 ? Math.PI : 0; st.add(t);
+        }
+    }
+
     // court signs on the gallery fascia, and carpets hung over the balustrade in the other bays
     const COURTS = ['EGYPT', 'GREECE', 'BABYLON', 'RHODES', 'ALEXANDRIA', 'PERSIA', 'INDIA', 'CHINA', 'SILKS', 'FINE ARTS', 'MACHINERY', 'ROME', 'THE AMERICAS', 'CHILE', 'JEWELLERY', 'GLASS'];
     const signMat = (t) => std({ roughness: 0.6, map: canvasTexture(512, 96, (x, w, h) => {
@@ -60,7 +68,7 @@ export function buildHallLife(scene, { HALL, iron }) {
         x.fillStyle = '#f3e3b0'; x.font = 'bold 54px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
         x.fillText(t, w / 2, h / 2 + 3, w - 60);
     }) });
-    const carpets = [0, 1, 2, 3].map((k) => carpetMat(k));
+    const carpets = Array.from({ length: HANGINGS }, (_, k) => carpetMat(k));
     let court = 0;
     for (const s of [-1, 1]) for (let i = 0; i < nBays; i++) {
         const x = bayX(i) + bay / 2;
@@ -68,7 +76,7 @@ export function buildHallLife(scene, { HALL, iron }) {
             const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 0.43), signMat(COURTS[court++ % COURTS.length]));
             sign.position.set(x, G1 - 0.15, s * 8.33); sign.rotation.y = s > 0 ? Math.PI : 0; st.add(sign);
         } else {
-            const rug = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 2.3), carpets[(i + court) % 4]);
+            const rug = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 2.3), carpets[(i * 3 + court) % 8]);
             rug.position.set(x, G1 + 1.1 - 1.15, s * 8.31); rug.rotation.y = s > 0 ? Math.PI : 0; st.add(rug);
         }
     }
@@ -85,8 +93,9 @@ export function buildHallLife(scene, { HALL, iron }) {
     for (const s of [-1, 1]) for (let i = 0; i < nBays; i++) {
         const x = bayX(i) + bay / 2, kind = (i * 3 + (s > 0 ? 1 : 0)) % 3;
         if ((i + (s > 0 ? 1 : 0)) % 2 === 0) {
-            const tap = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 2.9), carpets[(i + (s > 0 ? 2 : 0)) % 4]);
-            tap.position.set(x, 2.3, s * (half - 0.12)); tap.rotation.y = s > 0 ? Math.PI : 0; st.add(tap);
+            const k = (i * 7 + (s > 0 ? 5 : 0)) % HANGINGS, art = k >= 8;
+            const tap = new THREE.Mesh(new THREE.PlaneGeometry(art ? 1.9 : 2.3, art ? 2.3 : 2.9), carpets[k]);
+            tap.position.set(x, art ? 2.6 : 2.3, s * (half - 0.12)); tap.rotation.y = s > 0 ? Math.PI : 0; st.add(tap);
             for (const dx of [-1.45, 1.45]) {
                 const c = new THREE.Mesh(new THREE.PlaneGeometry(0.55, G1 - 0.1), curtain);
                 c.position.set(x + dx, (G1 - 0.1) / 2, s * (half - 0.3)); c.rotation.y = s > 0 ? Math.PI : 0; st.add(c);
@@ -475,21 +484,131 @@ function rider(mat, x, y, z) {
     g.position.set(x, y, z); g.scale.setScalar(1.25);
     return g;
 }
+// Ten hangings, so no two neighbours repeat: carpets from Persia, Turkey and India, a kilim, a tree of life,
+// a trellis, Chinese silk, a Gobelin landscape, and two oil paintings in gilt frames.
+const HANGINGS = 10;
 function carpetMat(k) {
-    const pal = [['#5c1c1e', '#1c2440', '#a88a4c', '#cbbd9c'], ['#1e3048', '#5e2420', '#a8904e', '#cfc2a2'], ['#2a3e2a', '#5c1c1e', '#a88a4c', '#c4b494'], ['#48263c', '#1c2440', '#a8844a', '#cdbc9e']][k];
-    const t = canvasTexture(256, 320, (x, w, h) => {
+    const P = [
+        ['#5c1c1e', '#1c2440', '#a88a4c', '#cbbd9c'], ['#1e3048', '#5e2420', '#a8904e', '#cfc2a2'], ['#7a3a1e', '#2a2a3a', '#c8a050', '#e0d2b0'],
+        ['#2a3e2a', '#5c1c1e', '#a88a4c', '#c4b494'], ['#48263c', '#1c2440', '#a8844a', '#cdbc9e'], ['#c8b88a', '#7a2a24', '#2a4a6a', '#3a5a3a'],
+    ];
+    const pal = P[k % P.length];
+    const frameBorder = (x, w, h) => {
         x.fillStyle = pal[1]; x.fillRect(0, 0, w, h);
-        x.fillStyle = pal[0]; x.fillRect(18, 18, w - 36, h - 36);
-        x.strokeStyle = pal[2]; x.lineWidth = 4; x.strokeRect(12, 12, w - 24, h - 24); x.strokeRect(24, 24, w - 48, h - 48);
-        for (let i = 0; i < 18; i++) { x.fillStyle = pal[i % 2 ? 2 : 3]; x.fillRect(6 + i * 14, 2, 6, 6); x.fillRect(6 + i * 14, h - 8, 6, 6); }
-        x.save(); x.translate(w / 2, h / 2);
-        for (const [s, c] of [[86, pal[2]], [66, pal[1]], [44, pal[3]], [22, pal[0]]]) { x.fillStyle = c; x.beginPath(); x.moveTo(0, -s * 1.3); x.lineTo(s, 0); x.lineTo(0, s * 1.3); x.lineTo(-s, 0); x.closePath(); x.fill(); }
-        x.restore();
-        x.fillStyle = pal[2];
-        for (const [cx, cy] of [[48, 52], [w - 48, 52], [48, h - 52], [w - 48, h - 52]]) { x.beginPath(); x.arc(cx, cy, 13, 0, Math.PI * 2); x.fill(); }
-        for (let i = 0; i < 260; i++) { x.fillStyle = `rgba(0,0,0,${0.04 + (i % 5) * 0.01})`; x.fillRect((i * 73) % w, (i * 151) % h, 3, 3); }
+        x.strokeStyle = pal[2]; x.lineWidth = 4; x.strokeRect(10, 10, w - 20, h - 20); x.strokeRect(22, 22, w - 44, h - 44);
+        x.fillStyle = pal[0]; x.fillRect(26, 26, w - 52, h - 52);
+    };
+    const dot = (x, cx, cy, r, c) => { x.fillStyle = c; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill(); };
+    const draw = [
+        (x, w, h) => { // the diamond medallion
+            frameBorder(x, w, h);
+            x.save(); x.translate(w / 2, h / 2);
+            for (const [s, c] of [[80, pal[2]], [60, pal[1]], [40, pal[3]], [20, pal[0]]]) { x.fillStyle = c; x.beginPath(); x.moveTo(0, -s * 1.3); x.lineTo(s, 0); x.lineTo(0, s * 1.3); x.lineTo(-s, 0); x.closePath(); x.fill(); }
+            x.restore();
+            for (const [cx, cy] of [[50, 54], [w - 50, 54], [50, h - 54], [w - 50, h - 54]]) dot(x, cx, cy, 12, pal[2]);
+        },
+        (x, w, h) => { // a round Persian medallion with petals and quarter corners
+            frameBorder(x, w, h);
+            const cx = w / 2, cy = h / 2;
+            for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; dot(x, cx + Math.cos(a) * 62, cy + Math.sin(a) * 62, 14, i % 2 ? pal[2] : pal[3]); }
+            dot(x, cx, cy, 58, pal[1]); dot(x, cx, cy, 40, pal[2]); dot(x, cx, cy, 18, pal[0]);
+            for (const [qx, qy] of [[26, 26], [w - 26, 26], [26, h - 26], [w - 26, h - 26]]) { x.save(); x.beginPath(); x.rect(26, 26, w - 52, h - 52); x.clip(); dot(x, qx, qy, 46, pal[1]); dot(x, qx, qy, 30, pal[2]); x.restore(); }
+            for (let i = 0; i < 40; i++) dot(x, 40 + (i * 53) % (w - 80), 40 + (i * 97) % (h - 80), 3, pal[3]);
+        },
+        (x, w, h) => { // a kilim: bands of stepped triangles
+            const bands = [pal[0], pal[3], pal[1], pal[2], pal[0], pal[1], pal[3], pal[2]];
+            const bh = h / bands.length;
+            bands.forEach((c, i) => {
+                x.fillStyle = c; x.fillRect(0, i * bh, w, bh);
+                x.fillStyle = bands[(i + 3) % bands.length];
+                for (let t = 0; t < w; t += 32) { x.beginPath(); x.moveTo(t, (i + 1) * bh - 4); x.lineTo(t + 16, i * bh + 8); x.lineTo(t + 32, (i + 1) * bh - 4); x.closePath(); x.fill(); }
+            });
+            for (let i = 0; i < 12; i++) { x.fillStyle = pal[3]; x.fillRect(i * 22 + 4, h - 6, 4, 6); x.fillRect(i * 22 + 4, 0, 4, 6); }
+        },
+        (x, w, h) => { // a tree of life with birds
+            frameBorder(x, w, h);
+            x.strokeStyle = pal[2]; x.lineWidth = 9; x.beginPath(); x.moveTo(w / 2, h - 40); x.lineTo(w / 2, 70); x.stroke();
+            x.lineWidth = 5;
+            for (let i = 0; i < 6; i++) { const y = h - 80 - i * 34, s = i % 2 ? 1 : -1; x.beginPath(); x.moveTo(w / 2, y); x.quadraticCurveTo(w / 2 + s * 50, y - 10, w / 2 + s * 80, y - 34); x.stroke(); dot(x, w / 2 + s * 80, y - 34, 10, pal[3]); dot(x, w / 2 - s * 40, y - 18, 7, pal[3]); }
+            for (const [bx, by] of [[70, 110], [w - 70, 150], [80, 220]]) { dot(x, bx, by, 9, pal[3]); x.fillStyle = pal[3]; x.beginPath(); x.moveTo(bx + 8, by); x.lineTo(bx + 20, by - 6); x.lineTo(bx + 8, by + 4); x.fill(); }
+            x.fillStyle = pal[1]; x.fillRect(w / 2 - 40, h - 46, 80, 14);
+        },
+        (x, w, h) => { // a trellis with a flower in every lozenge
+            frameBorder(x, w, h);
+            x.save(); x.beginPath(); x.rect(26, 26, w - 52, h - 52); x.clip();
+            x.strokeStyle = pal[2]; x.lineWidth = 3;
+            for (let t = -h; t < w + h; t += 36) { x.beginPath(); x.moveTo(t, 0); x.lineTo(t + h, h); x.stroke(); x.beginPath(); x.moveTo(t, h); x.lineTo(t + h, 0); x.stroke(); }
+            for (let gy = 26; gy < h; gy += 36) for (let gx = 26 + ((gy / 36) % 2) * 18; gx < w; gx += 36) { dot(x, gx, gy + 18, 6, pal[3]); dot(x, gx, gy + 18, 2.5, pal[1]); }
+            x.restore();
+        },
+        (x, w, h) => { // Chinese silk: roundels and drifting clouds on a plain field
+            x.fillStyle = pal[3]; x.fillRect(0, 0, w, h);
+            x.strokeStyle = pal[1]; x.lineWidth = 5; x.strokeRect(8, 8, w - 16, h - 16);
+            for (const [cx, cy] of [[72, 80], [184, 140], [80, 220], [176, 280]]) { dot(x, cx, cy, 30, pal[1]); x.strokeStyle = pal[2]; x.lineWidth = 3; x.beginPath(); x.arc(cx, cy, 22, 0, Math.PI * 2); x.stroke(); dot(x, cx, cy, 8, pal[2]); }
+            x.strokeStyle = pal[0]; x.lineWidth = 3;
+            for (const [cx, cy] of [[180, 60], [60, 150], [190, 220], [70, 296]]) for (let r = 0; r < 3; r++) { x.beginPath(); x.arc(cx + r * 12, cy, 7, Math.PI, 0); x.stroke(); }
+        },
+        (x, w, h) => { // a Gobelin tapestry: a classical landscape inside a border of flowers
+            x.fillStyle = '#5a4630'; x.fillRect(0, 0, w, h);
+            const sky = x.createLinearGradient(0, 24, 0, h * 0.6); sky.addColorStop(0, '#8aa0a8'); sky.addColorStop(1, '#d8c8a0'); x.fillStyle = sky; x.fillRect(22, 22, w - 44, h - 44);
+            x.fillStyle = '#6a7a50'; x.beginPath(); x.moveTo(22, h * 0.62); x.quadraticCurveTo(w * 0.4, h * 0.48, w - 22, h * 0.6); x.lineTo(w - 22, h - 22); x.lineTo(22, h - 22); x.fill();
+            x.fillStyle = '#4a5a3a'; x.beginPath(); x.moveTo(22, h * 0.75); x.quadraticCurveTo(w * 0.6, h * 0.66, w - 22, h * 0.78); x.lineTo(w - 22, h - 22); x.lineTo(22, h - 22); x.fill();
+            x.fillStyle = '#d8ccb0'; x.fillRect(w * 0.56, h * 0.42, 60, 34); x.beginPath(); x.moveTo(w * 0.56 - 4, h * 0.42); x.lineTo(w * 0.56 + 30, h * 0.36); x.lineTo(w * 0.56 + 64, h * 0.42); x.fill();
+            x.fillStyle = '#a89c80'; for (let c = 0; c < 5; c++) x.fillRect(w * 0.56 + 4 + c * 12, h * 0.43, 4, 30);
+            for (const [tx, ty, r] of [[60, h * 0.5, 30], [90, h * 0.58, 22], [w - 50, h * 0.56, 26]]) { x.fillStyle = '#3a4a2a'; x.fillRect(tx - 3, ty, 6, 50); dot(x, tx, ty, r, '#3e5230'); }
+            for (let i = 0; i < 44; i++) { const t = i / 44, side = i % 4; const px = side < 2 ? t * w * 4 % w : (side === 2 ? 11 : w - 11), py = side < 2 ? (side ? h - 11 : 11) : t * h * 4 % h; dot(x, px, py, 5, ['#b84a3a', '#d8b860', '#e8d8c0'][i % 3]); }
+        },
+        (x, w, h) => { // an Indian hanging: a row of pointed arches, each with a flowering vase
+            frameBorder(x, w, h);
+            for (let a = 0; a < 3; a++) {
+                const ax = 44 + a * 64, top = 70, bot = h - 46;
+                x.fillStyle = pal[1]; x.beginPath(); x.moveTo(ax, bot); x.lineTo(ax, top + 40); x.quadraticCurveTo(ax, top, ax + 24, top - 16); x.quadraticCurveTo(ax + 48, top, ax + 48, top + 40); x.lineTo(ax + 48, bot); x.fill();
+                x.fillStyle = pal[2]; x.beginPath(); x.ellipse(ax + 24, bot - 34, 12, 18, 0, 0, Math.PI * 2); x.fill();
+                for (let f = 0; f < 5; f++) dot(x, ax + 24 + Math.cos(f * 1.25 - 2.8) * 18, bot - 70 + Math.sin(f * 1.25 - 2.8) * 18, 6, pal[3]);
+            }
+        },
+        (x, w, h) => { // an oil painting: a ship at sea, in a gilt frame
+            x.fillStyle = '#b08a3a'; x.fillRect(0, 0, w, h); x.fillStyle = '#7a5a20'; x.fillRect(14, 14, w - 28, h - 28);
+            const sky = x.createLinearGradient(0, 22, 0, h * 0.6); sky.addColorStop(0, '#6a7a8a'); sky.addColorStop(1, '#e8c890'); x.fillStyle = sky; x.fillRect(22, 22, w - 44, h - 44);
+            x.fillStyle = '#3a4a5a'; x.fillRect(22, h * 0.62, w - 44, h * 0.38 - 22);
+            x.fillStyle = '#2a2018'; x.beginPath(); x.moveTo(80, h * 0.62); x.lineTo(180, h * 0.62); x.lineTo(166, h * 0.67); x.lineTo(92, h * 0.67); x.fill();
+            x.fillRect(128, h * 0.3, 3, h * 0.32); x.fillStyle = '#e8e0cc'; x.beginPath(); x.moveTo(132, h * 0.32); x.lineTo(170, h * 0.56); x.lineTo(132, h * 0.56); x.fill(); x.beginPath(); x.moveTo(126, h * 0.36); x.lineTo(96, h * 0.56); x.lineTo(126, h * 0.56); x.fill();
+            x.strokeStyle = '#d8c070'; x.lineWidth = 3; x.strokeRect(6, 6, w - 12, h - 12);
+        },
+        (x, w, h) => { // an oil portrait in a gilt frame
+            x.fillStyle = '#b08a3a'; x.fillRect(0, 0, w, h); x.fillStyle = '#7a5a20'; x.fillRect(14, 14, w - 28, h - 28);
+            const bg = x.createRadialGradient(w / 2, h * 0.4, 10, w / 2, h * 0.4, 160); bg.addColorStop(0, '#5a4a38'); bg.addColorStop(1, '#1e1810'); x.fillStyle = bg; x.fillRect(22, 22, w - 44, h - 44);
+            x.fillStyle = '#1a1a22'; x.beginPath(); x.moveTo(60, h - 22); x.quadraticCurveTo(w / 2, h * 0.5, w - 60, h - 22); x.fill();
+            x.fillStyle = '#e8e0d0'; x.beginPath(); x.moveTo(w / 2 - 14, h * 0.6); x.lineTo(w / 2, h * 0.72); x.lineTo(w / 2 + 14, h * 0.6); x.fill();
+            x.fillStyle = '#d8b090'; x.beginPath(); x.ellipse(w / 2, h * 0.42, 34, 44, 0, 0, Math.PI * 2); x.fill();
+            x.fillStyle = '#3a2a1a'; x.beginPath(); x.ellipse(w / 2, h * 0.34, 38, 24, 0, Math.PI, 0); x.fill();
+            x.strokeStyle = '#d8c070'; x.lineWidth = 3; x.strokeRect(6, 6, w - 12, h - 12);
+        },
+    ][k % HANGINGS];
+    const t = canvasTexture(256, 320, (x, w, h) => {
+        draw(x, w, h);
+        for (let i = 0; i < 260; i++) { x.fillStyle = `rgba(0,0,0,${0.03 + (i % 5) * 0.01})`; x.fillRect((i * 73) % w, (i * 151) % h, 3, 3); }
     });
-    return new THREE.MeshStandardMaterial({ map: t, roughness: 0.95, side: THREE.DoubleSide });
+    return new THREE.MeshStandardMaterial({ map: t, roughness: k >= 8 ? 0.5 : 0.95, side: THREE.DoubleSide });
+}
+
+// ---------------------------------------------------------------- the galleries' own displays
+// Small tables against the back of each gallery, leaving the front free for visitors at the rail.
+function galleryTable(m, kind, seed) {
+    const g = new THREE.Group(), cloth = [VELVET, stdm({ color: 0x1e2c48, roughness: 1 }), stdm({ color: 0x2a3a26, roughness: 1 })][seed % 3];
+    g.add(box(1.1, 0.04, 0.5, MAHOGANY, 0, 0.74, 0), box(1.14, 0.02, 0.54, cloth, 0, 0.78, 0));
+    for (const [lx, lz] of [[-0.5, -0.2], [0.5, -0.2], [-0.5, 0.2], [0.5, 0.2]]) g.add(cyl(0.025, 0.018, 0.74, MAHOGANY, lx, 0, lz, 6));
+    const y = 0.8;
+    const items = [
+        () => { g.add(cyl(0.05, 0.08, 0.06, m.gold, -0.3, y, 0, 10), lathe([[0, 0], [0.07, 0], [0.11, 0.1], [0.08, 0.2], [0.05, 0.24], [0.08, 0.28], [0, 0.28]], m.marble, 0.25, y, 0)); const globe = sphere(0.11, stdm({ color: 0x6a8aa8, roughness: 0.5 }), -0.3, y + 0.17, 0); g.add(globe); },
+        () => { g.add(box(0.14, 0.06, 0.12, m.marble, 0, y, 0), box(0.12, 0.18, 0.1, m.marble, 0, y + 0.06, 0)); g.add(sphere(0.07, m.marble, 0, y + 0.31, 0)); g.add(box(0.22, 0.24, 0.1, MAHOGANY, -0.35, y, 0), cyl(0.06, 0.06, 0.02, m.gold, -0.35, y + 0.14, 0.05, 14)); },
+        () => { for (const dx of [-0.32, 0, 0.32]) g.add(lathe([[0, 0], [0.05, 0], [0.04, 0.04], [0.08, 0.12], [0.06, 0.2], [0.035, 0.24], [0.05, 0.26], [0, 0.26]], [stdm({ color: 0x24448e, roughness: 0.25 }), m.gold, stdm({ color: 0xe8e2d4, roughness: 0.25 })][(seed + Math.round(dx * 10)) % 3 < 0 ? 0 : (seed + Math.round(dx * 10) + 3) % 3], dx, y, 0)); },
+        () => { g.add(box(0.7, 0.03, 0.12, MAHOGANY, 0, y, 0)); g.add(box(0.4, 0.08, 0.08, MAHOGANY, 0, y + 0.03, 0)); g.add(cyl(0.006, 0.006, 0.5, m.wood, -0.05, y + 0.11, 0, 4), cyl(0.006, 0.006, 0.36, m.wood, 0.12, y + 0.11, 0, 4)); g.add(box(0.2, 0.18, 0.005, stdm({ color: 0xece4cc, roughness: 1 }), -0.05, y + 0.25, 0.01)); },
+        () => { g.add(box(0.8, 0.26, 0.36, m.glass, 0, y, 0), box(0.82, 0.02, 0.38, m.brass, 0, y + 0.26, 0)); for (let i = 0; i < 5; i++) g.add(sphere(0.025, [m.gold, m.steel, stdm({ color: 0xc8463a, roughness: 0.3 })][i % 3], -0.28 + i * 0.14, y + 0.04, 0)); },
+        () => { g.add(cyl(0.06, 0.09, 0.04, m.brass, 0, y, 0, 10), cyl(0.012, 0.012, 0.36, m.brass, 0, y + 0.04, 0, 6)); for (const a of [0, 2.1, 4.2]) g.add(cyl(0.012, 0.016, 0.1, stdm({ color: 0xf2ead8, roughness: 0.6 }), Math.cos(a) * 0.12, y + 0.4, Math.sin(a) * 0.12, 6)); g.add(box(0.3, 0.2, 0.24, MAHOGANY, 0.34, y, 0), box(0.04, 0.12, 0.2, m.gold, 0.34, y + 0.2, 0)); },
+    ];
+    items[kind % items.length]();
+    return g;
 }
 
 // ---------------------------------------------------------------- the crowd
