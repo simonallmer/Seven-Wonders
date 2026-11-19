@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { Particles, box, cyl, shadowed } from './fx.js';
 import { woodMaps, floorMaps, clothMaps, glazingTexture, canvasTexture, papyrusBase } from './textures.js';
-import { materials, MINIATURES, buildSphinx, buildObelisk, buildPalm } from './models.js';
+import { materials, MINIATURES, buildSphinx, buildObelisk, buildPalm, PALACE_NIGHT } from './models.js';
 import { buildBoard } from './pyramid/scene.js';
 import { buildBoard as buildGardens, GROUND as GARDENS_GROUND } from './gardens/scene.js';
 import { buildBoard as buildTemple, GROUND as TEMPLE_GROUND } from './temple/scene.js';
@@ -1045,6 +1045,7 @@ export class PalaceWorld {
     lightNight() {
         const k = this.day ? this.day.lamps : 0;
         for (const mat of this.nightMats || []) mat.emissiveIntensity = k * 1.5;
+        for (const mat of PALACE_NIGHT) mat.emissiveIntensity = k * 1.2; // the Crystal Palace miniature glows too
     }
 
     setFocus(i) {

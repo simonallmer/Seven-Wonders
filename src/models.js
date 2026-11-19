@@ -1,7 +1,7 @@
 // Models built from code: the fourteen table miniatures and the props shared with the game worlds.
 import * as THREE from 'three';
 import { box, cyl } from './fx.js';
-import { limestoneMaps, marbleMaps } from './textures.js';
+import { limestoneMaps, marbleMaps, canvasTexture } from './textures.js';
 
 let M = null;
 export function materials() {
@@ -369,32 +369,83 @@ function cathedral() {
     return g;
 }
 
-function palace() { // the Crystal Palace itself: the hall you are standing in
+// The glass of the Crystal Palace miniature glows after dark; the hall turns these up with its lamps.
+export const PALACE_NIGHT = [];
+function palace() { // the Crystal Palace itself, as it stood in Hyde Park: tiers of arched iron and glass, the vaulted transept, flags
     const m = materials(), g = new THREE.Group();
-    g.add(box(1.1, 0.03, 0.6, m.darkstone));
-    const frame = m.steel;
-    const hall = (w, h, d, x, y, z) => {
-        g.add(box(w, h, d, m.glass, x, y, z));
-        const e = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)), new THREE.LineBasicMaterial({ color: 0xdfe8ee }));
-        e.position.set(x, y + h / 2, z); g.add(e);
-        const nx = Math.round(w / 0.07);
-        for (let i = 1; i < nx; i++) g.add(box(0.006, h, d + 0.004, frame, x - w / 2 + (i / nx) * w, y, z));
+    // one bay of the facade: a cream iron frame with a round-headed window, mullions and a fan of glazing bars
+    const bay = (x, w, h) => {
+        x.fillStyle = '#ece6d6'; x.fillRect(0, 0, w, h);
+        const gl = x.createLinearGradient(0, 0, 0, h); gl.addColorStop(0, '#8fb2c8'); gl.addColorStop(1, '#4f6f86');
+        x.fillStyle = gl; x.beginPath(); x.moveTo(10, h - 8); x.lineTo(10, h * 0.42); x.arc(w / 2, h * 0.42, w / 2 - 10, Math.PI, 0); x.lineTo(w - 10, h - 8); x.closePath(); x.fill();
+        x.strokeStyle = '#ece6d6'; x.lineWidth = 3;
+        x.beginPath(); x.moveTo(w / 2, h - 8); x.lineTo(w / 2, h * 0.42 - (w / 2 - 10)); x.stroke();
+        for (const t of [0.66, 0.84]) { x.beginPath(); x.moveTo(10, h * t); x.lineTo(w - 10, h * t); x.stroke(); }
+        for (const a of [0.25, 0.5, 0.75]) { x.beginPath(); x.moveTo(w / 2, h * 0.42); x.lineTo(w / 2 + Math.cos(Math.PI * (1 + a)) * (w / 2 - 10), h * 0.42 + Math.sin(Math.PI * (1 + a)) * (w / 2 - 10)); x.stroke(); }
+        x.fillStyle = '#d8cfb8'; x.fillRect(0, 0, w, 6);
     };
-    hall(1.04, 0.14, 0.5, 0, 0.03, 0);
-    hall(1.04, 0.12, 0.34, 0, 0.17, 0);
-    hall(1.04, 0.1, 0.18, 0, 0.29, 0);
-    const vault = (len, r, x, y, z, ry) => {
-        const v = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 24, 1, false, 0, Math.PI), m.glass);
-        v.rotation.set(0, ry, Math.PI / 2); v.position.set(x, y, z); g.add(v);
-        for (let i = 0; i <= 8; i++) {
-            const rib = new THREE.Mesh(new THREE.TorusGeometry(r, 0.006, 4, 20, Math.PI), frame);
-            const t = (i / 8 - 0.5) * len;
-            rib.position.set(x + (ry ? 0 : t), y, z + (ry ? t : 0)); rib.rotation.y = ry ? 0 : Math.PI / 2; g.add(rib);
+    const tex = canvasTexture(64, 128, bay);
+    const lit = canvasTexture(64, 128, (x, w, h) => { x.fillStyle = '#000'; x.fillRect(0, 0, w, h); x.fillStyle = '#ffd890'; x.beginPath(); x.moveTo(12, h - 10); x.lineTo(12, h * 0.42); x.arc(w / 2, h * 0.42, w / 2 - 12, Math.PI, 0); x.lineTo(w - 12, h - 10); x.closePath(); x.fill(); });
+    const roofGlass = new THREE.MeshStandardMaterial({ color: 0xc6dbe6, roughness: 0.15, metalness: 0.4 });
+    const facade = (rx, ry) => {
+        const mat = new THREE.MeshStandardMaterial({ map: tex.clone(), emissiveMap: lit.clone(), emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.4 });
+        for (const t of [mat.map, mat.emissiveMap]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.needsUpdate = true; }
+        PALACE_NIGHT.push(mat); return mat;
+    };
+    const cream = new THREE.MeshStandardMaterial({ color: 0xece6d6, roughness: 0.5 });
+    // a block with arched bays on its sides and a glazed roof
+    const tier = (w, h, d, y, bayW = 0.045) => {
+        const long = facade(Math.round(w / bayW), 1), end = facade(Math.round(d / bayW), 1);
+        const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [end, end, roofGlass, cream, long, long]);
+        b.position.y = y + h / 2; g.add(b);
+        g.add(box(w + 0.01, 0.008, d + 0.01, cream, 0, y + h, 0)); // the cornice
+    };
+    g.add(box(1.1, 0.02, 0.62, m.darkstone));
+    tier(1.06, 0.13, 0.5, 0.02);
+    tier(0.98, 0.1, 0.36, 0.15);
+    tier(0.9, 0.08, 0.22, 0.25);
+    // the barrel vault along the nave's ridge, ribbed
+    const vault = (len, r, x, y, z, alongZ) => {
+        const v = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 24, 1, true, 0, Math.PI), roofGlass);
+        v.rotation.set(0, alongZ ? Math.PI / 2 : 0, Math.PI / 2); v.position.set(x, y, z); g.add(v);
+        const n = Math.round(len / 0.04);
+        for (let i = 0; i <= n; i++) {
+            const rib = new THREE.Mesh(new THREE.TorusGeometry(r, 0.004, 4, 16, Math.PI), cream), t = (i / n - 0.5) * len;
+            rib.position.set(x + (alongZ ? 0 : t), y, z + (alongZ ? t : 0)); rib.rotation.y = alongZ ? 0 : Math.PI / 2; g.add(rib);
         }
     };
-    vault(0.56, 0.11, 0, 0.39, 0, Math.PI / 2);                        // the great transept
-    g.add(box(0.22, 0.36, 0.56, m.glass, 0, 0.03, 0));
-    vault(1.04, 0.05, 0, 0.39, 0, 0);
+    vault(0.9, 0.09, 0, 0.33, 0, false);
+    // the transept: taller than the nave, its round vault crossing it, a great fan window at each end
+    const TW = 0.26, TH = 0.36, TD = 0.62;
+    const tFace = facade(Math.round(TW / 0.045), 2), tSide = facade(Math.round(TD / 0.045), 2);
+    const tb = new THREE.Mesh(new THREE.BoxGeometry(TW, TH, TD), [tSide, tSide, roofGlass, cream, tFace, tFace]); tb.position.y = 0.02 + TH / 2; g.add(tb);
+    const TR = TW / 2, ty = 0.02 + TH;
+    vault(TD, TR, 0, ty, 0, true);
+    const fanTex = canvasTexture(128, 64, (x, w, h) => {
+        x.fillStyle = '#5c7c92'; x.fillRect(0, 0, w, h);
+        x.strokeStyle = '#ece6d6'; x.lineWidth = 3;
+        for (let k = 0; k <= 12; k++) { const a = Math.PI * k / 12; x.beginPath(); x.moveTo(w / 2, h); x.lineTo(w / 2 - Math.cos(a) * w / 2, h - Math.sin(a) * h); x.stroke(); }
+        for (const r of [0.35, 0.7, 0.98]) { x.beginPath(); x.ellipse(w / 2, h, w / 2 * r, h * r, 0, Math.PI, 0); x.stroke(); }
+    });
+    const fanLit = canvasTexture(128, 64, (x, w, h) => { x.fillStyle = '#ffd890'; x.beginPath(); x.ellipse(w / 2, h, w / 2 - 4, h - 4, 0, Math.PI, 0); x.fill(); });
+    const fan = new THREE.MeshStandardMaterial({ map: fanTex, emissiveMap: fanLit, emissive: 0xffffff, emissiveIntensity: 0, side: THREE.DoubleSide, roughness: 0.3 });
+    PALACE_NIGHT.push(fan);
+    for (const s of [-1, 1]) {
+        const f = new THREE.Mesh(new THREE.CircleGeometry(TR, 20, 0, Math.PI), fan); f.position.set(0, ty, s * (TD / 2 + 0.001)); f.rotation.y = s > 0 ? 0 : Math.PI; g.add(f);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(TR, 0.006, 4, 20, Math.PI), cream); ring.position.set(0, ty, s * (TD / 2 + 0.002)); g.add(ring);
+        g.add(box(0.07, 0.07, 0.01, m.darkstone, 0, 0.02, s * (TD / 2 + 0.003))); // the entrance arch below
+    }
+    // flags: the Union flag over the transept, the nations along the nave
+    const flagCols = [0xc8283a, 0x2a4fa0, 0xe8c040, 0x2f8a4a, 0xf2f2f2, 0xd06a20];
+    const flag = (x, y, z, h, col, big) => {
+        g.add(cyl(0.0025, 0.0025, h, cream, x, y, z, 4));
+        const f = new THREE.Mesh(new THREE.PlaneGeometry(big ? 0.06 : 0.04, big ? 0.036 : 0.024), new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, roughness: 0.8 }));
+        f.position.set(x + (big ? 0.03 : 0.02), y + h - (big ? 0.02 : 0.013), z); g.add(f);
+        if (big) { g.add(box(0.06, 0.006, 0.002, new THREE.MeshStandardMaterial({ color: 0xffffff }), x + 0.03, y + h - 0.023, z + 0.001)); g.add(box(0.008, 0.036, 0.002, new THREE.MeshStandardMaterial({ color: 0xc8283a }), x + 0.03, y + h - 0.038, z + 0.0015)); }
+    };
+    flag(0, ty + TR, 0, 0.12, 0x24346e, true);
+    for (let i = 0; i < 6; i++) { const x = -0.4 + i * 0.16; if (Math.abs(x) < 0.15) continue; flag(x, 0.42, 0, 0.06, flagCols[i % flagCols.length]); }
+    for (const s of [-1, 1]) for (const x of [-0.5, 0.5]) flag(x, 0.15, s * 0.24, 0.05, flagCols[(x > 0 ? 2 : 4) + (s > 0 ? 1 : 0)]);
     return g;
 }
 

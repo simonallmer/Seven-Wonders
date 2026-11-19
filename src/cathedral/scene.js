@@ -1,4 +1,4 @@
-// CATHEDRAL — the world: a Gothic cathedral on its market square, the engraved floor as the board, stones,
+// CATHEDRAL — the world: St Peter's Basilica on its square, the engraved floor as the board, stones,
 // effects and move animations.
 import * as THREE from 'three';
 import { L, createState, SIZE, PASSAGES } from './rules.js';
@@ -140,100 +140,153 @@ export function buildBoard(nPlayers, { mini = false } = {}) {
         for (let i = 0; i < L.N; i++) if (st.grid[i]) { const s = makeStone(st.grid[i], true); cellPos(i, s.position); group.add(s); }
     }
 
-    // Walls, windows, vaults, roofs, the two towers and the flèche: the cathedral is whole while the visitor
-    // arrives, and all of this is lifted away for the game. Its materials are its own, so that it can fade.
-    const rm = { stone: stone.clone(), slate: m.slate.clone(), dark: new THREE.MeshStandardMaterial({ color: 0x2a221c, roughness: 0.8 }),
-        glass: new THREE.MeshBasicMaterial({ color: 0xffffff }), gold: m.gold.clone() };
-    const up = new THREE.Group(), panes = [], butt = [], pins = [], bars = [], crenels = [], roses = [];
-    let gi = 0;
+    // St Peter's: travertine walls in a giant order of pilasters, attic and cornice, apses on three arms,
+    // Maderno's front at the near end, Michelangelo's dome on its drum of paired columns over the crossing.
+    // All of it stands while the visitor arrives and is lifted away for the game. Its materials are its own.
+    const rm = { stone: new THREE.MeshStandardMaterial({ color: 0xe6d9bf, roughness: 0.85 }), slate: new THREE.MeshStandardMaterial({ color: 0x8a96a0, roughness: 0.55, metalness: 0.35 }),
+        dark: new THREE.MeshStandardMaterial({ color: 0x4a3c30, roughness: 0.85 }), glass: new THREE.MeshBasicMaterial({ color: 0xffffff }), gold: m.gold.clone(),
+        pale: new THREE.MeshStandardMaterial({ color: 0xf2e9d6, roughness: 0.8 }) };
+    const up = new THREE.Group(), pil = [], panes = [], heads = [], recess = [], cols = [], figs = [];
+    const ORDER = WALL_H - 0.9, ATTIC = WALL_H + 0.5;            // top of the pilasters; top of the attic
+    const arch = new THREE.Shape(); arch.moveTo(-0.5, 0); arch.lineTo(0.5, 0); arch.lineTo(0.5, 0.62); arch.absarc(0, 0.62, 0.5, 0, Math.PI, false); arch.closePath();
+    const archGeo = new THREE.ShapeGeometry(arch, 8); archGeo.translate(0, -0.56, 0);
+    const amber = new THREE.Color(0xe8cf98);
+    // one wall run in the giant order: pilasters, windows with pediments, entablature, attic
+    const order = (x0, z0, len, ux, uz, nx, nz, door) => {
+        const ry = Math.atan2(nx, nz), bays = Math.max(2, Math.round(len / 1.25));
+        for (let k = 0; k <= bays; k++) {
+            const t = k / bays * len, px = x0 + ux * t + nx * 0.24, pz = z0 + uz * t + nz * 0.24;
+            pil.push({ x: px, y: 0.3 + (ORDER - 0.3) / 2, z: pz, ry, sx: 0.34, sy: ORDER - 0.3, sz: 0.1 });
+            pil.push({ x: px, y: ORDER + 0.64 + (ATTIC - ORDER - 0.64) / 2, z: pz, ry, sx: 0.3, sy: ATTIC - ORDER - 0.64, sz: 0.06 }); // the attic pilasters
+        }
+        for (let k = 0; k < bays; k++) {
+            const t = (k + 0.5) / bays * len, wx = x0 + ux * t + nx * 0.215, wz = z0 + uz * t + nz * 0.215;
+            if (door && Math.abs(t - (DOOR - WALL)) < 0.7) continue;
+            panes.push({ x: wx, y: 3.4, z: wz, ry, sx: 0.62, sy: 1.9, color: amber });
+            heads.push({ x: wx + nx * 0.04, y: 4.55, z: wz + nz * 0.04, ry, sx: 0.9, sy: 0.12, sz: 0.1 });       // pediment over it
+            panes.push({ x: wx, y: 5.55, z: wz, ry, sx: 0.5, sy: 0.6, color: amber });
+            recess.push({ x: wx + nx * 0.02, y: ORDER + 0.93, z: wz + nz * 0.02, ry, sx: 0.36, sy: 0.24, sz: 0.04 }); // attic window
+        }
+        const cx = x0 + ux * len / 2, cz = z0 + uz * len / 2, along = Math.abs(ux) > 0.5, L2 = len + 0.7;
+        up.add(box(along ? L2 : 0.62, 0.5, along ? 0.62 : L2, rm.stone, cx, ORDER, cz));            // entablature
+        up.add(box(along ? L2 + 0.2 : 0.78, 0.14, along ? 0.78 : L2 + 0.2, rm.pale, cx, ORDER + 0.5, cz)); // cornice
+        up.add(box(along ? L2 : 0.46, ATTIC - ORDER - 0.64, along ? 0.46 : L2, rm.stone, cx, ORDER + 0.64, cz)); // attic
+        up.add(box(along ? L2 + 0.1 : 0.56, 0.1, along ? 0.56 : L2 + 0.1, rm.pale, cx, ATTIC, cz));
+    };
     for (const [x0, z0, x1, z1, door] of runs) {
         const len = Math.hypot(x1 - x0, z1 - z0), ux = (x1 - x0) / len, uz = (z1 - z0) / len, alongX = Math.abs(ux) > 0.5;
         const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-        up.add(box(alongX ? len + 0.4 : 0.4, WALL_H - 0.3, alongX ? 0.4 : len + 0.4, rm.stone, cx, 0.3, cz));
-        // outward normal: away from the middle of the arm
-        const nx = alongX ? 0 : Math.sign(cx), nz = alongX ? Math.sign(cz) : 0, n = door ? 4 : 3;
-        for (let k = 0; k < n; k++) {
-            const t = (k + 0.5) / n * len, wx = x0 + ux * t, wz = z0 + uz * t;
-            const color = new THREE.Color(GLASS[gi++ % GLASS.length]);
-            for (const side of [1, -1]) {
-                const ry = Math.atan2(nx * side, nz * side), px = wx + nx * 0.215 * side, pz = wz + nz * 0.215 * side, w = door ? 0.62 : 0.8;
-                panes.push({ x: wx + nx * 0.21 * side, y: 3.7, z: wz + nz * 0.21 * side, ry, sx: w, sy: 3.6, color });
-                // tracery: a mullion down the middle and a transom near the head
-                bars.push({ x: px, y: 3.6, z: pz, ry, sx: 0.05, sy: 3.4, sz: 0.03 }, { x: px, y: 4.4, z: pz, ry, sx: w, sy: 0.05, sz: 0.03 });
-            }
-            if (k) {
-                const bx = x0 + ux * (k / n) * len + nx * 0.55, bz = z0 + uz * (k / n) * len + nz * 0.55;
-                butt.push({ x: bx, y: 3.1, z: bz, sx: alongX ? 0.3 : 0.9, sy: 6.2, sz: alongX ? 0.9 : 0.3 });
-                pins.push({ x: bx + nx * 0.15, y: 6.85, z: bz + nz * 0.15, sx: 0.2, sy: 1.3, sz: 0.2 }); // a pinnacle on every buttress
-            }
-        }
-        if (door) up.add(box(alongX ? 1.0 : 0.44, 2.0, alongX ? 0.44 : 1.0, rm.dark, x0 + ux * (DOOR - WALL), 0.3, z0 + uz * (DOOR - WALL)));
-        // a cornice, and a pierced parapet along the eaves
-        up.add(box(alongX ? len + 0.6 : 0.62, 0.16, alongX ? 0.62 : len + 0.6, rm.stone, cx, WALL_H - 0.16, cz));
-        for (let t = 0.25; t < len + 0.2; t += 0.5) crenels.push({ x: x0 + ux * t + nx * 0.26, y: WALL_H + 0.12, z: z0 + uz * t + nz * 0.26, sx: alongX ? 0.24 : 0.1, sy: 0.24, sz: alongX ? 0.1 : 0.24 });
-        // a rose window high in each gable end but the west, which the towers hide
-        if (!door && !(alongX && cz > 0)) roses.push({ x: cx + nx * 0.22, y: 5.3, z: cz + nz * 0.22, ry: Math.atan2(nx, nz) });
+        up.add(box(alongX ? len + 0.4 : 0.4, ORDER - 0.3, alongX ? 0.4 : len + 0.4, rm.stone, cx, 0.3, cz));
+        const nx = alongX ? 0 : Math.sign(cx), nz = alongX ? Math.sign(cz) : 0;
+        if (!door && cz > 0 && alongX) continue; // the front wall hides behind Maderno's facade
+        order(x0, z0, len, ux, uz, nx, nz, door);
+        if (door) up.add(box(alongX ? 0.9 : 0.44, 2.1, alongX ? 0.44 : 0.9, rm.dark, x0 + ux * (DOOR - WALL), 0.3, z0 + uz * (DOOR - WALL)));
     }
-    const lancet = new THREE.Shape(); lancet.moveTo(-0.5, 0); lancet.lineTo(0.5, 0); lancet.lineTo(0.5, 0.72); lancet.quadraticCurveTo(0.42, 0.93, 0, 1); lancet.quadraticCurveTo(-0.42, 0.93, -0.5, 0.72); lancet.closePath();
-    const lg = new THREE.ShapeGeometry(lancet, 6); lg.translate(0, -0.5, 0);
-    const glass = instanced(lg, rm.glass, panes); glass.castShadow = glass.receiveShadow = false; up.add(glass);
-    up.add(instanced(new THREE.BoxGeometry(1, 1, 1), rm.stone, butt));
-    up.add(instanced(new THREE.ConeGeometry(1, 1, 6), rm.stone, pins), instanced(new THREE.BoxGeometry(1, 1, 1), rm.stone, crenels), instanced(new THREE.BoxGeometry(1, 1, 1), rm.dark, bars));
-    for (const ro of roses) { // glass, a stone ring and eight spokes
-        const g = new THREE.Group(); g.position.set(ro.x, ro.y, ro.z); g.rotation.y = ro.ry;
-        const gl = new THREE.Mesh(new THREE.CircleGeometry(0.8, 20), rm.rose || (rm.rose = new THREE.MeshBasicMaterial({ color: 0x5a78c8 }))); gl.position.z = 0.01; g.add(gl);
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.82, 0.07, 6, 24), rm.stone); g.add(ring);
-        for (let k = 0; k < 4; k++) { const sp = box(1.6, 0.05, 0.05, rm.stone, 0, -0.025, 0.03); sp.rotation.z = k * Math.PI / 4; g.add(sp); }
-        g.add(new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.04, 6, 16), rm.stone));
-        up.add(g);
-    }
-    // the apse: a rounded east end beyond the choir, with tall windows of its own
-    const apseH = WALL_H - GROUND;
-    const apse = new THREE.Mesh(new THREE.CylinderGeometry(2.95, 2.95, apseH, 18, 1, false, Math.PI / 2, Math.PI), rm.stone);
-    apse.position.set(0, GROUND + apseH / 2, -END); up.add(apse);
-    const apseRoof = new THREE.Mesh(new THREE.ConeGeometry(3.15, 3.3, 18, 1, false, Math.PI / 2, Math.PI), rm.slate);
-    apseRoof.position.set(0, WALL_H + 1.65, -END); up.add(apseRoof);
-    for (let k = 0; k < 5; k++) {
-        const a = Math.PI / 2 + (k + 0.5) / 5 * Math.PI, wx = Math.sin(a) * 2.97, wz = -END + Math.cos(a) * 2.97;
-        const win = new THREE.Mesh(lg, new THREE.MeshBasicMaterial({ color: GLASS[k % GLASS.length] })); win.scale.set(0.6, 3.4, 1); win.position.set(wx, 3.7, wz); win.rotation.y = a; up.add(win);
-        rm['apse' + k] = win.material;
-        const bA = a + Math.PI / 5 / 2; if (k < 4) { const b = box(0.3, 6.2, 0.8, rm.stone, Math.sin(bA) * 3.25, 0, -END + Math.cos(bA) * 3.25); b.rotation.y = bA; up.add(b); const pn = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.3, 6), rm.stone); pn.position.set(Math.sin(bA) * 3.4, 6.85, -END + Math.cos(bA) * 3.4); up.add(pn); }
-    }
-    // gilt crestings along the ridges
-    up.add(box(15.9, 0.08, 0.08, rm.gold, 0, WALL_H + 3.28, 0), box(0.08, 0.08, 15.9, rm.gold, 0, WALL_H + 3.28, 0));
-    // roofs: two steep gables that cross, the flèche over the crossing
-    const tri = new THREE.Shape(); tri.moveTo(-3.15, 0); tri.lineTo(3.15, 0); tri.lineTo(0, 3.3); tri.closePath();
-    const gable = (rot) => { const r = new THREE.Mesh(new THREE.ExtrudeGeometry(tri, { depth: 15.9, bevelEnabled: false }), rm.slate); r.position.set(rot ? -7.95 : 0, WALL_H, rot ? 0 : -7.95); r.rotation.y = rot ? Math.PI / 2 : 0; return r; };
+    // low roofs of lead over the arms, half hidden behind the attics
+    const tri = new THREE.Shape(); tri.moveTo(-3.0, 0); tri.lineTo(3.0, 0); tri.lineTo(0, 1.1); tri.closePath();
+    const gable = (rot) => { const r = new THREE.Mesh(new THREE.ExtrudeGeometry(tri, { depth: 15.5, bevelEnabled: false }), rm.slate); r.position.set(rot ? -7.75 : 0, ATTIC - 0.4, rot ? 0 : -7.75); r.rotation.y = rot ? Math.PI / 2 : 0; return r; };
     up.add(gable(false), gable(true));
-    up.add(cyl(0.02, 0.5, 5.2, rm.slate, 0, WALL_H + 3.1, 0, 8), cyl(0.06, 0.06, 0.5, rm.gold, 0, WALL_H + 8.3, 0, 6));
-    // the west front, here at the near end: two towers with their spires, the rose between them, the portal
-    for (const sx of [-1, 1]) {
-        const tx = sx * 1.9, top = GROUND + 11.5;
-        up.add(box(2.5, 11.5, 2.5, rm.stone, tx, GROUND, 9.2));
-        for (const y of [3.2, 6.6, 9.9]) up.add(box(2.7, 0.16, 2.7, rm.stone, tx, GROUND + y, 9.2)); // string courses
-        for (const [cx, cz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) up.add(box(0.4, 11.5, 0.4, rm.stone, tx + cx * 1.2, GROUND, 9.2 + cz * 1.2)); // corner buttresses
-        // belfry and lower windows on the front and the outer side
-        for (const y of [5.2, 8.4]) {
-            up.add(box(0.5, 1.7, 0.06, rm.dark, tx - 0.32, y, 10.46), box(0.5, 1.7, 0.06, rm.dark, tx + 0.32, y, 10.46));
-            up.add(box(0.06, 1.7, 0.5, rm.dark, tx + sx * 1.26, y, 9.2 - 0.32), box(0.06, 1.7, 0.5, rm.dark, tx + sx * 1.26, y, 9.2 + 0.32));
+    // the apses that close three arms: half drums in the same order, with half domes of lead
+    for (const [ax, az] of [[0, -1], [-1, 0], [1, 0]]) {
+        const ox = ax * END, oz = az * END, base = Math.atan2(ax, az), R = 2.95, H = ORDER - GROUND;
+        const half = (r, h, mat, y) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 24, 1, false, base - Math.PI / 2, Math.PI), mat); c.position.set(ox, y + h / 2, oz); up.add(c); };
+        half(R, H, rm.stone, GROUND); half(R + 0.18, 0.5, rm.stone, ORDER); half(R + 0.26, 0.14, rm.pale, ORDER + 0.5); half(R - 0.05, ATTIC - ORDER - 0.64, rm.stone, ORDER + 0.64);
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(R - 0.1, 20, 8, base - Math.PI / 2, Math.PI, 0, Math.PI / 2), rm.slate); cap.scale.y = 0.24; cap.position.set(ox, ATTIC, oz); up.add(cap);
+        for (let k = 0; k <= 6; k++) {
+            const a = base - Math.PI / 2 + k / 6 * Math.PI, px = ox + Math.sin(a) * (R + 0.06), pz = oz + Math.cos(a) * (R + 0.06);
+            pil.push({ x: px, y: GROUND + H / 2, z: pz, ry: a, sx: 0.34, sy: H, sz: 0.12 });
+            if (k < 6) {
+                const b = a + Math.PI / 12, wx = ox + Math.sin(b) * (R + 0.01), wz = oz + Math.cos(b) * (R + 0.01);
+                panes.push({ x: wx, y: 3.4, z: wz, ry: b, sx: 0.6, sy: 1.9, color: amber }, { x: wx, y: 5.55, z: wz, ry: b, sx: 0.48, sy: 0.6, color: amber });
+                heads.push({ x: ox + Math.sin(b) * (R + 0.05), y: 4.55, z: oz + Math.cos(b) * (R + 0.05), ry: b, sx: 0.84, sy: 0.12, sz: 0.1 });
+            }
         }
-        up.add(box(2.7, 0.3, 2.7, rm.stone, tx, top, 9.2));
-        for (const [cx, cz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const pn = new THREE.Mesh(new THREE.ConeGeometry(0.24, 1.6, 6), rm.stone); pn.position.set(tx + cx * 1.15, top + 1.1, 9.2 + cz * 1.15); up.add(pn); }
-        const sp = new THREE.Mesh(new THREE.ConeGeometry(1.25, 6.4, 8), rm.slate); sp.position.set(tx, top + 0.3 + 3.2, 9.2); sp.rotation.y = Math.PI / 8; up.add(sp);
-        up.add(cyl(0.03, 0.03, 0.7, rm.gold, tx, top + 6.6, 9.2, 6), box(0.36, 0.05, 0.05, rm.gold, tx, top + 7.0, 9.2));
     }
-    // the portal: a deep doorway under a steep gable, the rose above it framed in stone
-    up.add(box(1.5, 6.4, 0.6, rm.stone, 0, GROUND, 10.1), box(1.1, 2.4, 0.08, rm.dark, 0, GROUND, 10.42));
-    const gab = new THREE.Shape(); gab.moveTo(-0.8, 0); gab.lineTo(0.8, 0); gab.lineTo(0, 1.2); gab.closePath();
-    const pg = new THREE.Mesh(new THREE.ExtrudeGeometry(gab, { depth: 0.3, bevelEnabled: false }), rm.stone); pg.position.set(0, GROUND + 2.6, 10.25); up.add(pg);
-    const rose = new THREE.Mesh(new THREE.CircleGeometry(0.52, 20), new THREE.MeshBasicMaterial({ color: 0x6f86c8 })); rose.position.set(0, 4.6, 10.42); up.add(rose);
-    const rr = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.06, 6, 24), rm.stone); rr.position.set(0, 4.6, 10.44); up.add(rr);
-    for (let k = 0; k < 4; k++) { const spk = box(1.04, 0.04, 0.04, rm.stone, 0, 4.58, 10.45); spk.rotation.z = k * Math.PI / 4; up.add(spk); }
-    up.add(box(1.7, 0.4, 0.7, rm.stone, 0, GROUND + 6.4, 10.1)); // a gallery of kings above the rose, as a band
-    shadowed(up); rose.castShadow = false;
+    // Michelangelo's dome: podium, drum ringed by paired columns, attic, the raised dome with its ribs, the lantern
+    let y = ATTIC - 0.1;
+    up.add(cyl(3.0, 3.0, 0.7, rm.stone, 0, y, 0, 32)); y += 0.7;
+    const DR = 2.55, DH = 2.3;
+    up.add(cyl(DR, DR, DH, rm.stone, 0, y, 0, 32));
+    for (let k = 0; k < 16; k++) {
+        const a = k / 16 * Math.PI * 2, c = Math.cos(a), s = Math.sin(a), t = [-s, c];
+        for (const off of [-0.2, 0.2]) cols.push({ x: c * (DR + 0.32) + t[0] * off, y: y + DH / 2, z: s * (DR + 0.32) + t[1] * off, sx: 0.11, sy: DH, sz: 0.11 });
+        pil.push({ x: c * (DR + 0.12), y: y + DH / 2, z: s * (DR + 0.12), ry: Math.PI / 2 - a, sx: 0.62, sy: DH, sz: 0.24 }); // the buttress behind the pair
+        const b = a + Math.PI / 16, wx = Math.cos(b) * (DR + 0.01), wz = Math.sin(b) * (DR + 0.01);
+        panes.push({ x: wx, y: y + DH * 0.48, z: wz, ry: Math.PI / 2 - b, sx: 0.46, sy: 1.25, color: amber });
+        heads.push({ x: Math.cos(b) * (DR + 0.05), y: y + DH * 0.48 + 0.78, z: Math.sin(b) * (DR + 0.05), ry: Math.PI / 2 - b, sx: 0.62, sy: 0.1, sz: 0.1 });
+    }
+    y += DH;
+    up.add(cyl(DR + 0.5, DR + 0.5, 0.3, rm.stone, 0, y, 0, 32), cyl(DR + 0.56, DR + 0.56, 0.1, rm.pale, 0, y + 0.3, 0, 32)); y += 0.4;
+    up.add(cyl(DR + 0.05, DR + 0.15, 0.55, rm.stone, 0, y, 0, 32)); y += 0.55;
+    const DOME_R = DR + 0.05, DOME_H = 3.5, prof = [];
+    for (let i = 0; i <= 16; i++) { const t = i / 16 * Math.PI / 2; prof.push(new THREE.Vector2(Math.max(0.5, DOME_R * Math.cos(t)), DOME_H * Math.sin(t))); }
+    const dome = new THREE.Mesh(new THREE.LatheGeometry(prof, 40), rm.slate); dome.position.y = y; up.add(dome);
+    for (let k = 0; k < 16; k++) { // the ribs, in pale stone
+        const a = k / 16 * Math.PI * 2, pts = prof.slice(0, 16).map((p) => new THREE.Vector3(Math.cos(a) * (p.x + 0.05), y + p.y + 0.02, Math.sin(a) * (p.x + 0.05)));
+        up.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 16, 0.07, 4), rm.pale));
+    }
+    for (let row = 0; row < 3; row++) for (let k = 0; k < 16; k++) { // three rows of small lucarnes between the ribs
+        const t = (0.22 + row * 0.22) * Math.PI / 2, a = (k + 0.5) / 16 * Math.PI * 2, r = DOME_R * Math.cos(t) + 0.03;
+        heads.push({ x: Math.cos(a) * r, y: y + DOME_H * Math.sin(t), z: Math.sin(a) * r, ry: Math.PI / 2 - a, sx: 0.2 - row * 0.04, sy: 0.16 - row * 0.03, sz: 0.08 });
+    }
+    y += DOME_H - 0.05;
+    up.add(cyl(0.62, 0.62, 0.14, rm.pale, 0, y, 0, 16)); y += 0.14;
+    up.add(cyl(0.48, 0.48, 1.0, rm.stone, 0, y, 0, 16));
+    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; cols.push({ x: Math.cos(a) * 0.58, y: y + 0.5, z: Math.sin(a) * 0.58, sx: 0.08, sy: 1.0, sz: 0.08 }); }
+    y += 1.0;
+    up.add(cyl(0.66, 0.66, 0.12, rm.pale, 0, y, 0, 16)); y += 0.12;
+    const lantern = new THREE.Mesh(new THREE.LatheGeometry([[0.55, 0], [0.5, 0.2], [0.3, 0.5], [0.1, 0.72], [0.06, 0.8]].map(([a, b]) => new THREE.Vector2(a, b)), 16), rm.slate); lantern.position.y = y; up.add(lantern);
+    y += 0.8;
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 10), rm.gold); ball.position.y = y + 0.15; up.add(ball);
+    up.add(box(0.06, 0.62, 0.06, rm.gold, 0, y + 0.3, 0), box(0.34, 0.06, 0.06, rm.gold, 0, y + 0.7, 0));
+    // the two minor cupolas that flank the dome, over the side arms
+    for (const sx of [-1, 1]) {
+        const cx = sx * 5.1; let cy = ATTIC - 0.2;
+        up.add(cyl(0.85, 0.85, 0.75, rm.stone, cx, cy, 0, 16)); cy += 0.75;
+        for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; cols.push({ x: cx + Math.cos(a) * 0.92, y: cy - 0.37, z: Math.sin(a) * 0.92, sx: 0.07, sy: 0.75, sz: 0.07 }); }
+        up.add(cyl(0.98, 0.98, 0.1, rm.pale, cx, cy, 0, 16)); cy += 0.1;
+        const p2 = []; for (let i = 0; i <= 10; i++) { const t = i / 10 * Math.PI / 2; p2.push(new THREE.Vector2(Math.max(0.16, 0.86 * Math.cos(t)), 1.15 * Math.sin(t))); }
+        const d2 = new THREE.Mesh(new THREE.LatheGeometry(p2, 20), rm.slate); d2.position.set(cx, cy, 0); up.add(d2);
+        up.add(cyl(0.16, 0.18, 0.36, rm.stone, cx, cy + 1.1, 0, 10), cyl(0.02, 0.1, 0.3, rm.slate, cx, cy + 1.46, 0, 8), box(0.03, 0.22, 0.03, rm.gold, cx, cy + 1.74, 0));
+    }
+    // Maderno's front at the near end: giant columns, five doors, the loggia of the blessings, a pediment,
+    // the attic with Christ and the apostles, the clocks at either end, and the steps
+    const FZ = END + 0.2, FW = 9.4, FH = ORDER - GROUND;
+    up.add(box(FW, FH, 1.0, rm.stone, 0, GROUND, FZ + 0.1));
+    for (let i = 0; i < 3; i++) up.add(box(FW + 0.8 - i * 0.3, 0.14, 1.9 - i * 0.35, rm.pale, 0, GROUND + i * 0.14, FZ + 1.05 - i * 0.12));
+    const colX = [-4.25, -3.15, -1.9, -0.65, 0.65, 1.9, 3.15, 4.25];
+    for (const cx of colX) {
+        const big = Math.abs(cx) < 2.5;
+        if (big) cols.push({ x: cx, y: GROUND + 0.42 + (FH - 0.42) / 2, z: FZ + 0.82, sx: 0.36, sy: FH - 0.42, sz: 0.36 });
+        else pil.push({ x: cx, y: GROUND + 0.42 + (FH - 0.42) / 2, z: FZ + 0.66, ry: 0, sx: 0.38, sy: FH - 0.42, sz: 0.12 });
+        heads.push({ x: cx, y: ORDER - 0.12, z: FZ + 0.8, ry: 0, sx: 0.5, sy: 0.18, sz: 0.5 }); // capitals
+    }
+    for (let k = 0; k < colX.length - 1; k++) {
+        const bx = (colX[k] + colX[k + 1]) / 2, w = (colX[k + 1] - colX[k]) * 0.5, mid = k === 3;
+        recess.push({ x: bx, y: GROUND + 1.25 + (mid ? 0.1 : 0), z: FZ + 0.62, ry: 0, sx: w, sy: 1.6 + (mid ? 0.2 : 0), sz: 0.06 });   // the doors
+        panes.push({ x: bx, y: 3.35, z: FZ + 0.61, ry: 0, sx: w * 0.82, sy: mid ? 1.5 : 1.1, color: amber });                       // the loggia windows
+        heads.push({ x: bx, y: mid ? 4.25 : 4.05, z: FZ + 0.66, ry: 0, sx: w * 1.2, sy: 0.12, sz: 0.1 });
+        panes.push({ x: bx, y: 5.5, z: FZ + 0.61, ry: 0, sx: w * 0.6, sy: 0.55, color: amber });
+    }
+    up.add(box(1.0, 0.12, 0.5, rm.pale, 0, 2.55, FZ + 0.75)); // the balcony of the blessings
+    up.add(box(FW + 0.3, 0.55, 1.35, rm.stone, 0, ORDER, FZ + 0.25), box(FW + 0.5, 0.16, 1.5, rm.pale, 0, ORDER + 0.55, FZ + 0.25));
+    const ped = new THREE.Shape(); ped.moveTo(-1.85, 0); ped.lineTo(1.85, 0); ped.lineTo(0, 0.85); ped.closePath();
+    const pedM = new THREE.Mesh(new THREE.ExtrudeGeometry(ped, { depth: 0.3, bevelEnabled: false }), rm.pale); pedM.position.set(0, ORDER + 0.7, FZ + 0.7); up.add(pedM);
+    up.add(box(FW, ATTIC - ORDER - 0.71, 0.8, rm.stone, 0, ORDER + 0.71, FZ + 0.1), box(FW + 0.15, 0.1, 0.9, rm.pale, 0, ATTIC, FZ + 0.1));
+    for (let k = 0; k < 13; k++) figs.push({ x: -3.6 + k * 0.6, y: ATTIC + 0.4, z: FZ + 0.3, sx: 0.11, sy: 0.26, sz: 0.11 }); // Christ, John the Baptist and the apostles
+    for (const sx of [-1, 1]) { // the clocks
+        up.add(box(1.0, 1.1, 0.9, rm.stone, sx * 4.25, ATTIC, FZ + 0.1));
+        const face = new THREE.Mesh(new THREE.CircleGeometry(0.32, 20), rm.pale); face.position.set(sx * 4.25, ATTIC + 0.58, FZ + 0.56); up.add(face);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.035, 6, 20), rm.gold); ring.position.set(sx * 4.25, ATTIC + 0.58, FZ + 0.57); up.add(ring);
+        up.add(cyl(0.18, 0.3, 0.45, rm.slate, sx * 4.25, ATTIC + 1.1, FZ + 0.1, 10));
+    }
+    const glass = instanced(archGeo, rm.glass, panes); glass.castShadow = glass.receiveShadow = false; up.add(glass);
+    up.add(instanced(new THREE.BoxGeometry(1, 1, 1), rm.stone, pil), instanced(new THREE.BoxGeometry(1, 1, 1), rm.pale, heads), instanced(new THREE.BoxGeometry(1, 1, 1), rm.dark, recess));
+    up.add(instanced(new THREE.CylinderGeometry(0.5, 0.56, 1, 10), rm.pale, cols), instanced(new THREE.CapsuleGeometry(0.5, 1.2, 2, 6), rm.pale, figs));
+    shadowed(up);
     mergeByMaterial(up, (o) => o.isInstancedMesh);
     group.add(up);
-    const lift = new Lift(up, [...Object.values(rm), rose.material], 4);
+    const lift = new Lift(up, Object.values(rm), 4);
     return { group, picks, lift, glass: rm.glass };
 }
 
@@ -333,7 +386,7 @@ export class CathedralWorld {
         this.clearIndicators();
     }
 
-    // Walls, vaults and towers stand while the visitor arrives, and are lifted away for the game.
+    // The basilica stands while the visitor arrives, and is lifted away for the game.
     reveal(on, animated = true) {
         if (!this.lift) return;
         if (animated) this.lift.reveal(this.tweens, on, true); else { this.lift.shown = on; this.lift.set(on ? 1 : 0); }
