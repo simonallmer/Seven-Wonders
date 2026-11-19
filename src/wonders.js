@@ -8,11 +8,11 @@ export const WONDERS = [
     { id: 'colossus', name: 'Colossus', place: 'Rhodes · c. 280 BC', line: 'Enclose your rival and send them to Hades.', playable: true },
     { id: 'pharos', name: 'Pharos', place: 'Alexandria · c. 280 BC', line: 'Light the beacons. Leave them no move.', playable: true },
     { id: 'colosseum', name: 'Colosseum', place: 'Rome · AD 80', line: 'Descend into the arena. Be the last commander standing.' },
-    { id: 'greatWall', name: 'Great Wall', place: 'China · from the 7th century BC', line: 'Hold the supply chain. Break the enemy line.', playable: true },
+    { id: 'greatWall', name: 'Great Wall', place: 'China · c. 7th century BC', line: 'Hold the supply chain. Break the enemy line.', playable: true },
     { id: 'library', name: 'Library', place: 'House of Wisdom, Baghdad · c. 830', line: 'Build the way from the fountain to your study.' },
     { id: 'tower', name: 'Tower', place: 'Porcelain Tower, Nanjing · 1431', line: 'Own a ring, or two columns from top to bottom.' },
-    { id: 'cathedral', name: 'Cathedral', place: 'A cross of five fields', line: 'Silence every other congregation.', playable: true },
-    { id: 'palace', name: 'Palace', place: 'Hyde Park, London · 1851', line: 'Glass bands that rise and fall beneath you.' },
-    { id: 'skyscraper', name: 'Skyscraper', place: 'Manhattan · 1930', line: 'Light the windows. Take the skyline.', playable: true },
+    { id: 'cathedral', name: 'Cathedral', place: "St Peter's Basilica, Vatican · 1626", line: 'Silence every other congregation.', playable: true },
+    { id: 'palace', name: 'Palace', place: 'Crystal Palace, London · 1851', line: 'Glass bands that rise and fall beneath you.' },
+    { id: 'skyscraper', name: 'Skyscraper', place: 'Chrysler Building, New York · 1930', line: 'Light the windows. Take the skyline.', playable: true },
 ];
 export const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];

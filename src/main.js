@@ -535,7 +535,7 @@ function bindUI() {
         if (state === 'intro') { if ((k === 'Enter' || k === ' ') && !$('#intro-enter').disabled) begin(); return; }
         if (k === 'Escape' && $('#arcade') && !$('#arcade').hidden) { closeArcade(); return; }
         if (k === 'Escape') { if (!$('#rules').hidden) closeRules(); else if (state === 'game') leaveGame(); return; }
-        if (k === 'Tab' && state === 'game') { e.preventDefault(); return toggleMenu(); }
+        if (k === 'Tab' && (state === 'game' || state === 'menu')) { e.preventDefault(); return toggleMenu(); }
         if (k === 'm' || k === 'M') return toggleSound();
         if (k === 'l' || k === 'L') return cycleLight();
         if ((k === 'r' || k === 'R') && (state === 'game' || (state === 'menu' && RULES[focusId()]))) return $('#rules').hidden ? openRules() : closeRules();
@@ -581,7 +581,7 @@ let hoverRules = -1;
 // the demo's one sign: what Arcade unlocks, and where to find it
 function openArcade() { if (!$('#arcade')) return; $('#arcade').hidden = false; sfx('paper'); }
 function closeArcade() { $('#arcade').hidden = true; sfx('tick'); }
-// in a game the panel can be folded away behind the three lines
+// in a game and in the Exhibition the panel can be folded away behind the three lines
 function toggleMenu(open = document.body.classList.contains('menu-closed'), remember = true) {
     if (!$('#btn-menu')) return;
     document.body.classList.toggle('menu-closed', !open);

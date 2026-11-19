@@ -50,12 +50,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
 body:not(.state-game) #share { display: none; }
 /* in a game the panel hangs under two small signs, and folds away behind the three lines */
 #gamebar { position: absolute; top: 18px; right: 22px; z-index: 5; display: flex; gap: 14px; }
-body:not(.state-game) #gamebar { display: none; }
+body:not(.state-game):not(.state-menu) #gamebar { display: none; }
+body.state-menu #btn-leave { display: none; }
 #gamebar button { width: 26px; height: 26px; padding: 0; border: 0; background: none; opacity: 0.9; transition: opacity 0.2s; }
 #gamebar button:hover { opacity: 1; }
 #gamebar svg { display: block; width: 26px; height: 26px; fill: none; stroke: var(--text); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 8px rgba(0, 0, 0, 0.7)); }
-body.state-game #panel { top: 56px; }
-body.state-game.menu-closed #panel { opacity: 0; pointer-events: none; transform: translateY(-8px); transition: opacity 0.25s, transform 0.25s; }
+body.state-game #panel, body.state-menu #panel { top: 56px; }
+/* in the Exhibition the three lines fold away the panel and the card: the arrow keys and a click on a wonder still walk the table */
+body.state-menu.menu-closed #card, body.state-menu.menu-closed #hint { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(16px); }
+body.state-menu.menu-closed #hint { transform: none; }
+body.menu-closed:is(.state-game, .state-menu) #panel { opacity: 0; pointer-events: none; transform: translateY(-8px); transition: opacity 0.25s, transform 0.25s; }
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(255, 255, 255, 0.06); }
 .seg button { border: 0; background: none; padding: 8px 6px; border-radius: 8px; font-size: 14px; letter-spacing: 0.04em; color: var(--muted); transition: background 0.2s, color 0.2s; }
 .seg button:hover { color: var(--text); }
@@ -198,7 +202,7 @@ body:not(.state-intro) #intro { opacity: 0; visibility: hidden; pointer-events: 
 @media (max-width: 720px) {
     #brand { display: none; }
     #panel { width: 214px; padding: 8px; top: 10px; right: 10px; }
-    body.state-game #panel { top: 48px; }
+    body.state-game #panel, body.state-menu #panel { top: 48px; }
     #gamebar { top: 12px; right: 14px; }
     .seat-type { min-width: 70px; padding: 4px 5px; }
     #card { bottom: 38px; gap: 6px; }
