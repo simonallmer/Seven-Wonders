@@ -81,20 +81,20 @@ export function buildBoard(nPlayers, { mini = false } = {}) {
         x.fillStyle = '#000'; x.fillRect(0, 0, 256, 256);
         for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if ((r * 5 + c * 3 + r * c * 7) % 9 < 5) { x.fillStyle = ['#ffd890', '#ffe6b8', '#fff3dc'][(r + c) % 3]; x.fillRect(c * 32 + 5, r * 32 + 5, 22, 22); }
     });
-    const facade = (rx, ry) => {
+    const facade = (rx, ry, lit = true) => {
         const mat = std({ map: facadeTex.clone(), emissiveMap: litTex.clone(), emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.35, metalness: 0.7 });
         mat.map.wrapS = mat.map.wrapT = mat.emissiveMap.wrapS = mat.emissiveMap.wrapT = THREE.RepeatWrapping;
         mat.map.repeat.set(rx, ry); mat.emissiveMap.repeat.set(rx / 8, ry / 8); mat.map.needsUpdate = mat.emissiveMap.needsUpdate = true;
-        night.push(mat); return mat;
+        if (lit) night.push(mat); return mat; // the base is the entrance and the lobby: it stays dark
     };
     const core = new THREE.Mesh(new THREE.BoxGeometry(5, 10, 5), mini ? facade(5, 10) : skin(5, 10)); core.position.y = -5; core.userData.body = true; group.add(core);
     // below the board: a shaft with dark window bands, two setbacks, the base
     const tall = canvasTexture(64, 128, (x) => { x.fillStyle = '#8f99a3'; x.fillRect(0, 0, 64, 128); x.fillStyle = '#1a2028'; for (let i = 0; i < 3; i++) x.fillRect(8 + i * 18, 6, 10, 116); });
     tall.wrapS = tall.wrapT = THREE.RepeatWrapping;
-    const band = (rx, ry) => { if (mini) return facade(rx * 1.6, ry * 3.4); const m = std({ map: tall.clone(), roughness: 0.4, metalness: 0.7 }); m.map.repeat.set(rx, ry); m.map.needsUpdate = true; return m; };
+    const band = (rx, ry, lit = true) => { if (mini) return facade(rx * 1.6, ry * 3.4, lit); const m = std({ map: tall.clone(), roughness: 0.4, metalness: 0.7 }); m.map.repeat.set(rx, ry); m.map.needsUpdate = true; return m; };
     group.add(box(5.5, 12, 5.5, band(3, 3), 0, -22, 0), box(5.9, 0.3, 5.9, steel, 0, -10.3, 0));
     group.add(box(7.2, 6, 7.2, band(4, 2), 0, -28, 0), box(7.6, 0.3, 7.6, steel, 0, -22.3, 0));
-    group.add(box(9.6, 4, 9.6, band(5, 1), 0, GROUND, 0), box(10, 0.3, 10, steel, 0, -28.3, 0));
+    group.add(box(9.6, 4, 9.6, band(5, 1, false), 0, GROUND, 0), box(10, 0.3, 10, steel, 0, -28.3, 0));
     shadowed(group);
 
     // the windows: one for every outward face of every block in play, all in one instanced mesh
