@@ -294,7 +294,7 @@ export class PalaceWorld {
         const { group, night } = buildSkyscraper(n, { mini: true });
         this.nightMats = night;
         this.lightNight();
-        const k = 0.024;
+        const k = 0.03; // a touch taller than the Tower of Babel beside it
         group.scale.setScalar(k);
         group.position.set(0, -SKYSCRAPER_GROUND * k, 0);
         w.holder.add(group);
