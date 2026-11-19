@@ -277,6 +277,21 @@ import { chooseMove as colossusMove } from './src/colossus/ai.js';
   s = fresh(); s.grid[at(0, 5)] = 1; s.grid[at(9, 5)] = 2; s.grid[at(5, 5)] = 2; s.turn = 1;
   ev = C.applyMove(s, { type: 'run', from: at(9, 5), to: at(10, 5) });
   console.assert(!ev.some(e => e.type === 'tilt') && s.grid[at(5, 5)] === 2, 'opposite fields cancel');
+  // a held field keeps the board leaning: every later move, by anyone, slides toward it again
+  s = fresh(); s.grid[at(5, 0)] = 1; s.grid[at(3, 5)] = 1; s.grid[at(7, 7)] = 2; s.turn = 1;
+  ev = C.applyMove(s, { type: 'run', from: at(7, 7), to: at(7, 8) });
+  console.assert(ev.some(e => e.type === 'tilt' && e.dir === 3) && s.grid[at(7, 1)] === 2 && s.grid[at(3, 1)] === 1, 'held field tilts again');
+  // a field just stepped onto tilts first, then the other held field once
+  s = fresh(); s.grid[at(5, 0)] = 2; s.grid[at(1, 5)] = 1; s.grid[at(6, 6)] = 2; s.turn = 0;
+  ev = C.applyMove(s, { type: 'run', from: at(1, 5), to: at(0, 5) });
+  let t = ev.filter(e => e.type === 'tilt');
+  console.assert(t.length === 2 && t[0].dir === 0 && t[1].dir === 3, 'fresh field first, then the held one: ' + t.map(e => C.leanName(e.dirs)));
+  // two neighbouring fields held from before: the stones slide diagonally
+  s = fresh(); s.grid[at(0, 5)] = 1; s.grid[at(5, 0)] = 2; s.grid[at(6, 6)] = 2; s.grid[at(8, 3)] = 1; s.turn = 1;
+  ev = C.applyMove(s, { type: 'run', from: at(6, 6), to: at(6, 7) });
+  t = ev.filter(e => e.type === 'tilt');
+  console.assert(t.length === 1 && t[0].dir === -1 && C.leanName(t[0].dirs) === 'north-west', 'diagonal: ' + t.map(e => C.leanName(e.dirs)));
+  console.assert(s.grid[at(1, 2)] === 2 && s.grid[at(5, 0)] === 2, 'the stone from (6,7) slid north-west to (1,2): ' + [...s.grid].map((v, i) => v ? i : -1).filter(i => i >= 0));
   // Hades: a group with no free field beside it is removed; the edge closes it in
   s = fresh(); s.grid[at(5, 9)] = 2; s.grid[at(4, 9)] = 1; s.grid[at(6, 9)] = 1; s.grid[at(5, 7)] = 1;
   s.grid[at(5, 10)] = 2; s.grid[at(4, 10)] = 1; s.grid[at(6, 10)] = 1; // black pair in the east arm, walled in

@@ -39,8 +39,9 @@ Move one of your stones (Run or Push). Then the board tilts if a direction field
 
 ## Special rules
 
-- **Tilt:** while a stone stands on a direction field, the board leans that way after every move: all stones slide toward that side until the edge or another stone stops them.
-- **Balance:** two opposite direction fields held at once cancel each other. With two neighbouring ones held, the board leans to each in turn, the one just stepped onto first, until nothing slides any more.
+- **Tilt:** as long as a stone stands on a direction field, the board stays tilted that way: after every move, by any player, all stones slide toward that side until the edge or another stone stops them.
+- **Balance:** two opposite direction fields held at once cancel each other. With two neighbouring ones held, a field just stepped onto tilts the board first, then the other one once. Two neighbouring fields held from before tilt it diagonally, toward the corner between them (each stone steps corner-wise while the field is free).
+- A stone that slides onto a direction field tilts the board again at once.
 - A Hades may form by a move or by a slide. Once it has, nothing slides further in that turn.
 
 ## End of the game
@@ -55,5 +56,5 @@ Turn order White, Red, Black, Blue. A player below four stones is out; their sto
 ## Implementation notes
 
 - Authority: old `colossus-game.js` for Run, Push and Hades.
-- The tilt rule is a tidy version written for Version 2 because old code and old rules text disagreed (no diagonal slide, no player choice). Not yet confirmed by Simon.
+- Tilt follows the old `resolveGravity()` (archive `Seven Wonders 2026.11.09/colossus-game.js`), confirmed by Simon in November 2026: held fields tilt after every move, opposite ones cancel, a fresh field first and then the others once, two neighbouring held fields diagonally. Added in Version 2: a stone sliding onto a direction field tilts again (the old rules text says so; the old code did not).
 - Code: `src/colossus/rules.js`.

@@ -103,14 +103,39 @@ export function leaning(s) {
     return [0, 1, 2, 3].filter((d) => on[d] && !on[(d + 2) % 4]);
 }
 
-// Tilts the board toward d. Every stone slides until the edge or another stone stops it. Returns the slides.
+// the name of a lean: 'west', or 'north-west' for two neighbouring directions at once
+export function leanName(dirs) {
+    if (dirs.length === 1) return DIR_NAMES[dirs[0]];
+    const ns = dirs.find((d) => d % 2 === 0), ew = dirs.find((d) => d % 2 === 1);
+    return DIR_NAMES[ns] + '-' + DIR_NAMES[ew];
+}
+
+// Tilts the board toward d — or, given two neighbouring directions, diagonally between them.
+// Every stone slides until the edge or another stone stops it. Returns the slides.
 export function tilt(s, d) {
     const L = layout(s.nPlayers), g = s.grid, moves = [];
-    for (const i of L.sweep[d]) {
-        if (!g[i]) continue;
-        let to = i;
-        for (let n = L.nb[to * 4 + d]; n >= 0 && !g[n]; n = L.nb[n * 4 + d]) to = n;
-        if (to !== i) { g[to] = g[i]; g[i] = 0; moves.push({ from: i, to, color: g[to] }); }
+    if (Array.isArray(d) && d.length === 1) d = d[0];
+    if (!Array.isArray(d)) {
+        for (const i of L.sweep[d]) {
+            if (!g[i]) continue;
+            let to = i;
+            for (let n = L.nb[to * 4 + d]; n >= 0 && !g[n]; n = L.nb[n * 4 + d]) to = n;
+            if (to !== i) { g[to] = g[i]; g[i] = 0; moves.push({ from: i, to, color: g[to] }); }
+        }
+    } else { // diagonal: each stone steps corner-wise while that field is free
+        const dr = STEP[d[0]][0] + STEP[d[1]][0], dc = STEP[d[0]][1] + STEP[d[1]][1], S = L.S;
+        const from = new Map(); // where each stone now standing on a field started
+        for (let moved = true, n = 0; moved && n < S * 2; n++) {
+            moved = false;
+            for (let a = 0; a < S; a++) for (let b = 0; b < S; b++) {
+                const r = dr > 0 ? S - 1 - a : a, c = dc > 0 ? S - 1 - b : b, i = r * S + c;
+                if (!g[i]) continue;
+                const rr = r + dr, cc = c + dc, j = rr * S + cc;
+                if (rr < 0 || cc < 0 || rr >= S || cc >= S || !L.active[j] || g[j]) continue;
+                g[j] = g[i]; g[i] = 0; from.set(j, from.has(i) ? from.get(i) : i); from.delete(i); moved = true;
+            }
+        }
+        for (const [to, f] of from) if (to !== f) moves.push({ from: f, to, color: g[to] });
     }
     if (moves.length) { s.pushed.fill(0); s.lastPushed = -1; } // a tilt shakes off the memory of pushes
     return moves;
@@ -150,23 +175,27 @@ export function applyMove(s, m, wantEvents = true) {
         ev && ev.push({ type: 'push', from: m.from, to: m.to, pushTo: m.pushTo });
     }
     s.passes = m.type === 'pass' ? s.passes + 1 : 0;
-    // The board answers. A Hades ends the sliding at once. Otherwise it tilts toward every occupied direction
-    // field in turn — a field stepped onto in this move first — and again for as long as anything still slides.
-    let fresh = [0, 1, 2, 3].filter((d) => !before[d] && g[L.field[d]] !== 0);
-    for (let n = 0; n < 12 && m.type !== 'pass'; n++) {
-        const gone = hades(s);
-        if (gone.length) { ev && ev.push({ type: 'hades', cells: gone }); break; }
+    // The board answers after every move, for as long as direction fields stay occupied. A Hades ends the
+    // sliding at once. Opposite fields cancel. A field stepped onto in this move tilts the board first, then every
+    // other held field once; two neighbouring fields held from before tilt it diagonally between them.
+    // A stone that slides onto a direction field tilts the board once more.
+    let fresh = [0, 1, 2, 3].filter((d) => !before[d] && g[L.field[d]] !== 0), stop = false;
+    const checkHades = () => { const gone = hades(s); if (gone.length) { ev && ev.push({ type: 'hades', cells: gone }); stop = true; } };
+    if (m.type !== 'pass') checkHades();
+    for (let round = 0; round < 6 && m.type !== 'pass' && !stop; round++) {
         const lean = leaning(s);
-        lean.sort((a, b) => (fresh.includes(b) ? 1 : 0) - (fresh.includes(a) ? 1 : 0));
-        let slid = false;
-        for (const d of lean) {
-            const moves = tilt(s, d);
-            if (!moves.length) continue;
-            ev && ev.push({ type: 'tilt', dir: d, moves });
-            slid = true; fresh = fresh.filter((x) => x !== d);
-            break;
+        if (!lean.length) break;
+        const first = lean.filter((d) => fresh.includes(d));
+        const plan = first.length ? [...first, ...lean.filter((d) => !first.includes(d))].map((d) => [d]) : [lean];
+        const held = L.field.map((i) => g[i] !== 0);
+        for (const dirs of plan) {
+            const moves = tilt(s, dirs);
+            if (moves.length) ev && ev.push({ type: 'tilt', dir: dirs.length === 1 ? dirs[0] : -1, dirs, moves });
+            checkHades();
+            if (stop) break;
         }
-        if (!slid) break;
+        fresh = [0, 1, 2, 3].filter((d) => !held[d] && g[L.field[d]] !== 0);
+        if (!fresh.length) break;
     }
     const counts = countStones(s);
     for (const c of order) if (!s.out[c] && counts[c] < MIN_STONES) { s.out[c] = 1; ev && ev.push({ type: 'out', color: c }); }

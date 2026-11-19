@@ -1,6 +1,6 @@
 // COLOSSUS — the world: the harbour of Rhodes under the bronze Helios, a deck that tilts, stones, effects and move animations.
 import * as THREE from 'three';
-import { layout, createState, STEP } from './rules.js';
+import { layout, createState, leaning, STEP } from './rules.js';
 import { Tweens, Particles, ease, box, cyl, shadowed, mergeByMaterial } from '../fx.js';
 import { sandMaps, canvasTexture } from '../textures.js';
 import { materials } from '../models.js';
@@ -212,7 +212,8 @@ export class ColossusWorld {
             this.torchLight.position.set(0, 3, -(L.S / 2 + 1));
         }
         this.tweens.clear();
-        this.tiltGroup.rotation.set(0, 0, 0);
+        const [rx, rz] = this.restLean(state);
+        this.tiltGroup.rotation.set(rx, 0, rz);
         this.sync(state);
         this.clearIndicators();
     }
@@ -294,8 +295,17 @@ export class ColossusWorld {
             else if (ev.type === 'tilt') await this.animTilt(ev);
             else if (ev.type === 'hades') await this.animHades(ev.cells);
         }
-        this.tiltGroup.rotation.set(0, 0, 0);
+        // the deck keeps leaning toward the held direction fields, and comes level once they are left
+        const g = this.tiltGroup, [rx, rz] = this.restLean(state), x0 = g.rotation.x, z0 = g.rotation.z;
+        if (Math.abs(rx - x0) + Math.abs(rz - z0) > 1e-4) await this.tweens.run(0.4, (k) => { const e = ease.inOut(k); g.rotation.x = x0 + (rx - x0) * e; g.rotation.z = z0 + (rz - z0) * e; });
         this.sync(state);
+    }
+
+    // how the deck rests while direction fields are held: tipped toward them, half as far as during a slide
+    restLean(state) {
+        const lean = leaning(state);
+        const dr = lean.reduce((a, d) => a + STEP[d][0], 0), dc = lean.reduce((a, d) => a + STEP[d][1], 0);
+        return [LEAN * 0.5 * dr, -LEAN * 0.5 * dc];
     }
 
     slide(from, to, quiet = false, dur = 0) {
@@ -309,10 +319,11 @@ export class ColossusWorld {
 
     // the deck tips, every loose stone slides to the low side, the deck comes level again
     async animTilt(ev) {
-        const [dr, dc] = STEP[ev.dir], g = this.tiltGroup, x0 = g.rotation.x, z0 = g.rotation.z;
+        const dirs = ev.dirs || [ev.dir], g = this.tiltGroup, x0 = g.rotation.x, z0 = g.rotation.z;
+        const dr = dirs.reduce((a, d) => a + STEP[d][0], 0), dc = dirs.reduce((a, d) => a + STEP[d][1], 0);
         sfx('tilt');
         await this.tweens.run(0.42, (k) => { const e = ease.inOut(k); g.rotation.x = x0 + (LEAN * dr - x0) * e; g.rotation.z = z0 + (-LEAN * dc - z0) * e; });
-        const far = Math.max(...ev.moves.map((mv) => Math.abs(mv.to - mv.from) / (dr ? this.L.S : 1)));
+        const S = this.L.S, far = Math.max(...ev.moves.map((mv) => Math.max(Math.abs(((mv.to / S) | 0) - ((mv.from / S) | 0)), Math.abs((mv.to % S) - (mv.from % S)))));
         // apply all slides at once: take every moving stone off the map first, so none overwrites another
         const moving = ev.moves.map((mv) => ({ mv, stone: this.stones.get(mv.from) }));
         for (const { mv } of moving) this.stones.delete(mv.from);
@@ -324,7 +335,8 @@ export class ColossusWorld {
             return this.tweens.run(0.18 + dist * 0.08, (k) => { stone.position.lerpVectors(a, b, k * k); if (k === 1) sfx('place'); });
         }));
         if (far > 3) this.shake = 0.1;
-        await this.tweens.run(0.4, (k) => { const e = ease.inOut(k); g.rotation.x = LEAN * dr * (1 - e); g.rotation.z = -LEAN * dc * (1 - e); });
+        // ease back to half the lean; play() then settles the deck on the lean of the held fields
+        await this.tweens.run(0.3, (k) => { const e = ease.inOut(k); g.rotation.x = LEAN * dr * (1 - e * 0.5); g.rotation.z = -LEAN * dc * (1 - e * 0.5); });
     }
 
     // Hades takes the enclosed: they sink through the deck in a breath of embers

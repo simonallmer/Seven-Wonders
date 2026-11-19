@@ -1,6 +1,6 @@
 // COLOSSUS — the match: turns, input, computer players. Talks to the rules, the world and the HUD.
 import {
-    createState, cloneState, movesFrom, allMoves, applyMove, outcome, turnOrder, countStones, positionKey, COLOR_NAMES, DIR_NAMES,
+    createState, cloneState, movesFrom, allMoves, applyMove, outcome, turnOrder, countStones, positionKey, COLOR_NAMES, DIR_NAMES, leanName,
 } from './rules.js';
 import { chooseMove } from './ai.js';
 import { sfx } from '../audio.js';
@@ -107,7 +107,7 @@ export class ColossusGame {
         const key = positionKey(this.state);
         this.history.push(key);
         const tilts = events.filter((e) => e.type === 'tilt');
-        if (tilts.length) this.hud.toast(tilts.length > 1 ? `The board tilts ${tilts.map((t) => DIR_NAMES[t.dir]).join(', then ')}` : `The board tilts ${DIR_NAMES[tilts[0].dir]}`);
+        if (tilts.length) this.hud.toast(`The board tilts ${tilts.map((t) => leanName(t.dirs)).join(', then ')}`);
         this.hud.status('');
         // the Hades is announced when it happens, after the slides that led to it
         const hades = events.find((e) => e.type === 'hades');
