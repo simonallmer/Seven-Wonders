@@ -162,13 +162,11 @@ body.state-travel #panel { transform: translateY(-8px); }
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), inset 0 0 60px rgba(110, 70, 20, 0.35);
     animation: unroll 0.16s ease-out;
     user-select: text; -webkit-user-select: text;
-    /* a thin ink-brown scrollbar on the paper instead of the computer's own */
-    scrollbar-width: thin; scrollbar-color: rgba(90, 44, 16, 0.45) transparent;
+    /* the computer's own scrollbar is hidden; a thin ink line drawn on the paper shows where you are */
+    scrollbar-width: none;
 }
-.papyrus::-webkit-scrollbar { width: 8px; }
-.papyrus::-webkit-scrollbar-track { background: transparent; margin: 10px 0; }
-.papyrus::-webkit-scrollbar-thumb { background: rgba(90, 44, 16, 0.4); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
-.papyrus::-webkit-scrollbar-thumb:hover { background-color: rgba(90, 44, 16, 0.6); }
+.papyrus::-webkit-scrollbar { display: none; }
+.papyrus .bar { position: absolute; right: 5px; top: 0; width: 4px; border-radius: 2px; background: rgba(90, 44, 16, 0.38); pointer-events: none; transition: opacity 0.3s; }
 @keyframes unroll { from { opacity: 0; transform: translateY(-6px); } }
 .papyrus .sigil { display: block; width: 54px; margin: 0 auto 4px; opacity: 0.8; }
 .papyrus h2 { margin: 0 0 12px; text-align: center; font-family: var(--display); font-weight: 400; font-size: 46px; letter-spacing: 0.06em; }

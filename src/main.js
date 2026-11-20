@@ -382,9 +382,21 @@ function openRules(id = state === 'game' ? cur.id : focusId()) {
     }
     if ($('#rules-keywords')) $('#rules-keywords').onclick = () => { closeRules(false); openKeywords(id); };
     $('#rules').hidden = false;
-    $('#rules article').scrollTop = 0;
+    $('#rules article').scrollTop = 0; paperBar($('#rules article'));
 }
 function closeRules(sound = true) { if (!$('#rules').hidden) { $('#rules').hidden = true; if (sound) sfx('paper'); } }
+
+// the papers draw their own thin scroll line instead of the computer's scrollbar
+function paperBar(art) {
+    let bar = art.querySelector(':scope > .bar');
+    if (!bar) { bar = document.createElement('i'); bar.className = 'bar'; art.append(bar); art.addEventListener('scroll', () => paperBar(art), { passive: true }); }
+    const { scrollTop: t, scrollHeight: H, clientHeight: h } = art;
+    if (H <= h + 1) { bar.style.opacity = 0; return; }
+    const len = Math.max(30, h * h / H) - 16;
+    bar.style.opacity = 1; bar.style.height = len + 'px';
+    bar.style.top = t + 8 + (h - 16 - len) * (t / (H - h)) + 'px';
+}
+addEventListener('resize', () => document.querySelectorAll('.papyrus').forEach((a) => a.offsetParent && paperBar(a)));
 
 // the register of keywords across the series; those of the wonder in front of you (or the one you play) are marked
 const gameName = (g) => (WONDERS.find((w) => w.id === g) || { name: g }).name;
@@ -408,7 +420,7 @@ function openKeywords(id = state === 'game' ? cur.id : focusId()) {
         }
     }
     box.hidden = false;
-    $('#keywords article').scrollTop = 0;
+    $('#keywords article').scrollTop = 0; paperBar($('#keywords article'));
 }
 function closeKeywords(sound = true) { const box = $('#keywords'); if (box && !box.hidden) { box.hidden = true; if (sound) sfx('paper'); } }
 
