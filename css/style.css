@@ -91,6 +91,7 @@ body.menu-closed:is(.state-game, .state-menu) #panel { opacity: 0; pointer-event
 .tools button:hover { color: var(--text); background: rgba(220, 183, 102, 0.16); }
 .tools button.off { text-decoration: line-through; opacity: 0.6; }
 body:not(.state-game) .game-only { display: none; }
+body:not(.state-menu) .menu-only { display: none; }
 body:not(.state-game) .seat-score { display: none; }
 
 /* ---------- wonder card ---------- */
@@ -151,6 +152,7 @@ body.state-travel #panel { transform: translateY(-8px); }
 /* ---------- overlays ---------- */
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at center, rgba(8, 6, 4, 0.5), rgba(8, 6, 4, 0.86)); animation: fade 0.35s ease-out; padding: 20px; }
 @keyframes fade { from { opacity: 0; } }
+#rules, #keywords { animation-duration: 0.16s; }
 .papyrus {
     position: relative; width: min(680px, 100%); max-height: min(86vh, 860px); overflow-y: auto; padding: 34px 44px 38px; color: #2c1c0c; border-radius: 4px;
     background:
@@ -158,17 +160,34 @@ body.state-travel #panel { transform: translateY(-8px); }
         repeating-linear-gradient(90deg, rgba(120, 84, 40, 0.06) 0 3px, transparent 3px 7px),
         radial-gradient(ellipse at center, #e9d3a0 30%, #cfae72 100%);
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), inset 0 0 60px rgba(110, 70, 20, 0.35);
-    animation: unroll 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: unroll 0.16s ease-out;
     user-select: text; -webkit-user-select: text;
+    /* a thin ink-brown scrollbar on the paper instead of the computer's own */
+    scrollbar-width: thin; scrollbar-color: rgba(90, 44, 16, 0.45) transparent;
 }
-@keyframes unroll { from { clip-path: inset(0 0 100% 0); transform: translateY(-20px); } to { clip-path: inset(0); } }
+.papyrus::-webkit-scrollbar { width: 8px; }
+.papyrus::-webkit-scrollbar-track { background: transparent; margin: 10px 0; }
+.papyrus::-webkit-scrollbar-thumb { background: rgba(90, 44, 16, 0.4); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+.papyrus::-webkit-scrollbar-thumb:hover { background-color: rgba(90, 44, 16, 0.6); }
+@keyframes unroll { from { opacity: 0; transform: translateY(-6px); } }
 .papyrus .sigil { display: block; width: 54px; margin: 0 auto 4px; opacity: 0.8; }
 .papyrus h2 { margin: 0 0 12px; text-align: center; font-family: var(--display); font-weight: 400; font-size: 46px; letter-spacing: 0.06em; }
 .papyrus h3 { margin: 18px 0 4px; font-family: var(--display); font-weight: 400; font-size: 23px; letter-spacing: 0.08em; text-align: center; color: #5a2c10; }
 .papyrus p { margin: 7px 0; font-size: 17px; line-height: 1.5; min-height: 1.5em; }
 .papyrus p b { color: #7a2a10; letter-spacing: 0.08em; }
 .papyrus .close { position: absolute; top: 10px; right: 14px; border: 0; background: none; font-size: 30px; color: #5a3a1a; }
-.papyrus .cursor { display: inline-block; width: 0.5em; height: 0.12em; background: #5a2c10; margin-left: 2px; animation: blink 0.6s infinite; }
+.papyrus .more { display: block; margin: 22px auto 0; border: 1px solid rgba(90, 44, 16, 0.4); border-radius: 999px; background: rgba(255, 245, 220, 0.25); padding: 7px 20px; font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: #5a2c10; }
+.papyrus .more:hover { background: rgba(255, 245, 220, 0.5); }
+.papyrus .note { text-align: center; font-style: italic; font-size: 15.5px; color: #5a3a1a; margin: -4px 0 6px; }
+.papyrus .note b { font-style: normal; color: #7a2a10; letter-spacing: 0.06em; }
+#keywords .papyrus { width: min(760px, 100%); }
+#keywords-list .kw { display: grid; grid-template-columns: 9.5em 1fr; column-gap: 16px; padding: 8px 10px; border-bottom: 1px solid rgba(90, 44, 16, 0.15); border-radius: 3px; opacity: 0.62; }
+#keywords-list .kw.mine { opacity: 1; background: rgba(255, 240, 200, 0.42); box-shadow: inset 3px 0 0 #7a2a10; }
+#keywords-list .kw b { grid-row: span 2; color: #7a2a10; letter-spacing: 0.08em; text-transform: uppercase; font-size: 14.5px; padding-top: 2px; }
+#keywords-list .kw p { margin: 0; min-height: 0; font-size: 16px; line-height: 1.42; }
+#keywords-list .kw small { margin-top: 3px; font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #6b4a26; }
+#keywords-list .kw small strong { color: #7a2a10; }
+@media (max-width: 720px) { #keywords-list .kw { grid-template-columns: 1fr; } #keywords-list .kw b { grid-row: auto; } }
 
 .banner { text-align: center; padding: 34px 54px; border-top: 1px solid var(--gold); border-bottom: 1px solid var(--gold); background: linear-gradient(90deg, transparent, rgba(14, 11, 8, 0.82) 20%, rgba(14, 11, 8, 0.82) 80%, transparent); width: 100%; }
 .banner h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(34px, 6vw, 70px); letter-spacing: 0.05em; color: #fff0cc; text-shadow: 0 0 40px rgba(255, 190, 90, 0.5); }
@@ -182,6 +201,7 @@ body.state-travel #panel { transform: translateY(-8px); }
 .banner a { display: inline-block; text-decoration: none; padding: 11px 22px; border: 1px solid var(--gold); border-radius: 999px; background: rgba(220, 183, 102, 0.2); color: #fff0cc; font-size: 16px; letter-spacing: 0.06em; }
 .banner a:hover { background: rgba(220, 183, 102, 0.4); }
 #arcade .banner p { max-width: 30em; margin-left: auto; margin-right: auto; }
+#arcade .banner button { padding: 11px 22px; font-size: 16px; letter-spacing: 0.06em; text-transform: none; color: #fff0cc; }
 #brand small { display: none; margin-left: 0.7em; font-family: Georgia, serif; font-size: 0.42em; letter-spacing: 0.22em; text-transform: uppercase; vertical-align: middle; padding: 2px 8px; border: 1px solid var(--gold); border-radius: 999px; color: var(--gold); }
 body.demo #brand small { display: inline-block; }
 .seg button.arcade { opacity: 0.55; }

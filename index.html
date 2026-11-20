@@ -31,6 +31,7 @@
             <div class="tools">
                 <button id="btn-sound" title="Sound (M)">Sound</button>
                 <button id="btn-light" title="Daylight follows your clock (L)">Live</button>
+                <button id="btn-keywords" class="menu-only" title="Keywords of the series (K)">Keywords</button>
                 <button id="btn-rules" class="game-only" title="Rules (R)">Rules</button>
                 <button id="btn-restart" class="game-only" title="Start again">Restart</button>
             </div>
@@ -70,6 +71,17 @@
                 <img src="assets/pyramid-symbol.svg" alt="" class="sigil" id="rules-sigil">
                 <h2 id="rules-title">Pyramid</h2>
                 <div id="rules-text"></div>
+                <button class="more" id="rules-keywords">Keywords of the series</button>
+            </article>
+        </div>
+
+        <div id="keywords" class="overlay" hidden>
+            <article class="papyrus">
+                <button class="close" id="keywords-close" aria-label="Close">×</button>
+                <img src="assets/SevenWondersSymbol.svg" alt="" class="sigil">
+                <h2>Keywords</h2>
+                <p class="note" id="keywords-note"></p>
+                <div id="keywords-list"></div>
             </article>
         </div>
 

@@ -7,6 +7,7 @@ import { PalaceWorld, loopPoint, wonderS, LOOP } from './palace.js';
 import { PyramidWorld, STONE_CSS } from './pyramid/scene.js';
 import { PyramidGame } from './pyramid/game.js';
 import { COLOR_NAMES } from './pyramid/rules.js';
+import { KEYWORDS } from './keywords.js';
 import { GardensWorld } from './gardens/scene.js';
 import { GardensGame } from './gardens/game.js';
 import { TempleWorld } from './temple/scene.js';
@@ -366,38 +367,50 @@ const RULES = { pyramid: [
     ['h', 'The End'],
     ['VICTORY', 'The first player with seven stones in their High Garden wins.'],
 ] };
-let writing = 0;
 function openRules(id = state === 'game' ? cur.id : focusId()) {
     if (!$('#rules').hidden || !RULES[id]) return;
+    closeKeywords(false);
     sfx('paper');
     $('#rules-title').textContent = WONDERS.find((w) => w.id === id).name;
     $('#rules-sigil').src = GAMES[id].sigil;
     const box = $('#rules-text'); box.innerHTML = '';
-    const spans = [];
     for (const [label, text] of RULES[id]) {
-        if (label === 'h') { const h = document.createElement('h3'); h.dataset.text = text; box.append(h); spans.push([h, text]); continue; }
+        if (label === 'h') { const h = document.createElement('h3'); h.textContent = text; box.append(h); continue; }
         const p = document.createElement('p');
-        if (label) { const b = document.createElement('b'); p.append(b, ' '); spans.push([b, label]); }
-        const s = document.createElement('span'); p.append(s); spans.push([s, text]); box.append(p);
+        if (label) { const b = document.createElement('b'); b.textContent = label; p.append(b, ' '); }
+        p.append(text); box.append(p);
     }
+    if ($('#rules-keywords')) $('#rules-keywords').onclick = () => { closeRules(false); openKeywords(id); };
     $('#rules').hidden = false;
-    // the scribe writes it out; a click finishes the page at once
-    const run = ++writing;
-    let si = 0, ci = 0;
-    const cursor = document.createElement('i'); cursor.className = 'cursor';
-    const step = () => {
-        if (run !== writing) return;
-        for (let n = 0; n < 4 && si < spans.length; n++) {
-            const [el, text] = spans[si];
-            el.textContent = text.slice(0, ++ci);
-            if (ci >= text.length) { si++; ci = 0; }
-        }
-        if (si < spans.length) { spans[si][0].after(cursor); requestAnimationFrame(step); } else cursor.remove();
-    };
-    box.onclick = () => { writing++; spans.forEach(([el, text]) => { el.textContent = text; }); cursor.remove(); };
-    step();
+    $('#rules article').scrollTop = 0;
 }
-function closeRules() { if (!$('#rules').hidden) { writing++; $('#rules').hidden = true; sfx('paper'); } }
+function closeRules(sound = true) { if (!$('#rules').hidden) { $('#rules').hidden = true; if (sound) sfx('paper'); } }
+
+// the register of keywords across the series; those of the wonder in front of you (or the one you play) are marked
+const gameName = (g) => (WONDERS.find((w) => w.id === g) || { name: g }).name;
+function openKeywords(id = state === 'game' ? cur.id : focusId()) {
+    const box = $('#keywords'); if (!box || !box.hidden) return;
+    closeRules(false);
+    sfx('paper');
+    const name = gameName(id);
+    $('#keywords-note').innerHTML = '';
+    $('#keywords-note').append('Many keywords carry across the series. Those of the ', Object.assign(document.createElement('b'), { textContent: name }), ' are marked.');
+    const list = $('#keywords-list'); list.innerHTML = '';
+    for (const [section, rows] of KEYWORDS) {
+        const h = document.createElement('h3'); h.textContent = section; list.append(h);
+        for (const [kw, desc, games] of rows) {
+            const row = document.createElement('div'); row.className = 'kw' + (games.includes(id) ? ' mine' : '');
+            const b = document.createElement('b'); b.textContent = kw;
+            const p = document.createElement('p'); p.textContent = desc;
+            const g = document.createElement('small');
+            games.forEach((x, i) => { if (i) g.append(' · '); const e = document.createElement(x === id ? 'strong' : 'span'); e.textContent = gameName(x); g.append(e); });
+            row.append(b, p, g); list.append(row);
+        }
+    }
+    box.hidden = false;
+    $('#keywords article').scrollTop = 0;
+}
+function closeKeywords(sound = true) { const box = $('#keywords'); if (box && !box.hidden) { box.hidden = true; if (sound) sfx('paper'); } }
 
 // ------------------------------------------------------------------ the walk around the table
 const CAM_R = 1.15 + 3.3, CAM_Y = 1.66, LOOK_Y = 1.5;
@@ -467,7 +480,7 @@ async function leaveGame() {
     const { world, game, controls, id } = cur, index = WONDERS.findIndex((w) => w.id === id);
     setState('travel');
     game.setActive(false); controls.enabled = false;
-    $('#gameover').hidden = true; closeRules();
+    $('#gameover').hidden = true; closeRules(); closeKeywords();
     sfx('leave');
     const home = world.homeView(), g0 = world.camera.position.clone(), t0 = controls.target.clone();
     await tweens.run(0.8, (k) => {
@@ -522,6 +535,11 @@ function bindUI() {
     $('#over-again').onclick = restart;
     $('#rules-close').onclick = closeRules;
     $('#rules').onclick = (e) => { if (e.target.id === 'rules') closeRules(); };
+    if ($('#keywords')) {
+        $('#btn-keywords').onclick = () => openKeywords();
+        $('#keywords-close').onclick = () => closeKeywords();
+        $('#keywords').onclick = (e) => { if (e.target.id === 'keywords') closeKeywords(); };
+    }
     $('#nav-prev').onclick = () => setFocus(settings.focus - 1);
     $('#nav-next').onclick = () => setFocus(settings.focus + 1);
     $('#card-play').onclick = activate;
@@ -534,12 +552,13 @@ function bindUI() {
         const k = e.key;
         if (state === 'intro') { if ((k === 'Enter' || k === ' ') && !$('#intro-enter').disabled) begin(); return; }
         if (k === 'Escape' && $('#arcade') && !$('#arcade').hidden) { closeArcade(); return; }
-        if (k === 'Escape') { if (!$('#rules').hidden) closeRules(); else if (state === 'game') leaveGame(); return; }
+        if (k === 'Escape') { if (!$('#rules').hidden) closeRules(); else if ($('#keywords') && !$('#keywords').hidden) closeKeywords(); else if (state === 'game') leaveGame(); return; }
         if (k === 'Tab' && (state === 'game' || state === 'menu')) { e.preventDefault(); return toggleMenu(); }
         if (k === 'm' || k === 'M') return toggleSound();
         if (k === 'l' || k === 'L') return cycleLight();
         if ((k === 'r' || k === 'R') && (state === 'game' || (state === 'menu' && RULES[focusId()]))) return $('#rules').hidden ? openRules() : closeRules();
-        if (state !== 'menu' || !$('#rules').hidden) return;
+        if ((k === 'k' || k === 'K') && $('#keywords') && (state === 'game' || state === 'menu')) return $('#keywords').hidden ? openKeywords() : closeKeywords();
+        if (state !== 'menu' || !$('#rules').hidden || ($('#keywords') && !$('#keywords').hidden)) return;
         if (k === 'ArrowRight' || k === 'd' || k === 'D') setFocus(settings.focus + 1);
         else if (k === 'ArrowLeft' || k === 'a' || k === 'A') setFocus(settings.focus - 1);
         else if (k === 'Enter' || k === ' ') { e.preventDefault(); activate(); }
@@ -707,7 +726,7 @@ async function boot() {
 
     const btn = $('#intro-enter'); btn.disabled = false; btn.textContent = 'Enter the Exhibition';
     // handle for the console and for automated checks: advance(seconds) steps the simulation at 30 fps
-    window.sevenWonders = { settings, palace, live, get world() { return cur.world; }, get game() { return cur.game; }, enterGame, leaveGame, setFocus, openRules, closeRules, R,
+    window.sevenWonders = { settings, palace, live, get world() { return cur.world; }, get game() { return cur.game; }, enterGame, leaveGame, setFocus, openRules, closeRules, openKeywords, closeKeywords, R,
         advance(sec) { for (let i = 0; i < sec * 30; i++) tick(1 / 30, performance.now()); } };
     if (params.has('skip')) { setState('menu'); if (params.has('play')) enterGame(); }
 }
