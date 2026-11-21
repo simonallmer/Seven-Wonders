@@ -382,7 +382,7 @@ export class PalaceWorld {
         w.holder.clear();
         const { group, ext } = buildMausoleum(n, { mini: true });
         // the whole monument stands on the plinth, centred, the board on its roof
-        const half = Math.max(ext.a, ext.hz) + 3.1, k = 1.2 / (half * 1.45);
+        const half = Math.max(ext.a, ext.hz) + 3.1, k = 1.2 / (half * 1.78);
         group.scale.setScalar(k);
         group.position.y = MAUSOLEUM_H * k; // the podium base sits at local -BUILD_H; lift it onto the plinth
         w.holder.add(group);
