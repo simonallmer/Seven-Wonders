@@ -7,7 +7,7 @@ import { buildBoard } from './pyramid/scene.js';
 import { buildBoard as buildGardens, GROUND as GARDENS_GROUND } from './gardens/scene.js';
 import { buildBoard as buildTemple, GROUND as TEMPLE_GROUND } from './temple/scene.js';
 import { buildBoard as buildStatue, GROUND as STATUE_GROUND } from './statue/scene.js';
-import { buildBoard as buildMausoleum, GROUND as MAUSOLEUM_GROUND } from './mausoleum/scene.js';
+import { buildBoard as buildMausoleum, BUILD_H as MAUSOLEUM_H } from './mausoleum/scene.js';
 import { buildBoard as buildColossus, GROUND as COLOSSUS_GROUND } from './colossus/scene.js';
 import { buildBoard as buildPharos, GROUND as PHAROS_GROUND } from './pharos/scene.js';
 import { buildBoard as buildGreatWall, GROUND as GREATWALL_GROUND } from './greatwall/scene.js';
@@ -380,11 +380,11 @@ export class PalaceWorld {
         if (this.miniMausoleum === n) return;
         this.miniMausoleum = n;
         w.holder.clear();
-        const { group, ext, tombZ } = buildMausoleum(n, { mini: true });
-        // floor and tomb together run from the front step to the back of the podium: centre that on the plinth
-        const front = ext.hz + 1.75, back = tombZ - 5.3, k = 1.2 / Math.hypot(front - back, (ext.a + 2.1) * 1.4);
+        const { group, ext } = buildMausoleum(n, { mini: true });
+        // the whole monument stands on the plinth, centred, the board on its roof
+        const half = Math.max(ext.a, ext.hz) + 3.1, k = 1.2 / (half * 1.45);
         group.scale.setScalar(k);
-        group.position.set(0, -MAUSOLEUM_GROUND * k, -((front + back) / 2) * k);
+        group.position.y = MAUSOLEUM_H * k; // the podium base sits at local -BUILD_H; lift it onto the plinth
         w.holder.add(group);
         w.mini = { scale: k, origin: w.pos.clone().add(group.position) };
     }

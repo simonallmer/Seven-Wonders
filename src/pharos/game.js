@@ -86,21 +86,21 @@ export class PharosGame {
 
     // show the stone in hand where it now stands, with what it may still do
     show() {
-        const { from, path } = this.sel, s = this.state;
-        const w = path.length ? tryPath(s, from, path) : null, at = path.length ? path[path.length - 1] : from;
+        const { from, path, picks } = this.sel, s = this.state;
+        const w = path.length ? tryPath(s, from, path, picks) : null, at = path.length ? path[path.length - 1] : from;
         const lights = lightsFor(w ? w.state : s, at, this.color).filter((id) => !w || !w.pick.includes(id));
         this.world.showSelection(at, this.sel.steps, this.sel.steps.length ? lights : [], path.length > 0);
         this.world.setSpent(w ? w.pick : []);
     }
 
     select(cell) {
-        const steps = nextSteps(this.state, cell, []);
+        const steps = nextSteps(this.state, cell, [], []);
         if (!steps.length) {
             sfx('deny');
             this.hud.toast(lightsFor(this.state, cell, this.color).length ? 'That stone has nowhere to go' : 'No light reaches that stone');
             return;
         }
-        this.sel = { from: cell, path: [], steps };
+        this.sel = { from: cell, path: [], steps, picks: [] };
         this.show();
         sfx('select');
         this.hud.status('Lit — choose a field');
@@ -115,16 +115,17 @@ export class PharosGame {
     }
 
     commit() {
-        const { from, path } = this.sel;
+        const { from, path, picks } = this.sel;
         this.sel = null;
-        this.doMove({ from, path }, false);
+        this.doMove({ from, path, picks }, false);
     }
 
     async step(st) {
         const sel = this.sel, gen = this.gen, color = this.color;
         const at = sel.path.length ? sel.path[sel.path.length - 1] : sel.from;
         sel.path.push(st.to);
-        const w = tryPath(this.state, sel.from, sel.path), k = sel.path.length - 1;
+        const w = tryPath(this.state, sel.from, sel.path, sel.picks), k = sel.path.length - 1;
+        sel.picks.push(w.pick[k]); // lock the light this step just spent, so it stays greyed out for the rest of the turn
         this.busy = true;
         this.hud.action(null);
         this.world.clearIndicators();
@@ -132,7 +133,7 @@ export class PharosGame {
         await this.world.playStep({ type: 'step', from: at, to: st.to, color, light: w.pick[k], capture: w.captures[k], lit: w.lit[k] });
         if (gen !== this.gen) return;
         this.busy = false;
-        sel.steps = nextSteps(this.state, sel.from, sel.path);
+        sel.steps = nextSteps(this.state, sel.from, sel.path, sel.picks);
         if (!sel.steps.length) { this.commit(); return; }
         this.show();
         this.hud.status('Move on, or end your turn');

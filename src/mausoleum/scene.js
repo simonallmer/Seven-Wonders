@@ -9,8 +9,11 @@ import { makeStone } from '../pyramid/scene.js';
 import { makeSkyDome } from '../daylight.js';
 import { sfx } from '../audio.js';
 
-export const GROUND = -1.4;   // the terrace; the slabs (top at y = 0) lie on a dark floor half a unit below
+export const GROUND = -1.4;   // the terrace the monument rises from
 const SLAB = 0.5;
+export const BUILD_H = 3.8;    // the monument's height: the board is its roof, lifted this far above the terrace
+export const DECK_Y = GROUND + BUILD_H; // the board (and everything on it) rides this high, atop the mausoleum
+export const CHAMBER = -2.2;   // the floor of the tomb inside the monument: a slab that opens drops its stone to here
 
 export const cellPos = (L, i, out = new THREE.Vector3()) => out.set(L.x[i], 0, L.z[i]);
 // half-width of the longest row (a) and of the end rows (b), and the half-depth (hz)
@@ -20,62 +23,69 @@ function extents(L) {
     for (let i = 0; i < L.N; i++) if (Math.abs(Math.abs(L.z[i]) - hz) < 0.01) b = Math.max(b, Math.abs(L.x[i]));
     return { a, b, hz };
 }
-// a six-sided slab of the given outline, standing on y
-function hexSlab(a, b, hz, h, mat, y) {
+const hexPts = (a, b, hz) => [[-a, 0], [-b, -hz], [b, -hz], [a, 0], [b, hz], [-b, hz]];
+// a six-sided slab of the given outline, standing on y; pass `hole` (an {a,b,hz} outline) to cut the centre out, leaving a frame
+function hexSlab(a, b, hz, h, mat, y, hole) {
     const s = new THREE.Shape();
-    [[-a, 0], [-b, -hz], [b, -hz], [a, 0], [b, hz], [-b, hz]].forEach(([x, z], i) => (i ? s.lineTo(x, z) : s.moveTo(x, z)));
+    hexPts(a, b, hz).forEach(([x, z], i) => (i ? s.lineTo(x, z) : s.moveTo(x, z)));
     s.closePath();
+    if (hole) {
+        const p = new THREE.Path();
+        hexPts(hole.a, hole.b, hole.hz).forEach(([x, z], i) => (i ? p.lineTo(x, z) : p.moveTo(x, z)));
+        p.closePath(); s.holes.push(p);
+    }
     const g = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: false });
     g.rotateX(Math.PI / 2); // the shape's y runs along z; the slab hangs down from its top face
     const m = new THREE.Mesh(g, mat); m.position.y = y + h;
     return m;
 }
 
-// ---------------------------------------------------------------- the tomb
-// The Mausoleum: a high podium banded with friezes, thirty-six columns, a pyramid of steps, the four-horse chariot.
-function buildTomb(mini) {
-    const m = materials(), g = new THREE.Group();
-    const std = (o) => new THREE.MeshStandardMaterial(o);
-    const marble = m.marble.clone(); marble.color.set(0xf2ede2); marble.roughness = 0.5;
-    const blue = std({ color: 0x5f7f9c, roughness: 0.6 }), band = std({ color: 0xb9743c, roughness: 0.7 });
-    g.add(box(9.2, 0.35, 10.6, marble, 0, 0, 0), box(8.4, 0.35, 9.8, marble, 0, 0.35, 0));
-    g.add(box(7.4, 4.0, 8.8, marble, 0, 0.7, 0));
-    g.add(box(7.46, 0.34, 8.86, band, 0, 2.3, 0), box(7.46, 0.34, 8.86, blue, 0, 4.2, 0), box(7.8, 0.2, 9.2, marble, 0, 4.7, 0));
-    const cols = [], y0 = 4.9, ch = 2.5;
-    for (let i = 0; i < 9; i++) for (const z of [-4.1, 4.1]) cols.push([-3.4 + i * 0.85, z]);
-    for (let j = 1; j < 10; j++) for (const x of [-3.4, 3.4]) cols.push([x, -4.1 + j * 0.82]);
-    const cm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.15, 0.18, ch, mini ? 6 : 10), marble, cols.length), d = new THREE.Object3D();
-    cols.forEach(([x, z], i) => { d.position.set(x, y0 + ch / 2, z); d.updateMatrix(); cm.setMatrixAt(i, d.matrix); });
-    cm.castShadow = cm.receiveShadow = true; cm.userData.keep = true; g.add(cm);
-    g.add(box(5.4, ch, 6.8, marble, 0, y0, 0), box(7.7, 0.45, 9.1, marble, 0, y0 + ch, 0), box(7.76, 0.14, 9.16, blue, 0, y0 + ch + 0.16, 0));
-    let y = y0 + ch + 0.45;
-    for (let i = 0; i < 8; i++) { const k = i / 8; g.add(box(7.5 - k * 5.6, 0.36, 8.9 - k * 6.4, marble, 0, y, 0)); y += 0.36; }
-    g.add(box(1.5, 0.4, 2.2, marble, 0, y, 0)); y += 0.4;
-    // the quadriga, in bronze
-    g.add(box(0.5, 0.36, 0.5, m.bronze, 0, y + 0.1, -0.6), cyl(0.09, 0.11, 0.7, m.bronze, 0, y + 0.4, -0.6, 6));
-    for (const x of [-0.45, -0.15, 0.15, 0.45]) {
-        const horse = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), m.bronze); horse.scale.set(0.8, 1.1, 2.3); horse.position.set(x, y + 0.42, 0.25); g.add(horse);
-        const neck = cyl(0.06, 0.09, 0.4, m.bronze, x, y + 0.48, 0.55, 5); neck.rotation.x = 0.5; g.add(neck);
-        for (const z of [0.0, 0.5]) g.add(cyl(0.03, 0.03, 0.34, m.bronze, x, y, z, 4));
-    }
-    // lions keeping watch on the podium's foot
-    if (!mini) for (const x of [-3, -1, 1, 3]) { const lion = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), marble); lion.scale.set(0.8, 0.9, 1.7); lion.position.set(x, 0.92, 4.6); g.add(lion); const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), marble); head.position.set(x, 1.12, 4.95); g.add(head); }
-    return g;
-}
+// ---------------------------------------------------------------- the mausoleum
+// The board is the roof of the tomb. The monument echoes it: a hexagonal cella that holds the burial chamber,
+// framed by a molded curb and a cornice, ringed by a peristyle of Ionic columns, on a stepped podium — so an
+// opened slab drops its stone straight into the tomb. hexRing gives the corner points of a hex outline.
+const hexRing = (o) => [[-o.a, 0], [-o.b, -o.hz], [o.b, -o.hz], [o.a, 0], [o.b, o.hz], [-o.b, o.hz]];
 
-// Builds the floor and the tomb behind it. Returns { group, tiles, L }.
+// Builds the monument with the board on its roof (local y = 0). Returns { group, tiles, L, ext }.
 export function buildBoard(nPlayers, { mini = false } = {}) {
     const L = layout(nPlayers), m = materials(), group = new THREE.Group();
     const std = (o) => new THREE.MeshStandardMaterial(o);
     const { a, b, hz } = extents(L);
-    const marble = m.marble.clone(); marble.color.set(0xe9e3d6); marble.roughness = 0.55;
-    const dark = std({ color: 0x131214, roughness: 0.9 });
-    // the dark floor the slabs rest on, and two marble steps down to the terrace
-    group.add(hexSlab(a + 1.25, b + 0.75, hz + 1.0, 0.06, dark, -SLAB - 0.06));
-    group.add(hexSlab(a + 1.6, b + 0.95, hz + 1.3, 0.42, marble, -SLAB - 0.48), hexSlab(a + 2.1, b + 1.25, hz + 1.75, -GROUND - SLAB - 0.48, marble, GROUND));
-    const tomb = buildTomb(mini), tz = -(hz + 1.75 + 5.7);
-    tomb.position.set(0, GROUND, tz); group.add(tomb);
-    group.add(box(3.4, 0.16, 1.4, marble, 0, GROUND, -(hz + 1.75) - 0.5)); // the way between floor and tomb
+    const ol = (g) => ({ a: a + g, b: b + g, hz: hz + g }); // the board outline grown outward by g, for concentric rings
+    const marble = m.marble.clone(); marble.color.set(0xeae4d7); marble.roughness = 0.5;
+    const dark = std({ color: 0x141312, roughness: 0.9 });
+    const gloom = std({ color: 0x0b0a09, roughness: 1, side: THREE.DoubleSide }); // the darkness inside the tomb
+    const band = std({ color: 0xb9743c, roughness: 0.72 }); // the painted frieze of the Amazon battle
+    const blue = std({ color: 0x5f7f9c, roughness: 0.6 });
+
+    const mouth = ol(0.5), cella = ol(1.5);
+    // the burial chamber, dropping from the slabs into the cella
+    const wallIn = { a: mouth.a - 0.5, b: mouth.b - 0.5, hz: mouth.hz - 0.5 };
+    group.add(hexSlab(mouth.a, mouth.b, mouth.hz, -SLAB - CHAMBER, gloom, CHAMBER, wallIn)); // shaft walls, chamber floor up to the slabs
+    group.add(hexSlab(mouth.a, mouth.b, mouth.hz, 0.18, gloom, CHAMBER));                     // the chamber floor
+    // the cella: a hexagonal wall from the roof down to the podium, open over the chamber
+    group.add(hexSlab(cella.a, cella.b, cella.hz, 2.4, marble, -2.4, mouth));
+    // the roof: a molded curb framing the board, and an overhanging cornice at the edge
+    const curb = ol(0.74);
+    group.add(hexSlab(curb.a, curb.b, curb.hz, 0.15, marble, 0, mouth));
+    const corn = ol(1.86), cornIn = ol(1.38);
+    group.add(hexSlab(corn.a, corn.b, corn.hz, 0.22, marble, -0.22, cornIn));
+    // the painted frieze under the cornice, with a thin blue fillet
+    const frz = ol(1.72), frzIn = ol(1.46);
+    group.add(hexSlab(frz.a, frz.b, frz.hz, 0.5, band, -0.78, frzIn));
+    group.add(hexSlab(frz.a, frz.b, frz.hz, 0.1, blue, -0.9, frzIn));
+    // the peristyle: a ring of columns standing on the stylobate, in front of the cella wall
+    const colAt = hexRing(ol(1.6)), cols = [], colH = 1.5;
+    for (let e = 0; e < 6; e++) { const [x0, z0] = colAt[e], [x1, z1] = colAt[(e + 1) % 6]; for (let k = 0; k < 3; k++) { const t = k / 3; cols.push([x0 + (x1 - x0) * t, z0 + (z1 - z0) * t]); } }
+    const cm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.2, colH, mini ? 6 : 12), marble, cols.length), cd = new THREE.Object3D();
+    cols.forEach(([x, z], i) => { cd.position.set(x, -2.38 + colH / 2, z); cd.updateMatrix(); cm.setMatrixAt(i, cd.matrix); });
+    cm.castShadow = cm.receiveShadow = true; cm.userData.keep = true; group.add(cm);
+    // the stylobate and the stepped podium down to the terrace
+    const sty = ol(2.0); group.add(hexSlab(sty.a, sty.b, sty.hz, 0.22, marble, -2.6));
+    for (const [g2, y] of [[2.32, -3.0], [2.7, -3.42], [3.08, -3.8]]) { const o = ol(g2); group.add(hexSlab(o.a, o.b, o.hz, 0.42, marble, y)); }
+    // slender acroteria at the roof corners
+    if (!mini) for (const [x, z] of hexRing(ol(1.42))) { group.add(box(0.2, 0.5, 0.2, marble, x, 0.25, z), cyl(0.0, 0.11, 0.18, m.bronze, x, 0.56, z, 6)); }
+
     shadowed(group);
     mergeByMaterial(group, (o) => o.userData.keep);
 
@@ -92,7 +102,7 @@ export function buildBoard(nPlayers, { mini = false } = {}) {
         const st = createState(nPlayers);
         for (let i = 0; i < L.N; i++) if (st.grid[i]) { const s = makeStone(st.grid[i], true); cellPos(L, i, s.position); group.add(s); }
     }
-    return { group, tiles, L, ext: { a, b, hz }, tombZ: tz };
+    return { group, tiles, L, ext: { a, b, hz } };
 }
 
 // ---------------------------------------------------------------- the world
@@ -214,17 +224,19 @@ export class MausoleumWorld {
         }
         this.nextCall = 9;
 
-        this.boardGroup = new THREE.Group(); scene.add(this.boardGroup);
-        this.props = new THREE.Group(); scene.add(this.props);
-        this.stoneGroup = new THREE.Group(); scene.add(this.stoneGroup);
-        this.indicatorGroup = new THREE.Group(); scene.add(this.indicatorGroup);
+        // everything on the roof — board, stones, indicators, lamps, dust — rides on the deck, lifted atop the monument
+        this.deck = new THREE.Group(); this.deck.position.y = DECK_Y; scene.add(this.deck);
+        this.boardGroup = new THREE.Group(); this.deck.add(this.boardGroup);
+        this.props = new THREE.Group(); this.deck.add(this.props);
+        this.stoneGroup = new THREE.Group(); this.deck.add(this.stoneGroup);
+        this.indicatorGroup = new THREE.Group(); this.deck.add(this.indicatorGroup);
         this.flames = [];
         this.sheet = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ visible: false }));
-        this.sheet.rotation.x = -Math.PI / 2; scene.add(this.sheet);
+        this.sheet.rotation.x = -Math.PI / 2; this.deck.add(this.sheet);
 
         this.puffs = new Particles(260, { color: 0xe6e0d2 }); this.puffs.drag = 1.6; this.puffs.gravity = 0.25;
         this.sparks = new Particles(220, { color: 0xfff0c0, additive: true }); this.sparks.drag = 1.0; this.sparks.gravity = -0.5;
-        scene.add(this.puffs.points, this.sparks.points);
+        this.deck.add(this.puffs.points, this.sparks.points);
     }
 
     // (re)build everything that depends on the number of players
@@ -258,8 +270,8 @@ export class MausoleumWorld {
     }
 
     homeView(n = this.nPlayers) {
-        return n === 2 ? { pos: new THREE.Vector3(-3.4, 10.4, 11.4), target: new THREE.Vector3(0, 0.3, -1.0) }
-            : { pos: new THREE.Vector3(-4.2, 12.6, 12.8), target: new THREE.Vector3(0, 0.3, -1.2) };
+        return n === 2 ? { pos: new THREE.Vector3(-3.4, 10.4 + DECK_Y, 11.4), target: new THREE.Vector3(0, 0.3 + DECK_Y, -1.0) }
+            : { pos: new THREE.Vector3(-4.2, 12.6 + DECK_Y, 12.8), target: new THREE.Vector3(0, 0.3 + DECK_Y, -1.2) };
     }
     cameraLimits() { return this.nPlayers === 2 ? { min: 6, max: 36 } : { min: 7, max: 42 }; }
 
@@ -364,7 +376,7 @@ export class MausoleumWorld {
         this.stones.delete(ev.to);
         const fall = victim ? this.tweens.run(0.75, (k) => {
             const e = Math.min(1, k * 1.8);
-            victim.position.lerpVectors(a, b, ease.out(e)); victim.position.y = -(Math.max(0, k - 0.4) ** 2) * 9;
+            victim.position.lerpVectors(a, b, ease.out(e)); victim.position.y = Math.max(CHAMBER + 0.18, -(Math.max(0, k - 0.35) ** 2) * 7);
             victim.rotation.x = (b.z - a.z) * k * 3; victim.rotation.z = -(b.x - a.x) * k * 3;
             if (k === 1) { this.stoneGroup.remove(victim); sfx('fall'); }
         }) : Promise.resolve();
@@ -379,11 +391,12 @@ export class MausoleumWorld {
             const stone = this.stones.get(c.at), p = cellPos(this.L, c.at);
             this.stones.delete(c.at);
             return this.tweens.run(0.9, (k) => {
-                const y = -(k * k) * 5;
-                this.setTile(c.at, y, 1 - k * 0.3, k * 0.5);
-                if (stone) { stone.position.y = y; stone.rotation.x = k * 0.5; }
+                // the slab gives way like a trapdoor and drops into the tomb, carrying its stone down to the chamber floor
+                const slabY = Math.max(CHAMBER + 0.08, -(k * k) * 3.2);
+                this.setTile(c.at, slabY, 1 - k * 0.22, k * 0.9);
+                if (stone) { stone.position.y = Math.max(CHAMBER + 0.2, -(k * k) * 3.6); stone.rotation.x = k * 1.2; stone.rotation.z = k * 0.4; }
                 if (k === 1) { this.setTile(c.at, 0, 0.0001); if (stone) this.stoneGroup.remove(stone); }
-            }, n * 0.12).then(() => this.puffs.burst(new THREE.Vector3(p.x, -0.3, p.z), 12, { speed: 0.6, up: 0.9, size: 0.7, alpha: 0.4, life: 1.3, spread: 0.5 }));
+            }, n * 0.12).then(() => this.puffs.burst(new THREE.Vector3(p.x, CHAMBER + 0.35, p.z), 12, { speed: 0.6, up: 0.9, size: 0.7, alpha: 0.4, life: 1.3, spread: 0.5 }));
         }));
     }
 

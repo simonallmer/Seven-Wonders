@@ -147,7 +147,10 @@ function ensure(id) {
     const def = GAMES[id], world = new def.World();
     world.camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 1400);
     const controls = new OrbitControls(world.camera, renderer.domElement);
-    Object.assign(controls, { enableDamping: true, dampingFactor: 0.08, enablePan: false, maxPolarAngle: Math.PI * 0.47, enabled: false, rotateSpeed: 0.7 });
+    Object.assign(controls, { enableDamping: true, dampingFactor: 0.08, enablePan: true, screenSpacePanning: true, panSpeed: 0.8, maxPolarAngle: Math.PI * 0.47, enabled: false, rotateSpeed: 0.7 });
+    // one finger / left drag turns the view; two fingers (or right drag) pan — the recenter button brings it home
+    controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+    controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
     const L = live[id] = { id, def, world, controls, game: new def.Game(world, hudFor(id)) };
     L.game.newGame(settings);
     fitGameCamera(L);
@@ -554,6 +557,7 @@ function bindUI() {
     }
     $('#nav-prev').onclick = () => setFocus(settings.focus - 1);
     $('#nav-next').onclick = () => setFocus(settings.focus + 1);
+    if ($('#btn-recenter')) $('#btn-recenter').onclick = recenter;
     $('#card-play').onclick = activate;
     $('#intro-enter').onclick = begin;
     if ($('#arcade')) { $('#arcade-close').onclick = closeArcade; $('#arcade').onclick = (e) => { if (e.target.id === 'arcade') closeArcade(); }; }
@@ -636,6 +640,20 @@ function restart() {
         controls.target.lerpVectors(t0, home.target, ease.inOut(k));
     });
     sfx('select');
+}
+
+// bring the view back over the board after panning away (the bottom-left center button, handy on a phone)
+function recenter() {
+    if (state !== 'game') return;
+    const { world, controls } = cur;
+    fitGameCamera();
+    const home = world.homeView(), p0 = world.camera.position.clone(), t0 = controls.target.clone();
+    tweens.run(0.7, (k) => {
+        const e = ease.inOut(k);
+        world.camera.position.lerpVectors(p0, home.pos, e);
+        controls.target.lerpVectors(t0, home.target, e);
+    });
+    sfx('tick');
 }
 
 function begin() {

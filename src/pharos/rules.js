@@ -108,14 +108,22 @@ function walk(s, from, path) {
 }
 
 // Every stone and every beacon gives one light per turn: can each step be given a light of its own?
-// Returns the lights chosen, one per step, or null.
-function assign(lights) {
+// Returns the lights chosen, one per step, or null. `fixed` locks the lights of steps already taken this
+// turn (one per step), so a light that has given light stays spent and is never reassigned to another step.
+function assign(lights, fixed = []) {
     const n = lights.length, used = new Set(), pick = new Array(n);
-    // the steps with the fewest lights choose first
-    const order = lights.map((_, i) => i).sort((a, b) => lights[a].length - lights[b].length);
+    for (let i = 0; i < fixed.length && i < n; i++) {
+        const id = fixed[i];
+        if (!lights[i].includes(id) || used.has(id)) return null; // a committed light can no longer serve its step
+        used.add(id); pick[i] = id;
+    }
+    // of the steps still to assign, the ones with the fewest lights choose first
+    const rest = [];
+    for (let i = fixed.length; i < n; i++) rest.push(i);
+    rest.sort((a, b) => lights[a].length - lights[b].length);
     const rec = (k) => {
-        if (k === n) return true;
-        const i = order[k];
+        if (k === rest.length) return true;
+        const i = rest[k];
         for (const id of lights[i]) {
             if (used.has(id)) continue;
             used.add(id); pick[i] = id;
@@ -127,20 +135,21 @@ function assign(lights) {
     return rec(0) ? pick : null;
 }
 
-// may the stone on `from` walk this path in one turn? returns { state, lights, captures, lit, pick } or null
-export function tryPath(s, from, path) {
+// may the stone on `from` walk this path in one turn? returns { state, lights, captures, lit, pick } or null.
+// `fixed` (optional) locks the lights of the steps already committed this turn.
+export function tryPath(s, from, path, fixed) {
     const w = walk(s, from, path);
     if (!w) return null;
-    const pick = assign(w.lights);
+    const pick = assign(w.lights, fixed);
     return pick ? Object.assign(w, { pick }) : null;
 }
-// the fields the stone may step to next, having walked `path` already
-export function nextSteps(s, from, path) {
+// the fields the stone may step to next, having walked `path` already (with its lights `fixed`)
+export function nextSteps(s, from, path, fixed) {
     const L = layout(s.nPlayers), at = path.length ? path[path.length - 1] : from, out = [];
     for (let d = 0; d < 4; d++) {
         const to = L.nb[at * 4 + d];
         if (to < 0) continue;
-        const w = tryPath(s, from, path.concat(to));
+        const w = tryPath(s, from, path.concat(to), fixed);
         if (w) out.push({ to, capture: w.captures[w.captures.length - 1] });
     }
     return out;
@@ -182,7 +191,8 @@ export function canMove(s, color) {
 // Applies a move in place. Returns the list of things that happened, for the view.
 export function applyMove(s, m, wantEvents = true) {
     const L = layout(s.nPlayers), ev = wantEvents ? [] : null, color = s.grid[m.from], order = turnOrder(s.nPlayers);
-    const w = tryPath(s, m.from, m.path);
+    // honour the lights the player committed step by step, if given; otherwise assign freshly
+    const w = tryPath(s, m.from, m.path, m.picks) || tryPath(s, m.from, m.path);
     if (ev) {
         let at = m.from;
         m.path.forEach((to, k) => { ev.push({ type: 'step', from: at, to, color, light: w.pick[k], capture: w.captures[k], lit: w.lit[k] }); at = to; });
