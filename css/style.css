@@ -116,7 +116,7 @@ body:not(.state-game) .seat-score { display: none; }
 #card-play:hover { transform: translateY(-1px); filter: brightness(1.1); }
 #card-play.locked { background: rgba(14, 11, 8, 0.55); color: var(--muted); border-color: var(--line); cursor: default; font-weight: 400; }
 .nav {
-    width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--line); background: var(--glass); font-size: 30px; line-height: 1; padding-bottom: 5px;
+    flex: none; box-sizing: border-box; aspect-ratio: 1; width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--line); background: var(--glass); font-size: 30px; line-height: 1; padding-bottom: 5px;
     backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: background 0.2s, transform 0.15s;
 }
 .nav:hover { background: rgba(220, 183, 102, 0.25); transform: scale(1.06); }

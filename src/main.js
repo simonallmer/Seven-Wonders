@@ -39,7 +39,7 @@ const smooth = (k, a, b) => THREE.MathUtils.smoothstep(k, a, b);
 const SEAT_TYPES = DEMO ? ['human', 'easy'] : ['human', 'easy', 'medium', 'hard'];
 const SEAT_LABEL = { human: 'Human', easy: 'CPU · Easy', medium: 'CPU · Medium', hard: 'CPU · Hard' };
 const settings = Object.assign(
-    { players: 2, seats: [{ type: 'human' }, { type: 'medium' }, { type: 'medium' }, { type: 'medium' }], light: 'live', focus: 0 },
+    { players: 2, seats: [{ type: 'human' }, { type: 'medium' }, { type: 'medium' }, { type: 'medium' }], light: 'live', focus: 0, menuClosed: true },
     JSON.parse(localStorage.getItem('sw.v2') || '{}'));
 const save = () => localStorage.setItem('sw.v2', JSON.stringify(settings));
 if (DEMO) { // the demo: two players, and the computer plays at its easy level
